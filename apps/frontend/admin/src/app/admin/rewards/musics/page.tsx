@@ -702,39 +702,37 @@ export default function RewardsMusicsPage() {
       </div>
 
       {/* 페이지네이션 */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-6">
+      <div className="flex items-center justify-center gap-2 mt-6">
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="px-3 py-2 rounded-md bg-white/10 text-white/80 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+        >
+          이전
+        </button>
+        
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
           <button
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="px-3 py-2 rounded-md bg-white/10 text-white/80 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            key={page}
+            onClick={() => handlePageChange(page)}
+            className={`px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+              currentPage === page
+                ? 'bg-teal-500 text-white'
+                : 'bg-white/10 text-white/80 hover:bg-white/20'
+            }`}
           >
-            이전
+            {page}
           </button>
-          
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-            <button
-              key={page}
-              onClick={() => handlePageChange(page)}
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                currentPage === page
-                  ? 'bg-teal-500 text-white'
-                  : 'bg-white/10 text-white/80 hover:bg-white/20'
-              }`}
-            >
-              {page}
-            </button>
-          ))}
-          
-          <button
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="px-3 py-2 rounded-md bg-white/10 text-white/80 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-          >
-            다음
-          </button>
-        </div>
-      )}
+        ))}
+        
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="px-3 py-2 rounded-md bg-white/10 text-white/80 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+        >
+          다음
+        </button>
+      </div>
 
       {/* 음원 상세 모달 */}
       {selectedMusic && (
