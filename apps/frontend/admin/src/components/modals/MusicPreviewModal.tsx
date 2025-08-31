@@ -58,7 +58,7 @@ export default function MusicPreviewModal({ open, onClose, musicData }: Props) {
         setTestResult({
           status: 'error',
           responseTime,
-          message: 'API 연결에 실패했습니다. 네트워크 상태를 확인해주세요.',
+          message: '연결 실패',
           timestamp: new Date().toLocaleTimeString()
         })
       }

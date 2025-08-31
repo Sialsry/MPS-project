@@ -1,4 +1,4 @@
-import { pgTable, bigserial, text, timestamp, pgEnum } from 'drizzle-orm/pg-core'
+import { pgTable, bigserial, text, timestamp, pgEnum, numeric } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { company_subscriptions } from './company_subscriptions'
 import { playlists } from './playlists'
@@ -21,6 +21,8 @@ export const companies = pgTable('companies', {
   homepage_url: text('homepage_url'),
   smart_account_address: text('smart_account_address').unique(),
   api_key_hash: text('api_key_hash'),
+  total_rewards_earned: numeric('total_rewards_earned').default('0'), // 전체 누적 적립 리워드
+  total_rewards_used: numeric('total_rewards_used').default('0'), // 전체 누적 사용 리워드 (할인용)
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 })
