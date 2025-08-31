@@ -19,7 +19,8 @@ function LoginForm() {
         setLoading(true);
         setErr(null);   
         try {
-            const res = await axios.post('/api/admin-login', {adminId, adminPw });
+            const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+            const res = await axios.post(`${API_BASE_URL}/admin/login`, {adminId, adminPw });
 
             if(res.status === 200) {
                 router.replace(next);
