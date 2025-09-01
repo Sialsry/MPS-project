@@ -1,16 +1,28 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Headers } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 
-@Controller('admin') // 이 컨트롤러의 모든 라우트(경로)에 기본적으로 /admin 접두사를 붙입니다.
+@Controller('admin')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {} // 의존성 주입
+  constructor(private readonly authService: AuthService) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto): Promise<LoginResponseDto> {
     return this.authService.login(loginDto);
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(@Headers('authorization') authHeader: string) {
+    return this.authService.logout(authHeader);
+  }
+
+  @Post('refresh-token')
+  @HttpCode(HttpStatus.OK)
+  async refreshToken(@Headers('authorization') authHeader: string) {
+    return this.authService.refreshToken(authHeader);
   }
 }
 

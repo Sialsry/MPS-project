@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import axios from 'axios'
 import { useState } from 'react'
 
@@ -22,8 +22,6 @@ const REWARD_GROUP = {
   ],
 }
 
-
-
 const REVENUE_GROUP = {
   label: '매출 관리',
   items: [
@@ -40,16 +38,32 @@ const SYSTEM_GROUP = {
 }
 
 export default function Sidebar() {
+  const router = useRouter();
   const pathname = usePathname()
   const [openMusic, setOpenMusic] = useState(true)
   const [openReward, setOpenReward] = useState(true)
   const [openRevenue, setOpenRevenue] = useState(true)
   const [openSystem, setOpenSystem] = useState(true)
 
-  async function logout() {
-    const response = await axios.post('/api/logout')
-    console.log(response)
-    location.href = '/admin'
+  const handleLogout = async() => {
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+      await axios.post(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/logout`, {}, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      })
+      
+      // 로컬 스토리지 토큰 삭제
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('adminId');
+
+      router.push('/admin');
+    } catch (error) {
+      console.error("로그아웃 실패", error);
+      router.push('/admin');
+    }
   }
 
   const isActive = (href: string) => {
@@ -189,7 +203,7 @@ export default function Sidebar() {
       </nav>
 
       <div className="mt-auto border-t border-white/10 pt-4">
-        <button onClick={logout} className="w-full rounded bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"> 로그아웃 </button>
+        <button onClick={handleLogout} className="w-full rounded bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"> 로그아웃 </button>
       </div>
     </aside>
   )

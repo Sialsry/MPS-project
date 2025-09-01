@@ -27,6 +27,51 @@ export class AuthService {
 
     return { accessToken, refreshToken, adminId };
   }
+
+  async logout(authHeader: string): Promise<{ message: string }> {
+    // 헤더 검증
+    if (!authHeader) {
+      throw new UnauthorizedException('유효하지 않은 인증 헤더입니다.');
+    }
+  
+    const token = authHeader.split(' ')[1];
+    
+    try {
+      // 토큰 검증
+      await this.jwtService.verifyAsync(token);
+      
+      // 성공 응답
+      return { message: '로그아웃 완료' };
+    } catch (error) {
+      throw new UnauthorizedException('유효하지 않은 토큰입니다.');
+    }
+  }
+
+  async refreshToken(authHeader: string): Promise<LoginResponseDto> {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedException('유효하지 않은 인증 헤더입니다.');
+    }
+  
+    const refreshToken = authHeader.split(' ')[1];
+    
+    try {
+      // refreshToken 검증
+      const payload = await this.jwtService.verifyAsync(refreshToken);
+      
+      // 새로운 토큰 생성
+      const newPayload = { sub: 'admin', adminId: payload.adminId, role: 'admin' };
+      const newAccessToken = this.jwtService.sign(newPayload, { expiresIn: '1h' });
+      const newRefreshToken = this.jwtService.sign(newPayload, { expiresIn: '7d' });
+  
+      return {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+        adminId: payload.adminId,
+      };
+    } catch (error) {
+      throw new UnauthorizedException('유효하지 않은 refresh token입니다.');
+    }
+  }
 }
 
 // 실제 비즈니스 로직을 담고있는 프로바이더. 컨트롤러에서 요청을 받아 처리하고 결과를 반환

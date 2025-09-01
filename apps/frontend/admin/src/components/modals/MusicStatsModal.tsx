@@ -36,6 +36,7 @@ type Props = {
 export default function MusicStatsModal({ open, onClose, title = '음원 상세', musicData }: Props) {
   const [timeTab, setTimeTab] = useState<'daily'|'weekly'|'monthly'>('daily')
   const [selectedMonth, setSelectedMonth] = useState('3월')
+  const [showLyricsModal, setShowLyricsModal] = useState(false)
   
   if (!open) return null
   return (
@@ -190,6 +191,19 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                         <div className="text-white/60 mb-1">등록일</div>
                         <div className="text-white font-medium">{musicData?.createdAt || '2024.01.15'}</div>
                       </div>
+                      <div>
+                        <div className="text-white/60 mb-1">가사</div>
+                        <button
+                          onClick={() => setShowLyricsModal(true)}
+                          className="text-teal-400 hover:text-teal-300 text-sm font-medium transition-colors flex items-center gap-1"
+                        >
+                          가사보기
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -254,6 +268,64 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
 
         </div>
       </div>
+
+      {/* 가사 모달 */}
+      {showLyricsModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-2xl max-h-[80vh] flex flex-col rounded-2xl bg-neutral-900 border border-white/10">
+            {/* 헤더 */}
+            <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0">
+              <div>
+                <h2 className="text-xl font-semibold text-white">{musicData?.title || title} 가사</h2>
+                <p className="text-white/60 text-sm mt-1">{musicData?.artist || 'Unknown'}</p>
+              </div>
+              <button
+                onClick={() => setShowLyricsModal(false)}
+                className="rounded-lg bg-white/10 p-2 text-white/60 hover:bg-white/20 hover:text-white transition-all duration-200"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* 가사 내용 */}
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+              <div className="text-white/80 text-base leading-relaxed whitespace-pre-line">
+                {`[Verse 1]
+This is the first verse of ${musicData?.title || title}
+A beautiful melody that touches your heart
+With lyrics that speak to your soul
+
+[Chorus]
+Sing along with the chorus
+Let the music take you away
+To a place where dreams come true
+
+[Verse 2]
+The second verse brings more emotion
+Every word carefully chosen
+To create a perfect harmony
+
+[Bridge]
+In this bridge we find
+The connection between heart and mind
+A moment of pure musical bliss
+
+[Chorus]
+Sing along with the chorus
+Let the music take you away
+To a place where dreams come true
+
+[Outro]
+As the song comes to an end
+We hope it brought you joy
+Until we meet again in melody`}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 

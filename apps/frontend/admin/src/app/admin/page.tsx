@@ -23,6 +23,11 @@ function LoginForm() {
             const res = await axios.post(`${API_BASE_URL}/admin/login`, {adminId, adminPw });
 
             if(res.status === 200) {
+                // 토큰 저장
+                const { accessToken, refreshToken, adminId } = res.data;
+                localStorage.setItem('accessToken', accessToken);
+                localStorage.setItem('refreshToken', refreshToken);
+                localStorage.setItem('adminId', adminId);
                 router.replace(next);
             }else {
                 setErr(res.data?.message ?? '로그인 실패')
