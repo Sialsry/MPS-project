@@ -2,8 +2,8 @@ import { Injectable, Inject } from '@nestjs/common';
 import { CreateMusicDto } from './dto/create-music.dto';
 import { UpdateMusicDto } from './dto/update-music.dto';
 import { FindMusicsDto } from './dto/find-musics.dto';
-import { musics, music_categories, music_tags, monthly_music_rewards } from '../../db/schema';
-import { eq, like, desc, asc, or, sql, and } from 'drizzle-orm';
+import { musics, music_categories, music_tags, monthly_music_rewards, music_plays } from '../../db/schema';
+import { eq, like, desc, asc, or, sql, and, inArray } from 'drizzle-orm';
 import type { DB } from '../../db/client';
 import type { SQL } from 'drizzle-orm';
 
@@ -121,8 +121,64 @@ export class MusicsService {
   update(id: number, updateMusicDto: UpdateMusicDto) {
     return `This action updates a #${id} music`;
   }
+  
+  async remove(id: number) {
+    try {
+      // 음원이 존재하는지 확인
+      const music = await this.db.select().from(musics).where(eq(musics.id, id)).limit(1);
+      
+      if (music.length === 0) {
+        throw new Error(`음원 ID ${id}를 찾을 수 없습니다.`);
+      }
 
-  remove(id: number) {
-    return `This action removes a #${id} music`;
+      await this.db.delete(monthly_music_rewards).where(eq(monthly_music_rewards.music_id, id));
+      
+      await this.db.delete(music_tags).where(eq(music_tags.music_id, id));
+      
+      await this.db.delete(music_plays).where(eq(music_plays.music_id, id));
+      
+      await this.db.delete(musics).where(eq(musics.id, id));
+      
+      return { message: `음원 삭제 완료` };
+    } catch (error) {
+      throw new Error(`음원 삭제 실패: ${error.message}`);
+    }
+  }
+
+  async bulkDelete(ids: number[]) {
+    try {
+      // 모든 음원이 존재하는지 한 번에 확인
+      const existingMusics = await this.db.select({ id: musics.id }).from(musics).where(inArray(musics.id, ids));
+      
+      const existingIds = existingMusics.map(m => m.id);
+      const missingIds = ids.filter(id => !existingIds.includes(id));
+      
+      // 만약 누락된 음원이 있으면 에러
+      if (missingIds.length > 0) {
+        throw new Error(`음원 ID ${missingIds}를 찾을 수 없습니다.`);
+      }
+      
+      // 모든 음원이 존재하면 일괄 삭제 진행
+      // 관련 테이블 데이터 일괄 삭제
+      await this.db.delete(monthly_music_rewards).where(inArray(monthly_music_rewards.music_id, ids));
+      await this.db.delete(music_tags).where(inArray(music_tags.music_id, ids));
+      await this.db.delete(music_plays).where(inArray(music_plays.music_id, ids));
+      
+      // 음원 일괄 삭제
+      await this.db.delete(musics).where(inArray(musics.id, ids));
+      
+      return {
+        message: `${ids.length}개 음원 일괄 삭제 완료`,
+        deletedIds: ids,
+        summary: {
+          total: ids.length,
+          success: ids.length,
+          failed: 0
+        }
+      };
+      
+    } catch (error) {
+      throw new Error(`일괄 삭제 실패: ${error.message}`);
+    }
   }
 }

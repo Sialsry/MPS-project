@@ -238,7 +238,7 @@ export default function MusicsPage() {
                       className="flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors"
                     >
                       <span className={idSortFilter !== '전체' ? 'text-teal-400' : 'text-white/70'}>음원번호</span>
-                      <span className="text-white/50">▼</span>
+                      <span className={idSortFilter !== '전체' ? 'text-teal-400' : 'text-white/50'}>▼</span>
                     </button>
                     
                     {openDropdown === 'idSort' && (
@@ -282,7 +282,7 @@ export default function MusicsPage() {
                       className="flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors"
                     >
                       <span className={musicTypeFilter !== '전체' ? 'text-teal-400' : 'text-white/70'}>음원 유형</span>
-                      <span className="text-white/50">▼</span>
+                      <span className={musicTypeFilter !== '전체' ? 'text-teal-400' : 'text-white/50'}>▼</span>
                     </button>
                     
                     {openDropdown === 'musicType' && (
@@ -324,7 +324,7 @@ export default function MusicsPage() {
                       className="flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors"
                     >
                       <span className={genreFilter !== '전체' ? 'text-teal-400' : 'text-white/70'}>카테고리</span>
-                      <span className="text-white/50">▼</span>
+                      <span className={genreFilter !== '전체' ? 'text-teal-400' : 'text-white/50'}>▼</span>
                     </button>
                     
                     {openDropdown === 'category' && (
@@ -362,7 +362,7 @@ export default function MusicsPage() {
                       className="flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors"
                     >
                       <span className={releaseDateSortFilter !== '전체' ? 'text-teal-400' : 'text-white/70'}>발매일</span>
-                      <span className="text-white/50">▼</span>
+                      <span className={releaseDateSortFilter !== '전체' ? 'text-teal-400' : 'text-white/50'}>▼</span>
                     </button>
                     
                     {openDropdown === 'releaseDate' && (
@@ -404,7 +404,7 @@ export default function MusicsPage() {
                       className="flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors"
                     >
                       <span className={rewardLimitFilter !== '전체' ? 'text-teal-400' : 'text-white/70'}>월 최대 리워드 한도</span>
-                      <span className="text-white/50">▼</span>
+                      <span className={rewardLimitFilter !== '전체' ? 'text-teal-400' : 'text-white/50'}>▼</span>
                     </button>
                     
                     {openDropdown === 'rewardLimit' && (
