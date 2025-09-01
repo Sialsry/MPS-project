@@ -19,7 +19,7 @@ export default function MusicsPage() {
   const [genreFilter, setGenreFilter] = useState('전체')
   const [musicTypeFilter, setMusicTypeFilter] = useState('전체')
   
-  // 드롭다운 필터 상태 (새로 추가)
+  // 드롭다운 필터 상태
   const [idSortFilter, setIdSortFilter] = useState('전체')
   const [releaseDateSortFilter, setReleaseDateSortFilter] = useState('전체')
   const [rewardLimitFilter, setRewardLimitFilter] = useState('전체')
@@ -30,6 +30,33 @@ export default function MusicsPage() {
   
   // 드롭다운 열림/닫힘 상태
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+
+  // API 연동을 위한 상태 변수들
+  const [musics, setMusics] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [totalCount, setTotalCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // API 호출 함수
+  const fetchMusics = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics?page=${currentPage}&limit=10&search=${searchQuery}&category=${genreFilter}&musicType=${musicTypeFilter}`)
+      const data = await response.json()
+      setMusics(data.musics)
+      setTotalCount(data.totalCount || data.musics.length)
+    } catch (error) {
+      console.error('음원 조회 실패:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // API 자동 호출을 위한 useEffect
+  useEffect(() => {
+    fetchMusics()
+  }, [currentPage, searchQuery, genreFilter, musicTypeFilter])
 
   // 페이지 외부 클릭 시 드롭다운 닫기
   React.useEffect(() => {
@@ -140,12 +167,12 @@ export default function MusicsPage() {
             <input
               className="w-full px-3 py-2 text-white placeholder-white/50 outline-none border border-white/10 rounded-lg focus:border-teal-400/50 transition-colors text-sm" 
               placeholder="음원명, 아티스트, 태그로 검색 .." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
           <button 
-            onClick={() => {
-              console.log('검색 실행')
-            }}
+            onClick={fetchMusics}
             className="rounded-lg bg-white/10 border border-white/20 px-3 py-2 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,7 +193,7 @@ export default function MusicsPage() {
 
         <div className="flex items-center gap-4">
           <div className="text-sm text-white/60">
-            총 음원: <span className="text-teal-300 font-semibold">1,234</span>개 | 
+            총 음원: <span className="text-teal-300 font-semibold">{totalCount}</span>개 | 
             선택됨: <span className="text-teal-300 font-semibold">{selectedItems.size}</span>개
           </div>
           <button
@@ -185,6 +212,13 @@ export default function MusicsPage() {
 
       {/* 목록 테이블 */}
       <div className="overflow-visible">
+        {/* 로딩 상태 표시 */}
+        {loading && (
+          <div className="text-center py-8 text-white/60">
+            음원 목록을 불러오는 중...
+          </div>
+        )}
+        
         <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full text-sm">
             <thead className="text-center">
@@ -203,7 +237,7 @@ export default function MusicsPage() {
                       onClick={(e) => toggleDropdown('idSort', e)}
                       className="flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors"
                     >
-                      <span>음원번호</span>
+                      <span className={idSortFilter !== '전체' ? 'text-teal-400' : 'text-white/70'}>음원번호</span>
                       <span className="text-white/50">▼</span>
                     </button>
                     
@@ -247,7 +281,7 @@ export default function MusicsPage() {
                       onClick={(e) => toggleDropdown('musicType', e)}
                       className="flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors"
                     >
-                      <span>음원 유형</span>
+                      <span className={musicTypeFilter !== '전체' ? 'text-teal-400' : 'text-white/70'}>음원 유형</span>
                       <span className="text-white/50">▼</span>
                     </button>
                     
@@ -289,7 +323,7 @@ export default function MusicsPage() {
                       onClick={(e) => toggleDropdown('category', e)}
                       className="flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors"
                     >
-                      <span>카테고리</span>
+                      <span className={genreFilter !== '전체' ? 'text-teal-400' : 'text-white/70'}>카테고리</span>
                       <span className="text-white/50">▼</span>
                     </button>
                     
@@ -327,7 +361,7 @@ export default function MusicsPage() {
                       onClick={(e) => toggleDropdown('releaseDate', e)}
                       className="flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors"
                     >
-                      <span>발매일</span>
+                      <span className={releaseDateSortFilter !== '전체' ? 'text-teal-400' : 'text-white/70'}>발매일</span>
                       <span className="text-white/50">▼</span>
                     </button>
                     
@@ -369,7 +403,7 @@ export default function MusicsPage() {
                       onClick={(e) => toggleDropdown('rewardLimit', e)}
                       className="flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors"
                     >
-                      <span>월 최대 리워드 한도</span>
+                      <span className={rewardLimitFilter !== '전체' ? 'text-teal-400' : 'text-white/70'}>월 최대 리워드 한도</span>
                       <span className="text-white/50">▼</span>
                     </button>
                     
@@ -410,18 +444,23 @@ export default function MusicsPage() {
             </thead>
             <tbody>
               {React.useMemo(() => {
+                // 디버깅: 실제 API 응답 데이터 구조 확인
+                console.log('API 응답 데이터:', musics)
+                
                 // 필터링 + 정렬된 데이터 생성
-                let filteredData = [...Array(10)].map((_, i) => ({
-                  index: i,
-                  id: i + 1,                                    // 음원번호
-                  title: `Song Title ${i+1}`,                  // 제목
-                  artist: `Artist ${i+1}`,                     // 아티스트
-                  musicType: i % 2 === 0 ? '일반' : 'Inst',     // 음원 유형
-                  genre: ['Pop', 'Rock', 'Jazz', 'Classical'][i % 4], // 카테고리
-                  tags: '차분한, 릴렉스',                        // 태그
-                  releaseDate: '2024.01.15',                   // 발매일
-                  maxRewardLimit: '1000토큰',                  // 월 최대 리워드 한도
-                }))
+                let filteredData = musics.map((item, index) => {
+                  return {
+                    index: index,
+                    id: item.id,                                    // 음원번호
+                    title: item.title,                              // 제목
+                    artist: item.artist,                            // 아티스트
+                    musicType: item.musictype ? 'Inst' : '일반',    // 음원 유형 (musictype 필드 사용)
+                    genre: item.category || '미분류',               // 카테고리 (category 필드 사용)
+                    tags: item.tags || '태그 없음',                  // 태그 (tags 필드 사용)
+                    releaseDate: item.releasedate ? new Date(item.releasedate).toLocaleDateString() : '미정', // 발매일 (releasedate 필드 사용)
+                    maxRewardLimit: `${item.maxrewardlimit}토큰`,   // 월 최대 리워드 한도 (maxrewardlimit 필드 사용)
+                  }
+                })
                 
                 // 필터링
                 filteredData = filteredData.filter(item => {
@@ -430,8 +469,46 @@ export default function MusicsPage() {
                   return true
                 })
                 
-                // 정렬
-                if (sortBy && sortOrder) {
+                // 기본 정렬: 음원번호 오름차순
+                if (!sortBy && !sortOrder) {
+                  filteredData.sort((a, b) => a.id - b.id)
+                }
+                // 드롭다운 정렬 필터 적용
+                else if (idSortFilter === '오름차순') {
+                  filteredData.sort((a, b) => a.id - b.id)
+                } else if (idSortFilter === '내림차순') {
+                  filteredData.sort((a, b) => b.id - a.id)
+                } else if (releaseDateSortFilter === '오름차순') {
+                  filteredData.sort((a, b) => {
+                    const dateA = a.releaseDate === '미정' ? new Date(0) : new Date(a.releaseDate)
+                    const dateB = b.releaseDate === '미정' ? new Date(0) : new Date(b.releaseDate)
+                    return dateA.getTime() - dateB.getTime()
+                  })
+                } else if (releaseDateSortFilter === '내림차순') {
+                  filteredData.sort((a, b) => {
+                    const dateA = a.releaseDate === '미정' ? new Date(0) : new Date(a.releaseDate)
+                    const dateB = b.releaseDate === '미정' ? new Date(0) : new Date(b.releaseDate)
+                    return dateB.getTime() - dateA.getTime()
+                  })
+                } else if (rewardLimitFilter === '오름차순') {
+                  filteredData.sort((a, b) => {
+                    const limitA = parseInt(a.maxRewardLimit) || 0
+                    const limitB = parseInt(b.maxRewardLimit) || 0
+                    return limitA - limitB
+                  })
+                } else if (rewardLimitFilter === '내림차순') {
+                  filteredData.sort((a, b) => {
+                    const limitA = parseInt(a.maxRewardLimit) || 0
+                    const limitB = parseInt(b.maxRewardLimit) || 0
+                    return limitB - limitA
+                  })
+                }
+                // 드롭다운이 '전체'일 때 기본 정렬 (음원번호 오름차순)
+                else if (idSortFilter === '전체' && releaseDateSortFilter === '전체' && rewardLimitFilter === '전체') {
+                  filteredData.sort((a, b) => a.id - b.id)
+                }
+                // 사용자 정렬 (기존 로직)
+                else if (sortBy && sortOrder) {
                   filteredData.sort((a, b) => {
                     let aVal = a[sortBy as keyof typeof a]
                     let bVal = b[sortBy as keyof typeof b]
@@ -445,9 +522,13 @@ export default function MusicsPage() {
                     return 0
                   })
                 }
+                // 모든 조건에 해당하지 않으면 기본 정렬
+                else {
+                  filteredData.sort((a, b) => a.id - b.id)
+                }
                 
                 return filteredData
-              }, [genreFilter, musicTypeFilter, sortBy, sortOrder, idSortFilter, releaseDateSortFilter, rewardLimitFilter]).map((item) => {
+              }, [genreFilter, musicTypeFilter, sortBy, sortOrder, idSortFilter, releaseDateSortFilter, rewardLimitFilter, musics]).map((item) => {
                 return (
                   <tr 
                     key={item.index} 
