@@ -40,15 +40,27 @@ export class FindMusicsDto {
 
     @IsOptional()
     @IsString()
-    validPlaysFilter?: '많은순' | '적은순';
+    idSortFilter?: '전체' | '오름차순' | '내림차순';
 
     @IsOptional()
     @IsString()
-    validRateFilter?: '높은순' | '낮은순';
+    releaseDateSortFilter?: '전체' | '오름차순' | '내림차순';
 
     @IsOptional()
     @IsString()
-    rewardFilter?: '높은순' | '낮은순' | '리워드 있음' | '리워드 없음';
+    rewardLimitFilter?: '전체' | '오름차순' | '내림차순';
+
+    // @IsOptional()
+    // @IsString()
+    // validPlaysFilter?: '많은순' | '적은순';
+
+    // @IsOptional()
+    // @IsString()
+    // validRateFilter?: '높은순' | '낮은순';
+
+    // @IsOptional()
+    // @IsString()
+    // rewardFilter?: '높은순' | '낮은순' | '리워드 있음' | '리워드 없음';
 
     @IsOptional()
     @IsString()

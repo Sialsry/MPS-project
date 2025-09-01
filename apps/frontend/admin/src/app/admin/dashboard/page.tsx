@@ -237,12 +237,12 @@ export default function DashboardPage() {
                     const validRate = Math.round((validPlays / totalPlays) * 100)
                     
                     return (
-                      <tr key={rank} className="border-b border-white/5">
-                        <td className={`py-2 px-3 font-medium ${
-                          rank <= 3 ? 'text-teal-300' : 'text-white/60'
-                        }`}>{rank}</td>
-                        <td className="py-2 px-3 text-white/80">Track Title {rank}</td>
-                        <td className="py-2 px-3 text-white/60">
+                    <tr key={rank} className="border-b border-white/5">
+                      <td className={`py-2 px-3 font-medium ${
+                        rank <= 3 ? 'text-teal-300' : 'text-white/60'
+                      }`}>{rank}</td>
+                      <td className="py-2 px-3 text-white/80">Track Title {rank}</td>
+                      <td className="py-2 px-3 text-white/60">
                           <div className="flex items-center gap-2">
                             <span>{validPlays.toLocaleString()}회</span>
                             <span className="text-xs text-white/50">
@@ -252,8 +252,8 @@ export default function DashboardPage() {
                           <div className="text-xs text-white/40">
                             총 {totalPlays.toLocaleString()}회
                           </div>
-                        </td>
-                      </tr>
+                      </td>
+                    </tr>
                     )
                   })}
                 </tbody>
