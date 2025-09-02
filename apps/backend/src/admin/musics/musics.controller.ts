@@ -13,6 +13,7 @@ export class MusicsController {
   async findAll(@Query() findMusicsDto: FindMusicsDto) {
     return this.musicsService.findAll(findMusicsDto);
   }
+  
 
   @Post()
   create(@Body() createMusicDto: CreateMusicDto) {

@@ -2,10 +2,11 @@ import { Injectable, Inject } from '@nestjs/common';
 import { CreateMusicDto } from './dto/create-music.dto';
 import { UpdateMusicDto } from './dto/update-music.dto';
 import { FindMusicsDto } from './dto/find-musics.dto';
-import { musics, music_categories, music_tags, monthly_music_rewards, music_plays } from '../../db/schema';
+import { musics, music_categories, music_tags, monthly_music_rewards, music_plays, raw_tags } from '../../db/schema';
 import { eq, like, desc, asc, or, sql, and, inArray } from 'drizzle-orm';
 import type { DB } from '../../db/client';
 import type { SQL } from 'drizzle-orm';
+import { throwError } from 'rxjs';
 
 @Injectable()
 export class MusicsService {
@@ -110,8 +111,125 @@ export class MusicsService {
     };
   }
 
-  create(createMusicDto: CreateMusicDto) {
-    return 'This action adds a new music';
+  async create(createMusicDto: CreateMusicDto) {
+    try {
+      // 카테고리 존재하는지 확인
+      const categoryExists = await this.db
+      .select({ id: music_categories.id, name: music_categories.name })
+      .from(music_categories)
+      .where(eq(music_categories.name, createMusicDto.category))
+      .limit(1);
+
+    if (categoryExists.length === 0) {
+      throw new Error(`카테고리를 찾을 수 없습니다.`);
+    }
+
+      const categoryId = categoryExists[0].id;
+      // file path 중복 확인  
+      const duplicateMusic = await this.db.select().from(musics).where(eq(musics.file_path, createMusicDto.audioFilePath)).limit(1);
+      if(duplicateMusic.length > 0) {throw new Error('동일한 경로의 음원이 존재합니다.')}
+      
+        const newMusic = await this.db.insert(musics).values({
+          file_path: createMusicDto.audioFilePath,
+          title: createMusicDto.title,
+          artist: createMusicDto.artist,
+          category_id: categoryId,
+          inst: createMusicDto.musicType === 'Inst',
+          release_date: createMusicDto.releaseDate ? createMusicDto.releaseDate : null,
+          duration_sec: createMusicDto.durationSec,
+          price_per_play: createMusicDto.priceMusicOnly.toString(),
+          lyrics_price: createMusicDto.priceLyricsOnly.toString(),
+          isrc: createMusicDto.isrc || null,
+          composer: createMusicDto.composer || null,
+          music_arranger: createMusicDto.arranger || null,
+          lyricist: createMusicDto.lyricist || null,
+          lyrics_text: createMusicDto.lyricsText || null,
+          cover_image_url: createMusicDto.coverImagePath || null,
+          lyrics_file_path: createMusicDto.lyricsFilePath || null,
+          is_active: true,
+          total_valid_play_count: 0,
+          total_play_count: 0,
+          total_rewarded_amount: '0',
+          total_revenue: '0',
+          grade: createMusicDto.accessTier === 'all' ? 0 : 1,
+          file_size_bytes: 0,
+          last_played_at: null
+        }).returning();
+        // 음원아이디 추출
+    const musicId = newMusic[0].id;
+    
+    // 리워드 생성
+    if (createMusicDto.hasRewards && createMusicDto.maxPlayCount) {
+      await this.db.insert(monthly_music_rewards).values({
+        music_id: musicId as any,
+        year_month: new Date().toISOString().slice(0, 7),
+        total_reward_count: createMusicDto.maxPlayCount,
+        remaining_reward_count: createMusicDto.maxPlayCount,
+        reward_per_play: createMusicDto.rewardPerPlay.toString()
+      });
+    }
+
+    // 태그 생성
+    if (createMusicDto.tags && createMusicDto.tags.trim()) {
+      const tagArr = createMusicDto.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+      
+      for (const tagText of tagArr) {
+        // 먼저 raw_tags에 태그 추가 (또는 기존 태그 찾기)
+        let rawTag = await this.db
+          .select()
+          .from(raw_tags)
+          .where(eq(raw_tags.name, tagText))
+          .limit(1);
+        
+        let rawTagId: number;
+        
+        if (rawTag.length === 0) {
+          // 새 태그 생성
+          const newRawTag = await this.db.insert(raw_tags).values({
+            name: tagText,
+            slug: tagText.toLowerCase().replace(/\s+/g, '-'),
+            type: 'genre' as any
+          }).returning();
+          rawTagId = newRawTag[0].id;
+        } else {
+          // 기존 태그 사용
+          rawTagId = rawTag[0].id;
+        }
+        
+        // music_tags에 추가
+        await this.db.insert(music_tags).values({
+          music_id: musicId,
+          text: tagText,
+          raw_tag_id: rawTagId
+        });
+      }
+    }
+
+    // 성공 응답 반환
+    return {
+      message: '음원 등록 완료',
+      music: {
+        id: musicId,
+        title: createMusicDto.title,
+        artist: createMusicDto.artist,
+        category: createMusicDto.category,
+        musicType: createMusicDto.musicType,
+        durationSec: createMusicDto.durationSec,
+        priceMusicOnly: createMusicDto.priceMusicOnly,
+        priceLyricsOnly: createMusicDto.priceLyricsOnly,
+        priceBoth: createMusicDto.priceBoth,
+        rewardPerPlay: createMusicDto.rewardPerPlay,
+        maxPlayCount: createMusicDto.maxPlayCount,
+        accessTier: createMusicDto.accessTier,
+        audioFilePath: createMusicDto.audioFilePath
+      },
+      id: musicId
+    };
+
+  } catch (error) {
+    console.error('음원 등록 실패:', error);
+    throw new Error(`음원 등록 실패: ${error.message}`);
+  }
   }
 
   findOne(id: number) {

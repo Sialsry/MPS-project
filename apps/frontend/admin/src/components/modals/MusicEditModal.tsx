@@ -11,11 +11,9 @@ type Props = {
     id?: string;
     title: string;
     artist: string;
-    album?: string;
     category?: string;
-    genre: string;
     tags: string;
-    releaseYear: number;
+    releaseDate?: string;
     durationSec: number;
     musicType?: '일반' | 'Inst' | '가사만';
     priceMusicOnly?: number;
@@ -41,11 +39,9 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
   // 기본 정보
   const [title, setTitle] = useState(isCreateMode ? '' : (musicData?.title || ''))
   const [artist, setArtist] = useState(isCreateMode ? '' : (musicData?.artist || ''))
-  const [album, setAlbum] = useState(isCreateMode ? '' : (musicData?.album || ''))
   const [category, setCategory] = useState(isCreateMode ? '' : (musicData?.category || ''))
-  const [genre, setGenre] = useState(isCreateMode ? 'Pop' : (musicData?.genre || 'Pop'))
   const [tags, setTags] = useState(isCreateMode ? '' : (musicData?.tags || ''))
-  const [releaseYear, setReleaseYear] = useState<number | ''>(isCreateMode ? '' : (musicData?.releaseYear || ''))
+  const [releaseDate, setReleaseDate] = useState(isCreateMode ? '' : (musicData?.releaseDate || ''))
   const [durationSec, setDurationSec] = useState<number | ''>(isCreateMode ? '' : (musicData?.durationSec || ''))
   const [musicType, setMusicType] = useState<'일반' | 'Inst' | '가사만'>(isCreateMode ? '일반' : '일반')
   
@@ -62,9 +58,9 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
 
   // 가격/리워드
   const [priceRef, setPriceRef] = useState(isCreateMode ? 7 : (musicData?.priceRef || 7))
-  const [priceMusicOnly, setPriceMusicOnly] = useState(isCreateMode ? 4 : (musicData?.priceMusicOnly || 4))
+  const [priceMusicOnly, setPriceMusicOnly] = useState(isCreateMode ? 7 : (musicData?.priceMusicOnly || 7))
   const [priceLyricsOnly, setPriceLyricsOnly] = useState(isCreateMode ? 2 : (musicData?.priceLyricsOnly || 2))
-  const [priceBoth, setPriceBoth] = useState(isCreateMode ? 4 : (musicData?.priceBoth || 4))
+  const [priceBoth, setPriceBoth] = useState(isCreateMode ? 7 : (musicData?.priceBoth || 7))
   const [hasRewards, setHasRewards] = useState(isCreateMode ? true : true)
   const [rewardPerPlay, setRewardPerPlay] = useState(isCreateMode ? 0.007 : (musicData?.rewardPerPlay || 0.007))
   const [maxPlayCount, setMaxPlayCount] = useState<number | ''>(isCreateMode ? '' : (musicData?.maxPlayCount || ''))
@@ -103,13 +99,13 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
     // 여기에 실제 수정/등록 로직 추가
     if (isCreateMode) {
       console.log('음원 등록됨:', {
-        title, artist, genre, tags, releaseYear, durationSec, musicType,
+        title, artist, category, tags, releaseDate, durationSec, musicType,
         lyricist, composer, arranger, isrc,
         priceMusicOnly, priceLyricsOnly, priceBoth, rewardPerPlay, maxPlayCount, accessTier
       })
     } else {
       console.log('음원 수정됨:', {
-        title, artist, genre, tags, releaseYear, durationSec, musicType,
+        title, artist, category, tags, releaseDate, durationSec, musicType,
         lyricist, composer, arranger, isrc,
         priceMusicOnly, priceLyricsOnly, priceBoth, rewardPerPlay, maxPlayCount, accessTier
       })
@@ -196,15 +192,7 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                     className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white placeholder-white/50 outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200" 
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-white/80">앨범명</label>
-                  <input 
-                    value={album || ''} 
-                    onChange={(e)=>setAlbum(e.target.value)} 
-                    placeholder="앨범명" 
-                    className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white placeholder-white/50 outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200" 
-                  />
-                </div>
+
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-white/80">카테고리 <span className="text-red-400">*</span></label>
                   <select 
@@ -223,23 +211,7 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                     <option value="기타">기타</option>
                   </select>
                 </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-white/80">장르 <span className="text-red-400">*</span></label>
-                  <select 
-                    value={genre} 
-                    onChange={(e)=>setGenre(e.target.value)} 
-                    className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200"
-                  >
-                    <option>Pop</option>
-                    <option>Rock</option>
-                    <option>Jazz</option>
-                    <option>HipHop</option>
-                    <option>Classical</option>
-                    <option>Electronic</option>
-                    <option>Folk</option>
-                    <option>Country</option>
-                  </select>
-                </div>
+
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-white/80">음원 유형 <span className="text-red-400">*</span></label>
                   <select 
@@ -250,10 +222,10 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                       
                       // 음원 유형에 따라 기본 가격 자동 설정
                       if (newType === '일반') {
-                        setPriceBoth(4) // 일반 음원: 가사+멜로디
-                        setPriceMusicOnly(4) // 일반 음원 사용
+                        setPriceBoth(7) // 일반 음원: 가사+멜로디 (7원)
+                        setPriceMusicOnly(7) // 일반 음원 사용 (7원)
                       } else {
-                        setPriceMusicOnly(3) // Inst 음원
+                        setPriceMusicOnly(3) // Inst 음원 (3원)
                       }
                       setPriceLyricsOnly(2) // 가사만은 항상 2원
                     }} 
@@ -264,13 +236,12 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-white/80">발매년도</label>
+                  <label className="block text-sm font-medium text-white/80">발매일</label>
                   <input 
-                    value={releaseYear} 
-                    onChange={(e)=>setReleaseYear(e.target.value ? Number(e.target.value) : '')} 
-                    type="number" 
-                    placeholder="2024" 
-                    className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white placeholder-white/50 outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200" 
+                    value={releaseDate} 
+                    onChange={(e)=>setReleaseDate(e.target.value)} 
+                    type="date" 
+                    className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200" 
                   />
                 </div>
                 <div className="space-y-2">
