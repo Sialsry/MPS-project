@@ -122,30 +122,7 @@ export class MusicsService {
     return `This action updates a #${id} music`;
   }
   
-  async remove(id: number) {
-    try {
-      // 음원이 존재하는지 확인
-      const music = await this.db.select().from(musics).where(eq(musics.id, id)).limit(1);
-      
-      if (music.length === 0) {
-        throw new Error(`음원 ID ${id}를 찾을 수 없습니다.`);
-      }
-
-      await this.db.delete(monthly_music_rewards).where(eq(monthly_music_rewards.music_id, id));
-      
-      await this.db.delete(music_tags).where(eq(music_tags.music_id, id));
-      
-      await this.db.delete(music_plays).where(eq(music_plays.music_id, id));
-      
-      await this.db.delete(musics).where(eq(musics.id, id));
-      
-      return { message: `음원 삭제 완료` };
-    } catch (error) {
-      throw new Error(`음원 삭제 실패: ${error.message}`);
-    }
-  }
-
-  async bulkDelete(ids: number[]) {
+  async delete(ids: number[]) {
     try {
       // 모든 음원이 존재하는지 한 번에 확인
       const existingMusics = await this.db.select({ id: musics.id }).from(musics).where(inArray(musics.id, ids));
@@ -155,20 +132,25 @@ export class MusicsService {
       
       // 만약 누락된 음원이 있으면 에러
       if (missingIds.length > 0) {
-        throw new Error(`음원 ID ${missingIds}를 찾을 수 없습니다.`);
+        throw new Error(`음원 ID ${missingIds.join(', ')}를 찾을 수 없습니다.`);
       }
       
-      // 모든 음원이 존재하면 일괄 삭제 진행
+      // 모든 음원이 존재하면 삭제 진행
       // 관련 테이블 데이터 일괄 삭제
       await this.db.delete(monthly_music_rewards).where(inArray(monthly_music_rewards.music_id, ids));
       await this.db.delete(music_tags).where(inArray(music_tags.music_id, ids));
       await this.db.delete(music_plays).where(inArray(music_plays.music_id, ids));
       
-      // 음원 일괄 삭제
+      // 음원 삭제
       await this.db.delete(musics).where(inArray(musics.id, ids));
       
+      // 응답 메시지 생성
+      const message = ids.length === 1 
+        ? `음원 ID ${ids[0]} 삭제 완료`
+        : `${ids.length}개 음원 일괄 삭제 완료`;
+      
       return {
-        message: `${ids.length}개 음원 일괄 삭제 완료`,
+        message,
         deletedIds: ids,
         summary: {
           total: ids.length,
@@ -178,7 +160,7 @@ export class MusicsService {
       };
       
     } catch (error) {
-      throw new Error(`일괄 삭제 실패: ${error.message}`);
+      throw new Error(`음원 삭제 실패: ${error.message}`);
     }
   }
 }

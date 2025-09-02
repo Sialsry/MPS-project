@@ -3,7 +3,7 @@ import { MusicsService } from './musics.service';
 import { CreateMusicDto } from './dto/create-music.dto';
 import { UpdateMusicDto } from './dto/update-music.dto';
 import { FindMusicsDto } from './dto/find-musics.dto';
-import { BulkDeleteDto } from './dto/bulk-delete-musics.dto';
+import { DeleteMusicsDto } from './dto/delete-musics.dto';
 
 @Controller('/admin/musics')
 export class MusicsController {
@@ -29,12 +29,8 @@ export class MusicsController {
     return this.musicsService.update(+id, updateMusicDto);
   }
 
-  @Delete(':id') // 단일삭제
-  remove(@Param('id') id: string) {
-    return this.musicsService.remove(+id);
-  }
-  @Delete('bulk-delete') // 일괄삭제
-  async bulkDelete(@Body() bulkDeleteDto: BulkDeleteDto) {
-    return this.musicsService.bulkDelete(bulkDeleteDto.ids);
+  @Delete('delete')
+  async delete(@Body() deleteDto: DeleteMusicsDto) {
+    return this.musicsService.delete(deleteDto.ids);
   }
 }

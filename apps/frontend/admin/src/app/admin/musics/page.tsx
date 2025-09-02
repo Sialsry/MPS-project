@@ -30,6 +30,8 @@ export default function MusicsPage() {
   
   // 드롭다운 열림/닫힘 상태
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  
+
 
   // API 연동을 위한 상태 변수들
   const [musics, setMusics] = useState<any[]>([])
@@ -70,8 +72,15 @@ export default function MusicsPage() {
     }
   }, [])
 
-  const handleDelete = (title: string) => {
-    setDeleteTarget(title)
+  const handleDelete = (ids: (string | number)[]) => {
+    const numericIds = ids.map(id => typeof id === 'string' ? parseInt(id) : id)
+    console.log('삭제할 ID들:', ids, '→ 숫자 변환:', numericIds)
+    
+    if (numericIds.length === 1) {
+      setDeleteTarget(`음원 ID ${numericIds[0]}`)
+    } else {
+      setDeleteTarget(`${numericIds.length}개 음원`)
+    }
     setDeleteModalOpen(true)
   }
   
@@ -99,17 +108,16 @@ export default function MusicsPage() {
       setSortOrder('desc')
     }
   }
-
-  const confirmDelete = () => {
-    if (deleteTarget.includes('개 음원')) {
-      console.log(`일괄 삭제됨: ${selectedItems.size}개 음원`)
-      setSelectedItems(new Set())
-      setSelectAll(false)
+  
+  // 체크박스 선택 핸들러
+  const handleSelectItem = (id: number) => {
+    const newSelectedItems = new Set(selectedItems)
+    if (newSelectedItems.has(id)) {
+      newSelectedItems.delete(id)
     } else {
-      console.log(`삭제됨: ${deleteTarget}`)
+      newSelectedItems.add(id)
     }
-    setDeleteModalOpen(false)
-    setDeleteTarget('')
+    setSelectedItems(newSelectedItems)
   }
 
   const handleSelectAll = () => {
@@ -117,27 +125,62 @@ export default function MusicsPage() {
       setSelectedItems(new Set())
       setSelectAll(false)
     } else {
-      const allIndices = new Set([...Array(10)].map((_, i) => i))
-      setSelectedItems(allIndices)
+      const allIds = musics.map(music => typeof music.id === 'string' ? parseInt(music.id) : music.id)
+      setSelectedItems(new Set(allIds))
       setSelectAll(true)
     }
   }
 
-  const handleItemSelect = (index: number) => {
-    const newSelected = new Set(selectedItems)
-    if (newSelected.has(index)) {
-      newSelected.delete(index)
+  const confirmDelete = () => {
+    if (deleteTarget.includes('개 음원')) {
+      // 일괄 삭제: 선택된 음원들 삭제
+      executeDelete(Array.from(selectedItems))
     } else {
-      newSelected.add(index)
+      // 개별 삭제: 음원 ID 추출하여 삭제
+      const musicId = parseInt(deleteTarget.match(/음원 ID (\d+)/)?.[1] || '0')
+      if (musicId > 0) {
+        executeDelete([musicId])
+      }
     }
-    setSelectedItems(newSelected)
-    setSelectAll(newSelected.size === 10)
   }
 
-  const handleBulkDelete = () => {
-    if (selectedItems.size === 0) return
-    setDeleteTarget(`${selectedItems.size}개 음원`)
-    setDeleteModalOpen(true)
+  const handleItemSelect = (id: string | number) => {
+    const numericId = typeof id === 'string' ? parseInt(id) : id
+    console.log('선택된 음원 ID:', id, '→ 숫자 변환:', numericId)
+    
+    const newSelected = new Set(selectedItems)
+    if (newSelected.has(numericId)) {
+      newSelected.delete(numericId)
+    } else {
+      newSelected.add(numericId)
+    }
+    setSelectedItems(newSelected)
+    setSelectAll(newSelected.size === musics.length)
+  }
+
+  const executeDelete = async (ids: number[]) => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/delete`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        },
+        body: JSON.stringify({ ids })
+      })
+      
+      if (response.ok) {
+        // 성공 시 선택 초기화 및 목록 새로고침
+        setSelectedItems(new Set())
+        setSelectAll(false)
+        setDeleteModalOpen(false)
+        fetchMusics() // 목록 새로고침
+      } else {
+        console.error('삭제 실패:', response.statusText)
+      }
+    } catch (error) {
+      console.error('삭제 실패:', error)
+    }
   }
 
   const handleEdit = (index: number) => {
@@ -197,7 +240,7 @@ export default function MusicsPage() {
             선택됨: <span className="text-teal-300 font-semibold">{selectedItems.size}</span>개
           </div>
           <button
-            onClick={handleBulkDelete}
+            onClick={() => handleDelete(Array.from(selectedItems))}
             disabled={selectedItems.size === 0}
             className={`rounded-lg border border-white/10 px-4 py-2 text-sm font-medium transition-all duration-200 ${
               selectedItems.size === 0 
@@ -205,7 +248,7 @@ export default function MusicsPage() {
                 : 'bg-white/5 text-white hover:bg-white/10'
             }`}
           >
-            일괄 삭제
+            일괄 삭제 ({selectedItems.size})
           </button>
         </div>
       </div>
@@ -543,10 +586,10 @@ export default function MusicsPage() {
                   <td className="px-6 py-4 text-center">
                     <input 
                       type="checkbox" 
-                        checked={selectedItems.has(item.index)}
+                        checked={selectedItems.has(typeof item.id === 'string' ? parseInt(item.id) : item.id)}
                         onChange={(e) => {
                           e.stopPropagation()
-                          handleItemSelect(item.index)
+                          handleItemSelect(item.id)
                         }}
                       className="accent-teal-400 rounded" 
                     />
@@ -681,6 +724,8 @@ export default function MusicsPage() {
           </div>
         </div>
       )}
+
+
     </div>
   )
 } 
