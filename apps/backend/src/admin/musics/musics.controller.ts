@@ -13,7 +13,10 @@ export class MusicsController {
   async findAll(@Query() findMusicsDto: FindMusicsDto) {
     return this.musicsService.findAll(findMusicsDto);
   }
-  
+  @Get('categories')
+  async getCategories() {
+    return this.musicsService.getCategories();
+  }
 
   @Post()
   create(@Body() createMusicDto: CreateMusicDto) {
@@ -33,5 +36,10 @@ export class MusicsController {
   @Delete('delete')
   async delete(@Body() deleteDto: DeleteMusicsDto) {
     return this.musicsService.delete(deleteDto.ids);
+  }
+
+  @Get('categories')
+  async getCategories() {
+    return this.musicsService.getCategories();
   }
 }

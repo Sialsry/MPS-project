@@ -281,4 +281,14 @@ export class MusicsService {
       throw new Error(`음원 삭제 실패: ${error.message}`);
     }
   }
+
+  async getCategories() {
+    try {
+      const categories = await this.db.select({id: music_categories.id, name : music_categories.name}).from(music_categories)
+
+      return{ categories: categories.map(c => ({id : c.id, name: c.name}))}
+    } catch (error) {
+      throw new Error('카테고리 조회 실패')
+    }
+  }
 }
