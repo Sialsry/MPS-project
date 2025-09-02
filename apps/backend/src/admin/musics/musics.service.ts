@@ -169,7 +169,7 @@ export class MusicsService implements OnModuleInit {
       const duplicateMusic = await this.db.select().from(musics).where(eq(musics.file_path, createMusicDto.audioFilePath)).limit(1);
       if(duplicateMusic.length > 0) {throw new Error('동일한 경로의 음원이 존재합니다.')}
       
-        const newMusic = await this.db.insert(musics).values({
+        const newMusic =       await this.db.insert(musics).values({
           file_path: createMusicDto.audioFilePath,
           title: createMusicDto.title,
           artist: createMusicDto.artist,
@@ -186,7 +186,6 @@ export class MusicsService implements OnModuleInit {
           lyrics_text: createMusicDto.lyricsText || null,
           cover_image_url: createMusicDto.coverImagePath || null,
           lyrics_file_path: createMusicDto.lyricsFilePath || null,
-          is_active: true,
           total_valid_play_count: 0,
           total_play_count: 0,
           total_rewarded_amount: '0',
