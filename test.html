@@ -182,9 +182,59 @@
             text-align: center;
         }
 
-        .audio-controls audio {
-            width: 100%;
-            margin-top: 0.5rem;
+        .quick-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .quick-button {
+            padding: 0.4rem 0.8rem;
+            background: #f8f9fa;
+            color: #495057;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .quick-button:hover {
+            background: #e9ecef;
+        }
+
+        .logs {
+            margin-top: 1.5rem;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .log-entry {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            margin-bottom: 0.5rem;
+            padding: 0.3rem;
+            border-radius: 4px;
+        }
+
+        .log-request {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .log-response {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+
+        .log-error {
+            background: #ffebee;
+            color: #c62828;
         }
     </style>
 </head>
@@ -211,8 +261,26 @@
                 type="text" 
                 id="apiKey" 
                 placeholder="여기에 API 키를 입력하세요"
-                value="test-api-key-12345"
+                value="free_test_api_key_64_characters_long_string_for_testing_purpose"
             >
+        </div>
+
+        <div class="form-group">
+            <label for="serverUrl">서버 URL</label>
+            <input 
+                type="text" 
+                id="serverUrl" 
+                placeholder="백엔드 서버 URL"
+                value="http://localhost:3001"
+            >
+        </div>
+
+        <div class="quick-buttons">
+            <button class="quick-button" onclick="setQuickTest('api/music/1/play', 'free')">Free - 음원1 재생</button>
+            <button class="quick-button" onclick="setQuickTest('api/music/2/play', 'standard')">Standard - 음원2 재생</button>
+            <button class="quick-button" onclick="setQuickTest('api/music/3/play', 'business')">Business - 음원3 재생</button>
+            <button class="quick-button" onclick="setQuickTest('api/lyric/1/download', 'free')">Free - 가사1 다운로드</button>
+            <button class="quick-button" onclick="setQuickTest('api/lyric/2/download', 'standard')">Standard - 가사2 다운로드</button>
         </div>
 
         <div class="action-section">
@@ -233,11 +301,17 @@
                 Your browser does not support the audio element.
             </audio>
         </div>
+
+        <div class="logs hidden" id="logsContainer">
+            <div style="font-weight: bold; margin-bottom: 0.5rem;">요청/응답 로그:</div>
+            <div id="logsContent"></div>
+        </div>
     </div>
 
     <script>
         const endpointInput = document.getElementById('endpoint');
         const apiKeyInput = document.getElementById('apiKey');
+        const serverUrlInput = document.getElementById('serverUrl');
         const actionButton = document.getElementById('actionButton');
         const buttonText = document.getElementById('buttonText');
         const loadingSpinner = document.getElementById('loadingSpinner');
@@ -245,33 +319,66 @@
         const statusMessage = document.getElementById('statusMessage');
         const audioControls = document.getElementById('audioControls');
         const audioPlayer = document.getElementById('audioPlayer');
+        const logsContainer = document.getElementById('logsContainer');
+        const logsContent = document.getElementById('logsContent');
 
-        // MPS 서비스 베이스 URL (실제 환경에서는 변경 필요)
-        const MPS_BASE_URL = 'https://api.mps.com/'; // 실제 MPS 서비스 URL로 변경
+        // 재생 세션 추적 변수 (표시용)
+        let currentSessionId = null;
+        let currentMusicId = null;
+        let playStartTime = null;
+        let totalPlayTime = 0;
 
-        // 더미 데이터 - Web Audio API를 사용해 간단한 톤 생성
-        function createDummyAudio() {
-            // AudioContext를 사용해 간단한 사인파 생성
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const duration = 5; // 5초
-            const sampleRate = audioContext.sampleRate;
-            const buffer = audioContext.createBuffer(1, duration * sampleRate, sampleRate);
-            const data = buffer.getChannelData(0);
-            
-            // 440Hz (A4 음) 사인파 생성
-            for (let i = 0; i < data.length; i++) {
-                data[i] = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.3;
+        // API 키 매핑
+        const API_KEYS = {
+            'free': 'free_test_api_key_64_characters_long_string_for_testing_purpose',
+            'standard': 'standard_test_api_key_64_characters_long_string_for_testing',
+            'business': 'business_test_api_key_64_characters_long_string_for_testing'
+        };
+
+        // 재생 시간 표시용 함수들 (서버에서 자동 처리되므로 표시용으로만 사용)
+        function startPlayTimeTracking() {
+            if (!playStartTime) {
+                playStartTime = Date.now();
+                addLog('클라이언트 재생 시간 표시 시작 (서버에서 자동 추적)', 'response');
             }
-            
-            return buffer;
+        }
+        
+        function pausePlayTimeTracking() {
+            if (playStartTime) {
+                totalPlayTime += Math.floor((Date.now() - playStartTime) / 1000);
+                playStartTime = null;
+                addLog(`클라이언트 표시 - 총 재생시간: ${totalPlayTime}초 (참고용)`, 'response');
+            }
+        }
+        
+        function stopPlayTimeTracking() {
+            if (playStartTime) {
+                totalPlayTime += Math.floor((Date.now() - playStartTime) / 1000);
+                playStartTime = null;
+            }
+            const finalPlayTime = totalPlayTime;
+            totalPlayTime = 0;
+            addLog(`클라이언트 표시 - 최종 재생시간: ${finalPlayTime}초 (참고용)`, 'response');
+            return finalPlayTime;
+        }
+        
+        
+        function setQuickTest(endpoint, grade) {
+            endpointInput.value = endpoint;
+            apiKeyInput.value = API_KEYS[grade];
+            updateButtonText();
+            addLog(`퀵 테스트 설정: ${grade} 등급으로 ${endpoint}`, 'request');
         }
 
-        // 더미 오디오 URL (실제 작동하는 짧은 무음 MP3)
-        const DUMMY_AUDIO_URL = 'data:audio/mp3;base64,//tQxAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAACAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA//+QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQ//+QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQ';
-        const DUMMY_LYRICS = `[00:00.00] 테스트 음원 가사
-[00:10.00] MPS 서비스 테스트를 위한
-[00:20.00] 더미 가사 파일입니다
-[00:30.00] 실제 가사로 교체해 주세요`;
+        // 로그 추가
+        function addLog(message, type) {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsContent.appendChild(logEntry);
+            logsContainer.classList.remove('hidden');
+            logsContent.scrollTop = logsContent.scrollHeight;
+        }
 
         // 엔드포인트 변경 감지 및 버튼 텍스트 업데이트
         endpointInput.addEventListener('input', updateButtonText);
@@ -280,7 +387,7 @@
             const endpoint = endpointInput.value.trim();
             if (endpoint.includes('/music/') && endpoint.includes('/play')) {
                 buttonText.textContent = '재생';
-            } else if (endpoint.includes('/lyric/') && endpoint.includes('/download')) {
+            } else if (endpoint.includes('/lyric/download')) {
                 buttonText.textContent = '가사 다운로드';
             } else {
                 buttonText.textContent = '요청';
@@ -329,48 +436,61 @@
             document.body.removeChild(a);
         }
 
-        // Web Audio API로 비프음 생성 및 재생
-        function playBeepSound(audioContext, musicId) {
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
+        // 실제 API 호출 함수
+        async function makeActualRequest(endpoint, apiKey, serverUrl) {
+            const fullUrl = `${serverUrl}/${endpoint}`;
             
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // A4 음
-            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-            gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.1);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 3);
-            
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 3);
-            
-            showStatus(`음원 ${musicId}번 재생 중... (테스트 톤)`, 'info');
-            
-            oscillator.onended = () => {
-                deactivateSpeaker();
-                showStatus(`음원 ${musicId}번 재생 완료`, 'success');
-            };
-        }
+            addLog(`요청: ${fullUrl}`, 'request');
+            addLog(`API Key: ${apiKey.substring(0, 20)}...`, 'request');
 
-        // 시각적 재생 시뮬레이션
-        function simulatePlayback(musicId) {
-            showStatus(`음원 ${musicId}번 재생 중... (시뮬레이션)`, 'info');
-            
-            // 3초 후 재생 완료 시뮬레이션
-            setTimeout(() => {
-                deactivateSpeaker();
-                showStatus(`음원 ${musicId}번 재생 완료`, 'success');
-            }, 3000);
+            try {
+                const response = await fetch(fullUrl, {
+                    method: 'GET',
+                    headers: {
+                        'x-api-key': apiKey,
+                        'User-Agent': 'MPS-Test-Client/1.0'
+                    }
+                });
+
+                addLog(`응답: ${response.status} ${response.statusText}`, 'response');
+
+                // 음원 재생 응답에서 세션 ID 추출
+                if (endpoint.includes('/music/') && endpoint.includes('/play')) {
+                    const sessionId = response.headers.get('X-Session-ID');
+                    if (sessionId) {
+                        addLog(`세션 ID 수신: ${sessionId}`, 'response');
+                        return { response, sessionId: parseInt(sessionId) };
+                    }
+                }
+
+                if (!response.ok) {
+                    let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                    try {
+                        const errorText = await response.text();
+                        if (errorText) {
+                            const errorData = JSON.parse(errorText);
+                            errorMessage = errorData.message || errorMessage;
+                        }
+                    } catch (e) {
+                        // JSON 파싱 실패시 기본 에러 메시지 사용
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                return { response };
+            } catch (error) {
+                addLog(`오류: ${error.message}`, 'error');
+                throw error;
+            }
         }
 
         async function makeRequest() {
             const endpoint = endpointInput.value.trim();
             const apiKey = apiKeyInput.value.trim();
+            const serverUrl = serverUrlInput.value.trim();
 
-            if (!endpoint || !apiKey) {
-                showStatus('엔드포인트와 API 키를 모두 입력해주세요.', 'error');
+            if (!endpoint || !apiKey || !serverUrl) {
+                showStatus('모든 필드를 입력해주세요.', 'error');
                 return;
             }
 
@@ -380,82 +500,128 @@
             audioControls.classList.add('hidden');
 
             try {
-                // 실제 환경에서는 이 부분을 실제 API 호출로 교체
-                const fullUrl = MPS_BASE_URL + endpoint;
-                console.log(`요청 URL: ${fullUrl}`);
-                console.log(`API Key: ${apiKey}`);
-
-                // 더미 API 응답 시뮬레이션
-                await new Promise(resolve => setTimeout(resolve, 1500)); // 로딩 시뮬레이션
-
-                // API 키 검증 시뮬레이션
-                if (apiKey !== 'test-api-key-12345' && apiKey !== 'valid-api-key') {
-                    throw new Error('INVALID_API_KEY');
-                }
-
                 if (endpoint.includes('/music/') && endpoint.includes('/play')) {
                     // 음원 재생 처리
-                    const musicId = endpoint.match(/\/music\/(\d+)\/play/)?.[1];
+                    const musicId = endpoint.match(/music\/(\d+)\/play/)?.[1];
                     if (!musicId) {
                         throw new Error('잘못된 음원 엔드포인트 형식입니다.');
                     }
 
-                    showStatus(`음원 ${musicId}번 재생 준비 완료`, 'success');
-                    activateSpeaker();
+                    addLog(`음원 ${musicId}번 재생 요청 시작`, 'request');
                     
-                    // 실제 오디오 대신 Web Audio API로 톤 생성 및 재생
-                    try {
-                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                        
-                        // 더미 오디오 파일 설정
-                        audioPlayer.src = DUMMY_AUDIO_URL;
-                        audioControls.classList.remove('hidden');
-                        
-                        // 수동으로 재생 시작
-                        const playPromise = audioPlayer.play();
-                        
-                        if (playPromise !== undefined) {
-                            playPromise.then(() => {
-                                showStatus(`음원 ${musicId}번 재생 중...`, 'info');
-                            }).catch((error) => {
-                                console.warn('자동 재생 실패, 수동 재생으로 전환:', error);
-                                showStatus(`음원 ${musicId}번 재생 준비됨 (재생 버튼을 클릭하세요)`, 'info');
-                            });
-                        }
-                        
-                        // 오디오 재생 이벤트 리스너
-                        audioPlayer.addEventListener('play', () => {
-                            showStatus(`음원 ${musicId}번 재생 중...`, 'info');
-                        }, { once: false });
-                        
-                        audioPlayer.addEventListener('ended', () => {
-                            deactivateSpeaker();
-                            showStatus(`음원 ${musicId}번 재생 완료`, 'success');
-                        }, { once: false });
-                        
-                        audioPlayer.addEventListener('error', (e) => {
-                            console.error('오디오 재생 오류:', e);
-                            deactivateSpeaker();
-                            
-                            // Web Audio API로 대체 재생
-                            playBeepSound(audioContext, musicId);
-                        }, { once: false });
-                        
-                    } catch (audioError) {
-                        console.warn('AudioContext 생성 실패:', audioError);
-                        // AudioContext 실패시 시각적 시뮬레이션만 실행
-                        simulatePlayback(musicId);
+                    const result = await makeActualRequest(endpoint, apiKey, serverUrl);
+                    const response = result.response;
+                    const sessionId = result.sessionId;
+                    
+                    // 세션 정보 저장
+                    currentSessionId = sessionId;
+                    currentMusicId = parseInt(musicId);
+                    
+                    if (sessionId) {
+                        addLog(`재생 세션 시작: ${sessionId}`, 'response');
                     }
+                    
+                    // 음원 스트리밍 처리 (쿼리 파라미터로 API 키 전달)
+                    // 브라우저 오디오 요소는 커스텀 헤더를 보낼 수 없으므로 쿼리 파라미터 사용
+                    const fullUrl = `${serverUrl}/${endpoint}?api_key=${encodeURIComponent(apiKey)}`;
+                    
+                    // Custom fetch로 API 키 헤더를 포함한 프록시 URL 생성
+                    // 실제 환경에서는 서버에서 인증된 스트리밍 URL을 제공해야 함
+                    // 브라우저 오디오 요소를 위해 쿼리 파라미터로 API 키 전달
+                    audioPlayer.src = fullUrl;
+                    
+                    // 브라우저의 Range 요청 감지를 위한 이벤트 리스너
+                    audioPlayer.addEventListener('loadstart', function() {
+                        addLog('브라우저가 Range 요청을 시작합니다', 'response');
+                        addLog('서버에서 각 Range 요청마다 진행도를 자동 추적합니다', 'response');
+                    });
+                    
+                    audioPlayer.addEventListener('progress', function() {
+                        if (audioPlayer.buffered.length > 0) {
+                            const buffered = audioPlayer.buffered.end(0);
+                            const duration = audioPlayer.duration;
+                            if (duration > 0) {
+                                const progressPercent = Math.round((buffered / duration) * 100);
+                                addLog(`버퍼링 진행도: ${progressPercent}% (Range 요청 누적)`, 'response');
+                            }
+                        }
+                    });
+                    
+                    audioControls.classList.remove('hidden');
+                    
+                    showStatus(`음원 ${musicId}번 스트리밍 준비 중...`, 'info');
+                    addLog(`음원 로드 완료 - 자동 재생 시작`, 'response');
+                    
+                    // 기존 이벤트 리스너 제거 (중복 방지)
+                    audioPlayer.onplay = null;
+                    audioPlayer.onpause = null;
+                    audioPlayer.onended = null;
+                    audioPlayer.onerror = null;
+                    audioPlayer.onloadeddata = null;
+                    
+                    // 실제 재생 시간 추적을 위한 이벤트 리스너
+                    audioPlayer.onplay = () => {
+                        activateSpeaker();
+                        showStatus(`음원 ${musicId}번 재생 중... (서버에서 자동 추적)`, 'info');
+                        addLog(`▶️ 음원 ${musicId}번 재생 시작 - 서버에서 유효재생 자동 판정`, 'response');
+                        startPlayTimeTracking();
+                    };
+                    
+                    audioPlayer.onpause = () => {
+                        deactivateSpeaker();
+                        showStatus(`음원 ${musicId}번 일시정지`, 'info');
+                        addLog(`⏸️ 음원 ${musicId}번 일시정지`, 'response');
+                        pausePlayTimeTracking();
+                    };
+                    
+                    audioPlayer.onended = () => {
+                        deactivateSpeaker();
+                        const finalPlayTime = stopPlayTimeTracking();
+                        showStatus(`음원 ${musicId}번 재생 완료`, 'success');
+                        addLog(`🏁 음원 ${musicId}번 재생 완료 - 서버에서 자동으로 유효재생 처리`, 'response');
+                        
+                        currentSessionId = null;
+                        currentMusicId = null;
+                    };
+                    
+                    audioPlayer.onerror = (e) => {
+                        console.error('오디오 재생 오류:', e);
+                        deactivateSpeaker();
+                        stopPlayTimeTracking();
+                        showStatus('오디오 재생 중 오류가 발생했습니다.', 'error');
+                        addLog('❌ 오디오 재생 오류', 'error');
+                        
+                        currentSessionId = null;
+                        currentMusicId = null;
+                    };
+                    
+                    // 음원 데이터 로드 완료 시 자동 재생
+                    audioPlayer.onloadeddata = () => {
+                        addLog(`음원 데이터 로드 완료 - 자동 재생 시작`, 'response');
+                        audioPlayer.play().catch(error => {
+                            console.error('자동 재생 실패:', error);
+                            addLog(`자동 재생 실패: ${error.message}`, 'error');
+                            showStatus('자동 재생이 차단되었습니다. 수동으로 재생 버튼을 눌러주세요.', 'error');
+                        });
+                    };
 
                 } else if (endpoint.includes('/lyric/') && endpoint.includes('/download')) {
                     // 가사 다운로드 처리
-                    const musicId = endpoint.match(/\/lyric\/(\d+)\/download/)?.[1];
+                    const musicId = endpoint.match(/lyric\/(\d+)\/download/)?.[1];
                     if (!musicId) {
                         throw new Error('잘못된 가사 엔드포인트 형식입니다.');
                     }
 
-                    downloadFile(DUMMY_LYRICS, `lyrics_${musicId}.txt`, 'text/plain');
+                    addLog(`음원 ${musicId}번 가사 다운로드 요청 시작`, 'request');
+                    
+                    const response = await makeActualRequest(endpoint, apiKey, serverUrl);
+                    
+                    // 가사 파일 다운로드
+                    const lyricsText = await response.text();
+                    downloadFile(lyricsText, `lyrics_${musicId}.txt`, 'text/plain');
+                    
                     showStatus(`음원 ${musicId}번 가사 다운로드 완료`, 'success');
+                    addLog(`음원 ${musicId}번 가사 다운로드 완료`, 'response');
                     
                 } else {
                     throw new Error('지원하지 않는 엔드포인트 형식입니다.');
@@ -464,8 +630,14 @@
             } catch (error) {
                 console.error('요청 실패:', error);
                 
-                if (error.message === 'INVALID_API_KEY') {
+                if (error.message.includes('401') || error.message.includes('Unauthorized')) {
                     showStatus('유효하지 않은 API 키입니다.', 'error');
+                } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
+                    showStatus('재생 권한이 없습니다. 구독 등급을 확인해주세요.', 'error');
+                } else if (error.message.includes('404') || error.message.includes('Not Found')) {
+                    showStatus('요청한 리소스를 찾을 수 없습니다.', 'error');
+                } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    showStatus('서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.', 'error');
                 } else {
                     showStatus(`요청 실패: ${error.message}`, 'error');
                 }
@@ -475,28 +647,6 @@
                 setLoading(false);
             }
         }
-
-        // 실제 API 호출 함수 (현재는 주석 처리, 실제 환경에서 사용)
-        /*
-        async function makeActualRequest(endpoint, apiKey) {
-            const response = await fetch(MPS_BASE_URL + endpoint, {
-                method: 'GET',
-                headers: {
-                    'X-API-Key': apiKey,
-                    'Accept': endpoint.includes('/music/') ? 'audio/mpeg' : 'text/plain'
-                }
-            });
-
-            if (!response.ok) {
-                if (response.status === 401 || response.status === 403) {
-                    throw new Error('INVALID_API_KEY');
-                }
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            return response;
-        }
-        */
 
         // 버튼 클릭 이벤트
         actionButton.addEventListener('click', makeRequest);
@@ -510,6 +660,7 @@
 
         // 초기화
         updateButtonText();
+        addLog('MPS API 테스트 클라이언트 초기화 완료', 'response');
     </script>
 </body>
 </html>
