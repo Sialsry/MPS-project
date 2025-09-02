@@ -22,6 +22,13 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false
   },
-  "types" : ["node"],
-  "include": ["src/**/*", "test/**/*", "drizzle.config.ts"]
+  "types": [
+    "node"
+  ],
+  "include": [
+    "src/**/*",
+    "test/**/*",
+    "drizzle.config.ts",
+    "../../new/api-key.service.ts"
+  ]
 }
