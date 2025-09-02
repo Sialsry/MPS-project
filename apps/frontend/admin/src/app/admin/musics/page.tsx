@@ -202,8 +202,8 @@ export default function MusicsPage() {
         priceMusicOnly: undefined,
         priceLyricsOnly: undefined,
         priceBoth: undefined,
-        rewardPerPlay: undefined,
-        maxPlayCount: undefined,
+        rewardPerPlay: (typeof data.rewardPerPlay === 'number' ? data.rewardPerPlay : undefined),
+        maxPlayCount: (typeof data.maxPlayCount === 'number' ? data.maxPlayCount : undefined),
         accessTier: (data.grade === 0 ? 'all' : 'subscribed') as 'all' | 'subscribed',
         lyricsText: data.lyricsText || '',
         lyricsFilePath: data.lyricsFilePath || '',
@@ -617,6 +617,13 @@ export default function MusicsPage() {
                            createdAt: data.createdAt,
                            lyricsText: data.lyricsText,
                            lyricsFilePath: data.lyricsFilePath,
+                           lyricist: data.lyricist,
+                           composer: data.composer,
+                           arranger: data.arranger,
+                           priceMusicOnly: data.priceMusicOnly,
+                           priceLyricsOnly: data.priceLyricsOnly,
+                           rewardPerPlay: data.rewardPerPlay,
+                           maxPlayCount: data.maxPlayCount
                          })
                         setStatsOpen(true)
                       } catch (e) {
@@ -699,6 +706,13 @@ export default function MusicsPage() {
                               createdAt: data.createdAt,
                               lyricsText: data.lyricsText,
                               lyricsFilePath: data.lyricsFilePath,
+                              lyricist: data.lyricist,
+                              composer: data.composer,
+                              arranger: data.arranger,
+                              priceMusicOnly: data.priceMusicOnly,
+                              priceLyricsOnly: data.priceLyricsOnly,
+                              rewardPerPlay: data.rewardPerPlay,
+                              maxPlayCount: data.maxPlayCount
                             })
                             setStatsOpen(true)
                           } catch (err) {

@@ -308,14 +308,18 @@ export class MusicsService implements OnModuleInit {
           m.lyrics_file_path AS "lyricsFilePath",
           m.file_path AS "audioFilePath",
           m.cover_image_url AS "coverImageUrl",
+          m.price_per_play AS "priceMusicOnly",
+          m.lyrics_price AS "priceLyricsOnly",
           m.created_at AS "createdAt",
-          COALESCE(mmr.total_reward_count * mmr.reward_per_play, 0) AS "maxRewardLimit"
+          COALESCE(mmr.total_reward_count * mmr.reward_per_play, 0) AS "maxRewardLimit",
+          mmr.reward_per_play AS "rewardPerPlay",
+          mmr.total_reward_count AS "maxPlayCount"
         FROM musics m
         LEFT JOIN music_categories mc ON m.category_id = mc.id
         LEFT JOIN music_tags mt ON m.id = mt.music_id
         LEFT JOIN monthly_music_rewards mmr ON m.id = mmr.music_id AND mmr.year_month = ${currentMonth}
         WHERE m.id = ${id}
-        GROUP BY m.id, m.title, m.artist, m.inst, mc.name, m.release_date, m.duration_sec, m.isrc, m.lyricist, m.composer, m.music_arranger, m.lyrics_text, m.lyrics_file_path, m.file_path, m.cover_image_url, m.created_at, mmr.total_reward_count, mmr.reward_per_play
+        GROUP BY m.id, m.title, m.artist, m.inst, mc.name, m.release_date, m.duration_sec, m.isrc, m.lyricist, m.composer, m.music_arranger, m.lyrics_text, m.lyrics_file_path, m.file_path, m.cover_image_url, m.price_per_play, m.lyrics_price, m.created_at, mmr.total_reward_count, mmr.reward_per_play
         LIMIT 1
       `;
 
@@ -345,7 +349,11 @@ export class MusicsService implements OnModuleInit {
         createdAt: row.createdAt,
         lyricsText: row.lyricsText,
         lyricsFilePath: row.lyricsFilePath,
-        maxRewardLimit: row.maxRewardLimit
+        priceMusicOnly: row.priceMusicOnly ? Number(row.priceMusicOnly) : undefined,
+        priceLyricsOnly: row.priceLyricsOnly ? Number(row.priceLyricsOnly) : undefined,
+        rewardPerPlay: row.rewardPerPlay ? Number(row.rewardPerPlay) : undefined,
+        maxPlayCount: row.maxPlayCount ? Number(row.maxPlayCount) : undefined,
+        maxRewardLimit: row.maxRewardLimit ? Number(row.maxRewardLimit) : 0
       };
     } catch (error) {
       throw new Error(`음원 상세 조회 실패: ${error.message}`);

@@ -122,13 +122,13 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
 
   useEffect(() => {
     if (!isCreateMode && musicData) {
-      if ((musicData as any).lyricsFilePath) {
-        setLyricsInputType('file')
-      } else {
-        setLyricsInputType('text')
+      if (typeof musicData.rewardPerPlay === 'number') {
+        setRewardPerPlay(musicData.rewardPerPlay)
+        setHasRewards(true)
       }
-      if ((musicData as any).lyricsText) {
-        setLyricsText((musicData as any).lyricsText as string)
+      if (typeof musicData.maxPlayCount === 'number') {
+        setMaxPlayCount(musicData.maxPlayCount)
+        setHasRewards(true)
       }
     }
   }, [isCreateMode, musicData])
@@ -792,13 +792,13 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
               <Title>가격 설정</Title>
               <div className="pt-2">
                 {musicType === '일반' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
-                      <div className="mb-1 text-sm text-white/60">일반 음원 가격</div>
-                      <div className="relative w-40">
+                      <div className="mb-1 text-sm text-white/60">음원만 가격</div>
+                      <div className="relative w-full">
                         <input 
-                          value={priceBoth} 
-                          onChange={(e)=>setPriceBoth(Number(e.target.value)||0)} 
+                          value={priceMusicOnly} 
+                          onChange={(e)=>setPriceMusicOnly(Number(e.target.value)||0)} 
                           type="number" 
                           placeholder="7"
                           className="w-full pr-8 rounded-lg bg-black/30 px-3 py-2 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200 text-center" 
@@ -808,7 +808,7 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                     </div>
                     <div>
                       <div className="mb-1 text-sm text-white/60">가사만 가격</div>
-                      <div className="relative w-40">
+                      <div className="relative w-full">
                         <input 
                           value={priceLyricsOnly} 
                           onChange={(e)=>setPriceLyricsOnly(Number(e.target.value)||0)} 
@@ -819,12 +819,25 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-white/60">원</span>
                       </div>
                     </div>
+                    <div>
+                      <div className="mb-1 text-sm text-white/60">음원+가사 가격</div>
+                      <div className="relative w-full">
+                        <input 
+                          value={priceBoth} 
+                          onChange={(e)=>setPriceBoth(Number(e.target.value)||0)} 
+                          type="number" 
+                          placeholder="7"
+                          className="w-full pr-8 rounded-lg bg-black/30 px-3 py-2 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200 text-center" 
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-white/60">원</span>
+                      </div>
+                    </div>
                   </div>
                 )}
                 {musicType === 'Inst' && (
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-white/60">Inst 음원 가격</span>
-                    <div className="relative w-40">
+                  <div className="space-y-2">
+                    <div className="mb-1 text-sm text-white/60">Inst 음원 가격</div>
+                    <div className="relative w-full">
                       <input 
                         value={priceMusicOnly} 
                         onChange={(e)=>setPriceMusicOnly(Number(e.target.value)||0)} 
