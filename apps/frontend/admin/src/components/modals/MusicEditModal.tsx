@@ -79,6 +79,20 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   
+  const getBasename = (p?: string) => (p ? p.split('/').pop() || '' : '')
+
+  useEffect(() => {
+    if (!isCreateMode && musicData) {
+      if ((musicData as any).lyricsFilePath) {
+        setLyricsInputType('file')
+      } else {
+        setLyricsInputType('text')
+      }
+      if ((musicData as any).lyricsText) {
+        setLyricsText((musicData as any).lyricsText as string)
+      }
+    }
+  }, [isCreateMode, musicData])
 
 
   // 카테고리 데이터 가져오기
@@ -341,13 +355,32 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
         // 실시간 검증으로 이미 모든 필드가 검증되었으므로 여기서는 네트워크 오류만 처리
       }
     } else {
-      // 수정 모드
-      console.log('음원 수정됨:', {
-        title, artist, category, tags, releaseDate, durationSec, musicType,
-        lyricist, composer, arranger, isrc,
-        priceMusicOnly, priceLyricsOnly, priceBoth, rewardPerPlay, maxPlayCount, accessTier
-      })
-      onClose()
+      // 수정 모드: 허용 필드만 PATCH
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+        if (!musicData?.id) throw new Error('수정 대상 ID가 없습니다.')
+        const payload: any = {
+          title, artist, category, tags, releaseDate,
+          accessTier, lyricsText,
+          // 가격류는 필요 시에만 보냄
+        }
+        const res = await fetch(`${baseUrl}/admin/musics/${musicData.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(()=>({}))
+          showToastMessage('수정 실패: 금지된 필드 포함 여부를 확인하세요.', 'error')
+          console.error('수정 실패', err)
+          return
+        }
+        showToastMessage('수정이 완료되었습니다!')
+        setTimeout(()=> onClose(), 800)
+      } catch (e) {
+        console.error('수정 에러', e)
+        showToastMessage('수정 중 오류가 발생했습니다.', 'error')
+      }
     }
   }
 
@@ -383,16 +416,22 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                     type="file" 
                     accept=".mp3,.wav,.flac" 
                     onChange={onSelectAudio} 
+                    disabled={!isCreateMode}
                     className={`w-full rounded-lg px-3 py-2.5 text-sm text-white ring-1 transition-all duration-200 ${
                       fieldErrors.audioFile ? 'bg-red-500/20 ring-red-500/50' : 'bg-black/30 ring-white/8'
-                    } file:mr-3 file:rounded-lg file:border-0 file:bg-teal-500/20 file:px-3 file:py-1.5 file:text-teal-300 hover:file:bg-teal-500/30`}
+                    } ${!isCreateMode ? 'opacity-50 cursor-not-allowed' : ''} file:mr-3 file:rounded-lg file:border-0 file:bg-teal-500/20 file:px-3 file:py-1.5 file:text-teal-300 hover:file:bg-teal-500/30`}
                   />
-                  {audioFile && (
+                  {audioFile ? (
                     <div className="flex items-center gap-2 text-sm text-teal-300">
                       <span className="w-2 h-2 bg-teal-400 rounded-full"></span>
                       선택됨: {audioFile.name}
                     </div>
-                  )}
+                  ) : (!isCreateMode && (musicData as any)?.audioFilePath) ? (
+                    <div className="flex items-center gap-2 text-sm text-white/70">
+                      <span className="w-2 h-2 bg-white/30 rounded-full"></span>
+                      현재 파일: {getBasename((musicData as any).audioFilePath)}
+                    </div>
+                  ) : null}
                   {fieldErrors.audioFile && (
                     <div className="text-sm text-red-400 flex items-center gap-2">
                       <span className="w-2 h-2 bg-red-400 rounded-full"></span>
@@ -407,12 +446,17 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                       type="file" 
                       accept=".jpg,.jpeg,.png" 
                       onChange={onSelectThumb} 
-                      className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-sm text-white ring-1 ring-white/8 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-500/20 file:px-3 file:py-1.5 file:text-teal-300 hover:file:bg-teal-500/30 transition-all duration-200" 
+                      disabled={!isCreateMode}
+                      className={`w-full rounded-lg bg-black/30 px-3 py-2.5 text-sm text-white ring-1 ring-white/8 transition-all duration-200 ${!isCreateMode ? 'opacity-50 cursor-not-allowed' : ''} file:mr-3 file:rounded-lg file:border-0 file:bg-teal-500/20 file:px-3 file:py-1.5 file:text-teal-300 hover:file:bg-teal-500/30`} 
                     />
                     {thumbFile ? (
                       <div className="flex items-center gap-2 text-sm text-teal-300">
                         <span className="w-2 h-2 bg-teal-400 rounded-full"></span>
                         선택됨: {thumbFile.name}
+                      </div>
+                    ) : (!isCreateMode && (musicData as any)?.coverImageUrl) ? (
+                      <div className="text-sm text-white/70">
+                        현재 썸네일: {getBasename((musicData as any).coverImageUrl)}
                       </div>
                     ) : (
                       <div className="text-xs text-white/50">
@@ -504,16 +548,17 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                       
                       // 음원 유형에 따라 기본 가격 자동 설정
                       if (newType === '일반') {
-                        setPriceBoth(7) // 일반 음원: 가사+멜로디 (7원)
-                        setPriceMusicOnly(7) // 일반 음원 사용 (7원)
+                        setPriceBoth(7)
+                        setPriceMusicOnly(7)
                       } else {
-                        setPriceMusicOnly(3) // Inst 음원 (3원)
+                        setPriceMusicOnly(3)
                       }
-                      setPriceLyricsOnly(2) // 가사만은 항상 2원
+                      setPriceLyricsOnly(2)
                     }} 
+                    disabled={!isCreateMode}
                     className={`w-full rounded-lg px-3 py-2.5 text-white outline-none ring-1 transition-all duration-200 ${
                       fieldErrors.musicType ? 'bg-red-500/20 ring-red-500/50' : 'bg-black/30 ring-white/8 focus:ring-2 focus:ring-teal-400/40'
-                    }`}
+                    } ${!isCreateMode ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <option value="일반">일반</option>
                     <option value="Inst">Inst</option>
@@ -591,10 +636,11 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                       setIsrc(e.target.value)
                       validateField('isrc', e.target.value)
                     }} 
+                    disabled={!isCreateMode}
                     placeholder="KRZ0123456789" 
                     className={`w-full rounded-lg px-3 py-2.5 text-white placeholder-white/50 outline-none ring-1 transition-all duration-200 ${
                       fieldErrors.isrc ? 'bg-red-500/20 ring-red-500/50' : 'bg-black/30 ring-white/8 focus:ring-2 focus:ring-teal-400/40'
-                    }`}
+                    } ${!isCreateMode ? 'opacity-50 cursor-not-allowed' : ''}`}
                   />
                   {fieldErrors.isrc && (
                     <div className="text-sm text-red-400 flex items-center gap-2">
@@ -656,12 +702,17 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                             onChange={onSelectLyrics} 
                             className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-sm text-white ring-1 ring-white/8 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-500/20 file:px-3 file:py-1.5 file:text-teal-300 hover:file:bg-teal-500/30 transition-all duration-200" 
                           />
-                          {lyricsFile && (
+                          {lyricsFile ? (
                             <div className="flex items-center gap-2 text-sm text-teal-300">
                               <span className="w-2 h-2 bg-teal-400 rounded-full"></span>
-                              선택됨: {lyricsInputType === 'file' ? lyricsFile.name : '가사 텍스트'}
+                              선택됨: {lyricsFile.name}
                             </div>
-                          )}
+                          ) : (!isCreateMode && (musicData as any)?.lyricsFilePath) ? (
+                            <div className="flex items-center gap-2 text-sm text-white/70">
+                              <span className="w-2 h-2 bg-white/30 rounded-full"></span>
+                              현재 가사 파일: {getBasename((musicData as any).lyricsFilePath)}
+                            </div>
+                          ) : null}
                         </div>
                       )}
                     </div>
@@ -670,161 +721,109 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
               </div>
             </Card>
 
-            {/* 가격 및 리워드 설정 */}
+            {/* 가격 설정 */}
             <Card>
-              <Title>가격 및 리워드 설정</Title>
-              
-              {/* 가격 설정 */}
-              <div className="mb-6">
-                <div className="mb-3 text-sm font-medium text-white/80">가격 설정</div>
-                
-                {/* 음원 유형 선택 */}
-                <div className="mb-4">
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-sm text-white/80">
-                      <input 
-                        type="radio" 
-                        name="musicType" 
-                        checked={musicType === '일반'} 
-                        onChange={() => setMusicType('일반')} 
-                        className="text-teal-500 focus:ring-teal-500/20"
-                      /> 
-                      일반 음원 (가사+멜로디)
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-white/80">
-                      <input 
-                        type="radio" 
-                        name="musicType" 
-                        checked={musicType === 'Inst'} 
-                        onChange={() => setMusicType('Inst')} 
-                        className="text-teal-500 focus:ring-teal-500/20"
-                      /> 
-                      Inst 음원
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-white/80">
-                      <input 
-                        type="radio" 
-                        name="musicType" 
-                        checked={musicType === '가사만'} 
-                        onChange={() => setMusicType('가사만')} 
-                        className="text-teal-500 focus:ring-teal-500/20"
-                      /> 
-                      가사만
-                    </label>
-                  </div>
-                </div>
-                
-                {/* 선택된 유형에 따른 가격 입력 */}
-                <div className="pt-2">
-                  {musicType === '일반' && (
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-white/60">일반 음원 가격:</span>
-                      <div className="flex items-center gap-2">
+              <Title>가격 설정</Title>
+              <div className="pt-2">
+                {musicType === '일반' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <div className="mb-1 text-sm text-white/60">일반 음원 가격</div>
+                      <div className="relative w-40">
                         <input 
                           value={priceBoth} 
                           onChange={(e)=>setPriceBoth(Number(e.target.value)||0)} 
                           type="number" 
-                          placeholder="4"
-                          className="w-24 rounded-lg bg-black/30 px-3 py-2 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200 text-center" 
+                          placeholder="7"
+                          className="w-full pr-8 rounded-lg bg-black/30 px-3 py-2 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200 text-center" 
                         />
-                        <span className="text-sm text-white/60">원</span>
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-white/60">원</span>
                       </div>
                     </div>
-                  )}
-                  
-                  {musicType === 'Inst' && (
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-white/60">Inst 음원 가격:</span>
-                      <div className="flex items-center gap-2">
-                        <input 
-                          value={priceMusicOnly} 
-                          onChange={(e)=>setPriceMusicOnly(Number(e.target.value)||0)} 
-                          type="number" 
-                          placeholder="3"
-                          className="w-24 rounded-lg bg-black/30 px-3 py-2 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200 text-center" 
-                        />
-                        <span className="text-sm text-white/60">원</span>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {musicType === '가사만' && (
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-white/60">가사만 가격:</span>
-                      <div className="flex items-center gap-2">
+                    <div>
+                      <div className="mb-1 text-sm text-white/60">가사만 가격</div>
+                      <div className="relative w-40">
                         <input 
                           value={priceLyricsOnly} 
                           onChange={(e)=>setPriceLyricsOnly(Number(e.target.value)||0)} 
                           type="number" 
                           placeholder="2"
-                          className="w-24 rounded-lg bg-black/30 px-3 py-2 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200 text-center" 
+                          className="w-full pr-8 rounded-lg bg-black/30 px-3 py-2 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200 text-center" 
                         />
-                        <span className="text-sm text-white/60">원</span>
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-white/60">원</span>
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 리워드 설정 */}
-              <div className="mb-6">
-                <div className="mb-3 text-sm font-medium text-white/80">리워드 설정</div>
-                                 <div className="mb-4">
-                   <label className="flex items-center gap-2 text-sm text-white/80">
-                     <input 
-                       type="checkbox" 
-                       checked={hasRewards} 
-                       onChange={(e) => {
-                         const checked = e.target.checked
-                         setHasRewards(checked)
-                         // 리워드가 있으면 구독기업만, 없으면 모든기업 사용 가능
-                         setAccessTier(checked ? 'subscribed' : 'all')
-                       }} 
-                       className="text-teal-400 focus:ring-teal-500/20 rounded"
-                     /> 
-                     이 음원에 리워드 시스템 적용
-                   </label>
-
-                 </div>
-                
-                {hasRewards && (
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-white/80">1회 재생당 리워드 (토큰) <span className="text-red-400">*</span></label>
+                  </div>
+                )}
+                {musicType === 'Inst' && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-white/60">Inst 음원 가격</span>
+                    <div className="relative w-40">
                       <input 
-                        value={rewardPerPlay} 
-                        onChange={(e)=>setRewardPerPlay(Number(e.target.value)||0)} 
+                        value={priceMusicOnly} 
+                        onChange={(e)=>setPriceMusicOnly(Number(e.target.value)||0)} 
                         type="number" 
-                        step="0.001" 
-                        className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200" 
+                        placeholder="3"
+                        className="w-full pr-8 rounded-lg bg-black/30 px-3 py-2 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200 text-center" 
                       />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-white/80">최대 재생 횟수 <span className="text-red-400">*</span></label>
-                      <input 
-                        value={maxPlayCount} 
-                        onChange={(e)=>setMaxPlayCount(e.target.value ? Number(e.target.value) : '')} 
-                        type="number" 
-                        placeholder="1000" 
-                        className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200" 
-                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-white/60">원</span>
                     </div>
                   </div>
                 )}
               </div>
+            </Card>
 
-              {/* 리워드 미리보기 */}
+            {/* 리워드 설정 */}
+            <Card>
+              <Title>리워드 설정</Title>
+              <div className="mt-3 mb-4">
+                <label className="flex items-center gap-2 text-sm text-white/80">
+                  <input 
+                    type="checkbox" 
+                    checked={hasRewards} 
+                    onChange={(e) => {
+                      const checked = e.target.checked
+                      setHasRewards(checked)
+                      setAccessTier(checked ? 'subscribed' : 'all')
+                    }} 
+                    className="text-teal-400 focus:ring-teal-500/20 rounded"
+                  /> 
+                  이 음원에 리워드 시스템 적용
+                </label>
+              </div>
               {hasRewards && (
-                <div className="rounded-lg border border-teal-500/20 bg-teal-500/10 p-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-white/80">1회 재생당 리워드 (토큰) <span className="text-red-400">*</span></label>
+                    <input 
+                      value={rewardPerPlay} 
+                      onChange={(e)=>setRewardPerPlay(Number(e.target.value)||0)} 
+                      type="number" 
+                      step="0.001" 
+                      className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-white/80">최대 재생 횟수 <span className="text-red-400">*</span></label>
+                    <input 
+                      value={maxPlayCount} 
+                      onChange={(e)=>setMaxPlayCount(e.target.value ? Number(e.target.value) : '')} 
+                      type="number" 
+                      placeholder="1000" 
+                      className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200" 
+                    />
+                  </div>
+                </div>
+              )}
+              {hasRewards && (
+                <div className="mt-4 rounded-lg border border-teal-500/20 bg-teal-500/10 p-4">
                   <div className="text-sm text-teal-300 font-medium mb-1">리워드 미리보기</div>
                   {maxPlayCount ? (
                     <p className="text-sm text-white/80">
                       총 리워드: <span className="text-sm font-semibold text-teal-300">{totalReward}</span> 토큰
                     </p>
                   ) : (
-                    <p className="text-sm text-white/80">
-                      최대 재생 횟수를 입력하면 총 리워드를 확인할 수 있습니다
-                    </p>
+                    <p className="text-sm text-white/80">최대 재생 횟수를 입력하면 총 리워드를 확인할 수 있습니다</p>
                   )}
                 </div>
               )}

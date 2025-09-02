@@ -1,4 +1,4 @@
-import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
+import { Injectable, Inject, OnModuleInit, BadRequestException } from '@nestjs/common';
 import { CreateMusicDto } from './dto/create-music.dto';
 import { UpdateMusicDto } from './dto/update-music.dto';
 import { FindMusicsDto } from './dto/find-musics.dto';
@@ -9,6 +9,7 @@ import type { SQL } from 'drizzle-orm';
 import { throwError } from 'rxjs';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { UpdateRewardDto } from './dto/update-reward.dto';
 
 @Injectable()
 export class MusicsService implements OnModuleInit {
@@ -289,6 +290,7 @@ export class MusicsService implements OnModuleInit {
           m.music_arranger AS "arranger",
           m.lyrics_text AS "lyricsText",
           m.lyrics_file_path AS "lyricsFilePath",
+          m.file_path AS "audioFilePath",
           m.cover_image_url AS "coverImageUrl",
           m.created_at AS "createdAt",
           COALESCE(mmr.total_reward_count * mmr.reward_per_play, 0) AS "maxRewardLimit"
@@ -297,7 +299,7 @@ export class MusicsService implements OnModuleInit {
         LEFT JOIN music_tags mt ON m.id = mt.music_id
         LEFT JOIN monthly_music_rewards mmr ON m.id = mmr.music_id AND mmr.year_month = ${currentMonth}
         WHERE m.id = ${id}
-        GROUP BY m.id, m.title, m.artist, m.inst, mc.name, m.release_date, m.duration_sec, m.isrc, m.lyricist, m.composer, m.music_arranger, m.lyrics_text, m.lyrics_file_path, m.cover_image_url, m.created_at, mmr.total_reward_count, mmr.reward_per_play
+        GROUP BY m.id, m.title, m.artist, m.inst, mc.name, m.release_date, m.duration_sec, m.isrc, m.lyricist, m.composer, m.music_arranger, m.lyrics_text, m.lyrics_file_path, m.file_path, m.cover_image_url, m.created_at, mmr.total_reward_count, mmr.reward_per_play
         LIMIT 1
       `;
 
@@ -323,6 +325,7 @@ export class MusicsService implements OnModuleInit {
         composer: row.composer,
         arranger: row.arranger,
         coverImageUrl: row.coverImageUrl,
+        audioFilePath: row.audioFilePath,
         createdAt: row.createdAt,
         lyricsText: row.lyricsText,
         lyricsFilePath: row.lyricsFilePath,
@@ -496,8 +499,77 @@ export class MusicsService implements OnModuleInit {
     return { absPath, filename, contentType, isUrl: false };
   }
 
-  update(id: number, updateMusicDto: UpdateMusicDto) {
-    return `This action updates a #${id} music`;
+  async update(id: number, updateMusicDto: UpdateMusicDto) {
+    const forbiddenKeys: Array<keyof UpdateMusicDto> = ['audioFilePath', 'coverImagePath', 'isrc' as any, 'musicType' as any];
+    for (const key of forbiddenKeys) {
+      if ((updateMusicDto as any)[key] !== undefined) {
+        throw new BadRequestException('음원 파일, 썸네일, ISRC, 음원 유형은 수정할 수 없습니다.');
+      }
+    }
+    const updates: any = {};
+    if (updateMusicDto.title !== undefined) updates.title = updateMusicDto.title;
+    if (updateMusicDto.artist !== undefined) updates.artist = updateMusicDto.artist;
+    // musicType은 수정 금지
+    if (updateMusicDto.releaseDate !== undefined) updates.release_date = updateMusicDto.releaseDate || null;
+    if (updateMusicDto.priceMusicOnly !== undefined) updates.price_per_play = updateMusicDto.priceMusicOnly.toString();
+    if (updateMusicDto.priceLyricsOnly !== undefined) updates.lyrics_price = updateMusicDto.priceLyricsOnly.toString();
+    if (updateMusicDto.accessTier !== undefined) updates.grade = updateMusicDto.accessTier === 'all' ? 0 : 1;
+
+    if (updateMusicDto.lyricsFilePath !== undefined) {
+      updates.lyrics_file_path = updateMusicDto.lyricsFilePath || null;
+      updates.lyrics_text = null;
+    } else if (updateMusicDto.lyricsText !== undefined) {
+      updates.lyrics_text = updateMusicDto.lyricsText || null;
+      updates.lyrics_file_path = null;
+    }
+
+    if (updateMusicDto.category !== undefined) {
+      const category = await this.db
+        .select({ id: music_categories.id })
+        .from(music_categories)
+        .where(eq(music_categories.name, updateMusicDto.category))
+        .limit(1);
+      if (category.length === 0) {
+        throw new BadRequestException('카테고리를 찾을 수 없습니다.');
+      }
+      updates.category_id = category[0].id;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await this.db.update(musics).set(updates).where(eq(musics.id, id));
+    }
+
+    if (updateMusicDto.tags !== undefined) {
+      const tagArr = updateMusicDto.tags
+        .split(',')
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+
+      // 기존 태그 삭제
+      await this.db.delete(music_tags).where(eq(music_tags.music_id, id));
+
+      for (const tagText of tagArr) {
+        let raw = await this.db
+          .select({ id: raw_tags.id })
+          .from(raw_tags)
+          .where(eq(raw_tags.name, tagText))
+          .limit(1);
+        let rawId: number;
+        if (raw.length === 0) {
+          const inserted = await this.db.insert(raw_tags).values({
+            name: tagText,
+            slug: tagText.toLowerCase().replace(/\s+/g, '-'),
+            type: 'genre' as any
+          }).returning();
+          rawId = inserted[0].id;
+        } else {
+          rawId = raw[0].id;
+        }
+        await this.db.insert(music_tags).values({ music_id: id, text: tagText, raw_tag_id: rawId });
+      }
+    }
+
+    return { message: '음원 정보가 수정되었습니다.', id };
   }
   
   async delete(ids: number[]) {
@@ -540,6 +612,26 @@ export class MusicsService implements OnModuleInit {
     } catch (error) {
       throw new Error(`음원 삭제 실패: ${error.message}`);
     }
+  }
+
+  async updateNextMonthRewards(musicId: number, dto: UpdateRewardDto) {
+    const now = new Date();
+    const y = now.getUTCFullYear();
+    const m = now.getUTCMonth(); 
+    const next = new Date(Date.UTC(y, m + 1, 1));
+    const ym = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`;
+
+    // upsert: (music_id, year_month) 기준
+    const upsertQuery = sql`
+      insert into ${monthly_music_rewards} (music_id, year_month, total_reward_count, remaining_reward_count, reward_per_play)
+      values (${musicId}, ${ym}, ${dto.totalRewardCount}, ${dto.totalRewardCount}, ${dto.rewardPerPlay})
+      on conflict (music_id, year_month)
+      do update set total_reward_count = ${dto.totalRewardCount}, remaining_reward_count = ${dto.totalRewardCount}, reward_per_play = ${dto.rewardPerPlay}
+      returning music_id, year_month
+    `;
+
+    const result = await this.db.execute(upsertQuery);
+    return { message: '다음 달 리워드가 업데이트되었습니다.', musicId, yearMonth: ym };
   }
 
 

@@ -184,22 +184,41 @@ export default function MusicsPage() {
     }
   }
 
-  const handleEdit = (index: number) => {
-    const mockMusicData = {
-      title: `Song Title ${index + 1}`,
-      artist: `Artist ${index + 1}`,
-      genre: 'Pop',
-      tags: '차분한, 릴렉스',
-      releaseYear: 2024,
-      durationSec: 180 + index * 10,
-      priceRef: 7,
-      rewardPerPlay: 0.007,
-      maxPlayCount: 1000,
-      accessTier: 'all' as const
+  const handleEdit = async (id: number) => {
+    try {
+      setIsCreateMode(false)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${id}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+              const mapped = {
+        id: String(data.id),
+        title: data.title,
+        artist: data.artist,
+        category: data.category,
+        tags: data.tags || '',
+        releaseDate: data.releaseDate || '',
+        durationSec: typeof data.durationSec === 'number' ? data.durationSec : '',
+        musicType: data.musicType as '일반' | 'Inst',
+        priceMusicOnly: undefined,
+        priceLyricsOnly: undefined,
+        priceBoth: undefined,
+        rewardPerPlay: undefined,
+        maxPlayCount: undefined,
+        accessTier: (data.grade === 0 ? 'all' : 'subscribed') as 'all' | 'subscribed',
+        lyricsText: data.lyricsText || '',
+        lyricsFilePath: data.lyricsFilePath || '',
+        audioFilePath: data.audioFilePath || '',
+        coverImageUrl: data.coverImageUrl || '',
+        lyricist: data.lyricist || '',
+        composer: data.composer || '',
+        arranger: data.arranger || '',
+        isrc: data.isrc || ''
+      }
+      setEditMusicData(mapped)
+      setEditModalOpen(true)
+    } catch (e) {
+      console.error('수정 데이터 로드 실패', e)
     }
-    setIsCreateMode(false)
-    setEditMusicData(mockMusicData)
-    setEditModalOpen(true)
   }
 
   return (
@@ -652,7 +671,7 @@ export default function MusicsPage() {
                         className="rounded-lg bg-gradient-to-r from-teal-500 to-teal-600 px-3 py-1.5 text-xs text-white font-medium hover:from-teal-600 hover:to-teal-700 transition-all duration-200"
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleEdit(item.index)
+                          handleEdit(item.id)
                         }}
                       >
                         수정

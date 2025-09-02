@@ -8,6 +8,7 @@ import type { Response } from 'express';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import * as fs from 'fs';
+import { UpdateRewardDto } from './dto/update-reward.dto';
 
 @Controller('/admin/musics')
 export class MusicsController {
@@ -42,6 +43,11 @@ export class MusicsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.musicsService.findOne(+id);
+  }
+
+  @Patch(':id/rewards')
+  async updateRewards(@Param('id') id: string, @Body() dto: UpdateRewardDto) {
+    return this.musicsService.updateNextMonthRewards(+id, dto);
   }
 
   @Get(':id/cover')
