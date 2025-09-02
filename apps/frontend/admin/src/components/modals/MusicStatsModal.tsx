@@ -1,6 +1,5 @@
 'use client'
 import { useState } from 'react'
-import SimpleLineChart from '@/components/charts/SimpleLineChart'
 import Card from '@/components/ui/Card'
 
 type Props = { 
@@ -36,8 +35,6 @@ type Props = {
 }
 
 export default function MusicStatsModal({ open, onClose, title = '음원 상세', musicData }: Props) {
-  const [timeTab, setTimeTab] = useState<'daily'|'weekly'|'monthly'>('daily')
-  const [selectedMonth, setSelectedMonth] = useState('3월')
   const [showLyricsModal, setShowLyricsModal] = useState(false)
   
   const formatDateHyphen = (s?: string) => {
@@ -58,7 +55,7 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
         <div className="flex items-center justify-between p-6 pb-4 border-b border-white/10">
           <div>
             <h3 className="text-xl font-semibold text-white">{title}</h3>
-            <p className="mt-1 text-sm text-teal-300">음원 상세 정보 및 통계</p>
+            <p className="mt-1 text-sm text-teal-300">음원 상세 정보</p>
           </div>
           <button 
             onClick={onClose} 
@@ -74,22 +71,21 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
         <div className="flex-1 overflow-y-auto p-6 pt-4 scrollbar-thin scrollbar-track-white/5 scrollbar-thumb-white/20 hover:scrollbar-thumb-white/30">
           {/* 음원 상세 정보 */}
           <div className="grid gap-6 mb-6">
-            {/* 기본 정보 */}
             <Card>
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="h-4 w-1.5 rounded bg-teal-300" />
                   <div className="text-lg font-semibold">음원 기본 정보</div>
                 </div>
-                <div className="flex gap-8 items-start">
+                <div className="flex gap-8 items-stretch">
                   {/* 음원 커버 이미지 */}
                   <div className="flex-shrink-0">
-                    <div className="w-64 h-64 rounded-lg border border-white/10 overflow-hidden bg-white/5">
+                    <div className="h-full min-h-[16rem] max-w-[22rem] rounded-lg border border-white/10 overflow-hidden bg-white/5 self-stretch">
                       {musicData?.id ? (
                         <img 
                           src={`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${musicData.id}/cover`} 
                           alt={`${musicData.title} 커버`}
-                          className="w-full h-full object-cover"
+                          className="h-full w-auto object-contain"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.style.display = 'none';
@@ -102,7 +98,7 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                       <div className={`w-full h-full flex items-center justify-center ${musicData?.id ? 'hidden' : ''}`}>
                         <div className="text-center">
                           <svg className="w-20 h-20 mx-auto text-white/30 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                           </svg>
                           <div className="text-xs text-white/40">음원 커버</div>
                         </div>
@@ -110,7 +106,6 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                     </div>
                   </div>
                   
-                  {/* 음원 정보 */}
                   <div className="flex-1 min-w-0 pt-1">
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                       <div>
@@ -121,24 +116,24 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                         <div className="text-white/60 mb-1">아티스트</div>
                         <div className="text-white font-medium">{musicData?.artist || 'Unknown'}</div>
                       </div>
-                        <div>
-    <div className="text-white/60 mb-1">음원 ID</div>
-    <div className="text-white font-medium">{musicData?.id || '-'}</div>
-  </div>
+                      <div>
+                        <div className="text-white/60 mb-1">음원 ID</div>
+                        <div className="text-white font-medium">{musicData?.id || '-'}</div>
+                      </div>
                       <div>
                         <div className="text-white/60 mb-1">카테고리</div>
                         <div className="text-white font-medium">{musicData?.category || '-'}</div>
                       </div>
-                        <div>
-    <div className="text-white/60 mb-1">음원 유형</div>
-    <div className="text-white font-medium">
-      {(musicData?.musicType ?? '일반') === 'Inst' ? (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/15 text-blue-300 border border-blue-500/30">Inst</span>
-      ) : (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-teal-500/15 text-teal-300 border border-teal-500/30">일반</span>
-      )}
-    </div>
-  </div>
+                      <div>
+                        <div className="text-white/60 mb-1">음원 유형</div>
+                        <div className="text-white font-medium">
+                          {(musicData?.musicType ?? '일반') === 'Inst' ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/15 text-blue-300 border border-blue-500/30">Inst</span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-teal-500/15 text-teal-300 border border-teal-500/30">일반</span>
+                          )}
+                        </div>
+                      </div>
                       <div>
                         <div className="text-white/60 mb-1">재생 시간</div>
                         <div className="text-white font-medium">
@@ -148,7 +143,7 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                           }
                         </div>
                       </div>
-                                              <div>
+                      <div>
                         <div className="text-white/60 mb-1">발매일</div>
                         <div className="text-white font-medium">
                           {formatDateHyphen(musicData?.releaseDate)}
@@ -171,9 +166,11 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                         <div className="text-white font-medium">{musicData?.arranger || '-'}</div>
                       </div>
                       <div>
-                        <div className="text-white/60 mb-1">참고가격(음원, 가사, 음원+가사)</div>
+                        <div className="text-white/60 mb-1">참고가격</div>
                         <div className="text-white font-medium text-xs">
-                          {musicData?.priceMusicOnly || 5}원, {musicData?.priceLyricsOnly || 3}원, {musicData?.priceBoth || 7}원
+                          {(musicData?.musicType ?? '일반') === 'Inst'
+                            ? `${musicData?.priceMusicOnly ?? 3}원`
+                            : `${musicData?.priceMusicOnly ?? 7}원, ${musicData?.priceLyricsOnly ?? 2}원`}
                         </div>
                       </div>
                       <div>
@@ -241,60 +238,6 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                     </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-
-            {/* 유효재생 추이 차트 */}
-            <Card>
-              <div className="mb-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="h-4 w-1.5 rounded bg-teal-300" />
-                    <div className="text-lg font-semibold">유효재생 추이</div>
-                  </div>
-                  <div className="flex gap-2 text-xs">
-                    <button 
-                      onClick={() => setTimeTab('daily')} 
-                      className={`rounded px-2 py-1 ${timeTab === 'daily' ? 'bg-teal-600/90' : 'bg-white/10 hover:bg-white/15'}`}
-                    >
-                      일간
-                    </button>
-                    <button 
-                      onClick={() => setTimeTab('weekly')} 
-                      className={`rounded px-2 py-1 ${timeTab === 'weekly' ? 'bg-teal-600/90' : 'bg-white/10 hover:bg-white/15'}`}
-                    >
-                      주간
-                    </button>
-                    <button 
-                      onClick={() => setTimeTab('monthly')} 
-                      className={`rounded px-2 py-1 ${timeTab === 'monthly' ? 'bg-teal-600/90' : 'bg-white/10 hover:bg-white/15'}`}
-                    >
-                      월간
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div className="min-w-0 overflow-hidden h-64">
-                <SimpleLineChart 
-                  labels={timeTab === 'daily' ? [...Array(31)].map((_,i)=>`${i+1}일`) : 
-                          timeTab === 'weekly' ? ['1주', '2주', '3주', '4주'] : 
-                          ['1월', '2월', '3월', '4월', '5월', '6월']}
-                  series={[
-                    {
-                      label: timeTab === 'daily' ? '일간 유효재생' : timeTab === 'weekly' ? '주간 유효재생' : '월간 유효재생',
-                      data: timeTab === 'daily' ? [...Array(31)].map((_,i)=>100+i*13) :
-                             timeTab === 'weekly' ? [1200, 1350, 1480, 1620] :
-                             [5000, 5800, 6600, 7200, 7800, 8400]
-                    },
-                    {
-                      label: timeTab === 'daily' ? '일간 총재생' : timeTab === 'weekly' ? '주간 총재생' : '월간 총재생',
-                      data: timeTab === 'daily' ? [...Array(31)].map((_,i)=>Math.floor((100+i*13)*1.15)) :
-                             timeTab === 'weekly' ? [1380, 1550, 1700, 1860] :
-                             [5750, 6670, 7590, 8280, 8970, 9660]
-                    }
-                  ]}
-                  colors={['#14b8a6', '#6b7280']}
-                />
               </div>
             </Card>
           </div>

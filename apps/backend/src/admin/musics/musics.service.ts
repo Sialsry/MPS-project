@@ -255,7 +255,7 @@ export class MusicsService implements OnModuleInit {
         durationSec: createMusicDto.durationSec,
         priceMusicOnly: createMusicDto.priceMusicOnly,
         priceLyricsOnly: createMusicDto.priceLyricsOnly,
-        priceBoth: createMusicDto.priceBoth,
+
         rewardPerPlay: createMusicDto.rewardPerPlay,
         maxPlayCount: createMusicDto.maxPlayCount,
         accessTier: createMusicDto.accessTier,
