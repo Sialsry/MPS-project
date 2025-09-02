@@ -18,7 +18,7 @@ export const musics = pgTable('musics', {
   lyrics_text: text('lyrics_text'),
   lyrics_file_path: text('lyrics_file_path'), // 가사 파일 경로 (기존 lyrics_file에서 변경)
   inst: boolean('inst').notNull().default(false), // true: instrumental, false: with vocal. 가사가 없으면 true
-  isrc: text('isrc').unique(),
+  isrc: text('isrc'),
   duration_sec: integer('duration_sec'),
   release_date: date('release_date'),
   cover_image_url: text('cover_image_url'),

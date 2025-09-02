@@ -83,7 +83,7 @@ export default function MusicsPage() {
     }
     setDeleteModalOpen(true)
   }
-  
+
   // 드롭다운 토글 함수
   const toggleDropdown = (dropdownName: string, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -207,7 +207,7 @@ export default function MusicsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="min-w-[300px]">
-            <input
+            <input 
               className="w-full px-3 py-2 text-white placeholder-white/50 outline-none border border-white/10 rounded-lg focus:border-teal-400/50 transition-colors text-sm" 
               placeholder="음원명, 아티스트, 태그로 검색 .." 
               value={searchQuery}
@@ -233,13 +233,13 @@ export default function MusicsPage() {
             음원 등록
           </button>
         </div>
-
+        
         <div className="flex items-center gap-4">
           <div className="text-sm text-white/60">
             총 음원: <span className="text-teal-300 font-semibold">{totalCount}</span>개 | 
             선택됨: <span className="text-teal-300 font-semibold">{selectedItems.size}</span>개
           </div>
-          <button
+          <button 
             onClick={() => handleDelete(Array.from(selectedItems))}
             disabled={selectedItems.size === 0}
             className={`rounded-lg border border-white/10 px-4 py-2 text-sm font-medium transition-all duration-200 ${
@@ -266,7 +266,7 @@ export default function MusicsPage() {
           <table className="w-full text-sm">
             <thead className="text-center">
               <tr className="border-b border-white/10">
-                <th className="px-6 py-4">
+                <th className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                   <input 
                     type="checkbox" 
                     checked={selectAll}
@@ -583,16 +583,21 @@ export default function MusicsPage() {
                       setStatsOpen(true)
                     }}
                   >
-                  <td className="px-6 py-4 text-center">
-                    <input 
-                      type="checkbox" 
-                        checked={selectedItems.has(typeof item.id === 'string' ? parseInt(item.id) : item.id)}
-                        onChange={(e) => {
+                  <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                          checked={selectedItems.has(typeof item.id === 'string' ? parseInt(item.id) : item.id)}
+                                                  onChange={(e) => {
                           e.stopPropagation()
                           handleItemSelect(item.id)
                         }}
-                      className="accent-teal-400 rounded" 
-                    />
+                        onClick={(e) => {
+                          e.stopPropagation()
+                        }}
+                        className="accent-teal-400 rounded" 
+                      />
+                    </div>
                   </td>
 
                   <td className="px-6 py-4 text-center">
@@ -621,7 +626,7 @@ export default function MusicsPage() {
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex gap-2 justify-center">
-                      <button
+                      <button 
                         className="rounded-lg bg-gradient-to-r from-teal-500 to-teal-600 px-3 py-1.5 text-xs text-white font-medium hover:from-teal-600 hover:to-teal-700 transition-all duration-200"
                         onClick={(e) => {
                           e.stopPropagation()
@@ -630,7 +635,7 @@ export default function MusicsPage() {
                       >
                         수정
                       </button>
-                      <button
+                      <button 
                         className="rounded-lg bg-gradient-to-r from-teal-500 to-teal-600 px-3 py-1.5 text-xs text-white font-medium hover:from-teal-600 hover:to-teal-700 transition-all duration-200" 
                         onClick={(e) => {
                           e.stopPropagation()
@@ -680,7 +685,7 @@ export default function MusicsPage() {
       <MusicStatsModal open={statsOpen} onClose={()=>setStatsOpen(false)} title={statsTitle} />
 
       {/* 수정/등록 모달 */}
-      <MusicEditModal
+      <MusicEditModal 
         open={editModalOpen} 
         onClose={() => {
           setEditModalOpen(false)
