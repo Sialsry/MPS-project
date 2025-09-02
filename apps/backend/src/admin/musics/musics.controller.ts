@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Res, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Res, UseInterceptors, UploadedFiles, BadRequestException } from '@nestjs/common';
 import { MusicsService } from './musics.service';
 import { CreateMusicDto } from './dto/create-music.dto';
 import { UpdateMusicDto } from './dto/update-music.dto';
@@ -9,6 +9,7 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import * as fs from 'fs';
 import { UpdateRewardDto } from './dto/update-reward.dto';
+import { CreateCategoryDto } from './dto/create-category.dto';
 
 @Controller('/admin/musics')
 export class MusicsController {
@@ -23,6 +24,14 @@ export class MusicsController {
   async getCategories() {
     return this.musicsService.getCategories();
   }
+
+  @Post('categories')
+  async createCategory(@Body() dto: CreateCategoryDto) {
+    const name = dto.name?.trim();
+    if (!name) throw new BadRequestException('카테고리 이름은 필수입니다.');
+    return this.musicsService.createCategory({ ...dto, name });
+  }
+
   @Post()
   create(@Body() createMusicDto: CreateMusicDto) {
     return this.musicsService.create(createMusicDto);

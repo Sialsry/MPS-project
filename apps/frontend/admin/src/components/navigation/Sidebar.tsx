@@ -9,8 +9,7 @@ const DASHBOARD = { href: '/admin/dashboard', label: '대시보드' }
 const MUSIC_GROUP = {
   label: '음원 관리',
   items: [
-    { href: '/admin/musics', label: '음원 목록' },
-    { href: '/admin/musics/categories', label: '카테고리 관리' },
+    { href: '/admin/musics', label: '음원 목록' }
   ],
 }
 

@@ -271,6 +271,23 @@ export class MusicsService implements OnModuleInit {
   }
   }
 
+  async createCategory(dto: { name: string; description?: string }) {
+    const name = dto.name.trim();
+    const dup = await this.db
+      .select({ id: music_categories.id })
+      .from(music_categories)
+      .where(sql`LOWER(${music_categories.name}) = LOWER(${name})`)
+      .limit(1);
+    if (dup.length > 0) {
+      throw new BadRequestException('이미 존재하는 카테고리입니다.');
+    }
+    const inserted = await this.db
+      .insert(music_categories)
+      .values({ name })
+      .returning({ id: music_categories.id, name: music_categories.name });
+    return { id: inserted[0].id, name };
+  }
+
   async findOne(id: number) {
     try {
       const currentMonth = new Date().toISOString().slice(0, 7);
@@ -396,7 +413,6 @@ export class MusicsService implements OnModuleInit {
       let lyricsFilePath: string | undefined;
       let coverImagePath: string | undefined;
 
-      // Save audio
       if (files.audio && files.audio[0]) {
         const file = files.audio[0];
         const original = this.sanitizeFilename(file.originalname || 'audio');
@@ -404,30 +420,25 @@ export class MusicsService implements OnModuleInit {
         const filename = `${timestamp}_${original}`;
         const abs = path.resolve(musicBaseDir, filename);
         await fs.writeFile(abs, file.buffer);
-        audioFilePath = filename; // relative path stored in DB
+        audioFilePath = filename; 
       }
 
-      // Save lyrics
       if (files.lyrics && files.lyrics[0]) {
         const file = files.lyrics[0];
         const original = this.sanitizeFilename(file.originalname || 'lyrics.txt');
         const timestamp = Date.now();
         const filename = `${timestamp}_${original}`;
         const abs = path.resolve(lyricsBaseDir, filename);
-        // Normalize UTF-16 BOM (LE/BE) -> UTF-8 to avoid garbled text on open
         let outBuffer = file.buffer;
         if (outBuffer.length >= 2) {
           const b0 = outBuffer[0];
           const b1 = outBuffer[1];
-          // UTF-16 LE BOM 0xFF 0xFE
           if (b0 === 0xFF && b1 === 0xFE) {
             const td = new TextDecoder('utf-16le');
             const text = td.decode(outBuffer.subarray(2));
             outBuffer = Buffer.from(text, 'utf-8');
           }
-          // UTF-16 BE BOM 0xFE 0xFF
           else if (b0 === 0xFE && b1 === 0xFF) {
-            // swap bytes (skip BOM)
             const swapped = Buffer.alloc(outBuffer.length - 2);
             for (let i = 2; i < outBuffer.length; i += 2) {
               const hi = outBuffer[i];
@@ -441,10 +452,9 @@ export class MusicsService implements OnModuleInit {
           }
         }
         await fs.writeFile(abs, outBuffer);
-        lyricsFilePath = filename; // relative path stored in DB
+        lyricsFilePath = filename; 
       }
 
-      // Save cover image
       if (files.cover && files.cover[0]) {
         const file = files.cover[0];
         const original = this.sanitizeFilename(file.originalname || 'cover');
@@ -452,7 +462,7 @@ export class MusicsService implements OnModuleInit {
         const filename = `${timestamp}_${original}`;
         const abs = path.resolve(imagesBaseDir, filename);
         await fs.writeFile(abs, file.buffer);
-        coverImagePath = filename; // relative path stored in DB
+        coverImagePath = filename; 
       }
 
       return { audioFilePath, lyricsFilePath, coverImagePath };
@@ -506,10 +516,11 @@ export class MusicsService implements OnModuleInit {
         throw new BadRequestException('음원 파일, 썸네일, ISRC, 음원 유형은 수정할 수 없습니다.');
       }
     }
+
     const updates: any = {};
+
     if (updateMusicDto.title !== undefined) updates.title = updateMusicDto.title;
     if (updateMusicDto.artist !== undefined) updates.artist = updateMusicDto.artist;
-    // musicType은 수정 금지
     if (updateMusicDto.releaseDate !== undefined) updates.release_date = updateMusicDto.releaseDate || null;
     if (updateMusicDto.priceMusicOnly !== undefined) updates.price_per_play = updateMusicDto.priceMusicOnly.toString();
     if (updateMusicDto.priceLyricsOnly !== undefined) updates.lyrics_price = updateMusicDto.priceLyricsOnly.toString();
@@ -521,6 +532,12 @@ export class MusicsService implements OnModuleInit {
     } else if (updateMusicDto.lyricsText !== undefined) {
       updates.lyrics_text = updateMusicDto.lyricsText || null;
       updates.lyrics_file_path = null;
+    }
+
+    let oldCategoryId: number | null = null;
+    if (updateMusicDto.category !== undefined) {
+      const before = await this.db.select({ id: musics.category_id }).from(musics).where(eq(musics.id, id)).limit(1);
+      oldCategoryId = before.length ? (before[0].id as unknown as number) : null;
     }
 
     if (updateMusicDto.category !== undefined) {
@@ -545,7 +562,6 @@ export class MusicsService implements OnModuleInit {
         .map(t => t.trim())
         .filter(t => t.length > 0);
 
-      // 기존 태그 삭제
       await this.db.delete(music_tags).where(eq(music_tags.music_id, id));
 
       for (const tagText of tagArr) {
@@ -569,36 +585,42 @@ export class MusicsService implements OnModuleInit {
       }
     }
 
+    if (updateMusicDto.category !== undefined && oldCategoryId && updates.category_id && oldCategoryId !== updates.category_id) {
+      await this.cleanupOrphanCategories();
+    }
+
     return { message: '음원 정보가 수정되었습니다.', id };
   }
-  
+
+  private async cleanupOrphanCategories() {
+    await this.db.execute(sql`
+      delete from ${music_categories} c
+      where not exists (
+        select 1 from ${musics} m where m.category_id = c.id
+      )
+    `);
+  }
+
   async delete(ids: number[]) {
     try {
       // 모든 음원이 존재하는지 한 번에 확인
       const existingMusics = await this.db.select({ id: musics.id }).from(musics).where(inArray(musics.id, ids));
-      
       const existingIds = existingMusics.map(m => m.id);
       const missingIds = ids.filter(id => !existingIds.includes(id));
-      
-      // 만약 누락된 음원이 있으면 에러
       if (missingIds.length > 0) {
         throw new Error(`음원 ID ${missingIds.join(', ')}를 찾을 수 없습니다.`);
       }
-      
-      // 모든 음원이 존재하면 삭제 진행
-      // 관련 테이블 데이터 일괄 삭제
       await this.db.delete(monthly_music_rewards).where(inArray(monthly_music_rewards.music_id, ids));
       await this.db.delete(music_tags).where(inArray(music_tags.music_id, ids));
       await this.db.delete(music_plays).where(inArray(music_plays.music_id, ids));
-      
-      // 음원 삭제
       await this.db.delete(musics).where(inArray(musics.id, ids));
-      
-      // 응답 메시지 생성
+
+      // 고아 카테고리 정리
+      await this.cleanupOrphanCategories();
+
       const message = ids.length === 1 
         ? `음원 ID ${ids[0]} 삭제 완료`
         : `${ids.length}개 음원 일괄 삭제 완료`;
-      
       return {
         message,
         deletedIds: ids,
@@ -608,7 +630,6 @@ export class MusicsService implements OnModuleInit {
           failed: 0
         }
       };
-      
     } catch (error) {
       throw new Error(`음원 삭제 실패: ${error.message}`);
     }

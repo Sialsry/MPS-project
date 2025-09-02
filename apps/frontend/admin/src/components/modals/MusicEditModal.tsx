@@ -81,6 +81,45 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
   
   const getBasename = (p?: string) => (p ? p.split('/').pop() || '' : '')
 
+  // 카테고리 인라인 생성 UI 상태
+  const [showAddCategory, setShowAddCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [addingCategory, setAddingCategory] = useState(false)
+
+  const handleAddCategory = async () => {
+    const name = newCategoryName.trim()
+    if (!name) {
+      showToastMessage('카테고리 이름을 입력하세요.', 'error')
+      return
+    }
+    try {
+      setAddingCategory(true)
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+      const res = await fetch(`${baseUrl}/admin/musics/categories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({}))
+        showToastMessage(err?.message || '카테고리 생성 실패', 'error')
+        return
+      }
+      const data = await res.json()
+      const created = { id: data.id ?? Date.now(), name: data.name ?? name }
+      setCategories(prev => [...prev, created])
+      setCategory(created.name)
+      setShowAddCategory(false)
+      setNewCategoryName('')
+      // 성공 토스트 제거
+    } catch (e) {
+      showToastMessage('카테고리 생성 중 오류가 발생했습니다.', 'error')
+      console.error(e)
+    } finally {
+      setAddingCategory(false)
+    }
+  }
+
   useEffect(() => {
     if (!isCreateMode && musicData) {
       if ((musicData as any).lyricsFilePath) {
@@ -529,6 +568,33 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                       <option value="" disabled>카테고리 로딩 중...</option>
                     )}
                   </select>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCategory(v => !v)}
+                      className="text-xs text-teal-300 hover:text-teal-200"
+                    >
+                      {showAddCategory ? '취소' : '+ 새 카테고리 추가'}
+                    </button>
+                  </div>
+                  {showAddCategory && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={newCategoryName}
+                        onChange={(e)=>setNewCategoryName(e.target.value)}
+                        placeholder="새 카테고리 이름"
+                        className="flex-1 rounded-lg bg-black/30 px-3 py-2 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCategory}
+                        disabled={addingCategory}
+                        className={`rounded-lg px-3 py-2 text-sm ${addingCategory ? 'bg-white/10 text-white/60' : 'bg-teal-600 text-white hover:bg-teal-500'}`}
+                      >
+                        추가
+                      </button>
+                    </div>
+                  )}
                   {fieldErrors.category && (
                     <div className="text-sm text-red-400 flex items-center gap-2">
                       <span className="w-2 h-2 bg-red-400 rounded-full"></span>
