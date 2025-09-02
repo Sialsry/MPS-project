@@ -7,6 +7,7 @@ import MusicEditModal from '@/components/modals/MusicEditModal'
 export default function MusicsPage() {
   const [statsOpen, setStatsOpen] = useState(false)
   const [statsTitle, setStatsTitle] = useState<string>('음원 상세 통계')
+  const [statsMusicData, setStatsMusicData] = useState<any>(null)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string>('')
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set())
@@ -578,9 +579,30 @@ export default function MusicsPage() {
                     className={`border-b border-white/5 transition-all duration-200 cursor-pointer ${
                       item.index % 2 === 0 ? 'bg-white/2' : 'bg-white/1'
                     } hover:bg-white/8`}
-                    onClick={() => {
+                    onClick={async () => {
                       setStatsTitle(item.title)
-                      setStatsOpen(true)
+                      try {
+                                                 const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${item.id}`)
+                         const data = await res.json()
+                         setStatsMusicData({
+                           id: String(data.id),
+                           title: data.title,
+                           artist: data.artist,
+                           category: data.category,
+                           genre: undefined,
+                           tags: data.tags,
+                           releaseDate: data.releaseDate,
+                           durationSec: data.durationSec,
+                           musicType: data.musicType,
+                           isrc: data.isrc,
+                           createdAt: data.createdAt,
+                           lyricsText: data.lyricsText,
+                           lyricsFilePath: data.lyricsFilePath,
+                         })
+                        setStatsOpen(true)
+                      } catch (e) {
+                        console.error('상세 조회 실패', e)
+                      }
                     }}
                   >
                   <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
@@ -637,10 +659,32 @@ export default function MusicsPage() {
                       </button>
                       <button 
                         className="rounded-lg bg-gradient-to-r from-teal-500 to-teal-600 px-3 py-1.5 text-xs text-white font-medium hover:from-teal-600 hover:to-teal-700 transition-all duration-200" 
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation()
                           setStatsTitle(item.title)
-                          setStatsOpen(true)
+                          try {
+                            const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${item.id}`)
+                            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                            const data = await res.json()
+                            setStatsMusicData({
+                              id: String(data.id),
+                              title: data.title,
+                              artist: data.artist,
+                              category: data.category,
+                              genre: undefined,
+                              tags: data.tags,
+                              releaseDate: data.releaseDate,
+                              durationSec: data.durationSec,
+                              musicType: data.musicType,
+                              isrc: data.isrc,
+                              createdAt: data.createdAt,
+                              lyricsText: data.lyricsText,
+                              lyricsFilePath: data.lyricsFilePath,
+                            })
+                            setStatsOpen(true)
+                          } catch (err) {
+                            console.error('상세 조회 실패', err)
+                          }
                         }}
                       >
                         상세
@@ -682,7 +726,7 @@ export default function MusicsPage() {
       </div>
 
       {/* 통계 모달 */}
-      <MusicStatsModal open={statsOpen} onClose={()=>setStatsOpen(false)} title={statsTitle} />
+      <MusicStatsModal open={statsOpen} onClose={()=>setStatsOpen(false)} title={statsTitle} musicData={statsMusicData} />
 
       {/* 수정/등록 모달 */}
       <MusicEditModal 

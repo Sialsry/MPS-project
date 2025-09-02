@@ -11,12 +11,12 @@ type Props = {
     id?: string;
     title: string;
     artist: string;
-    album?: string;
     category?: string;
-    genre: string;
-    tags: string;
-    releaseYear: number;
-    durationSec: number;
+    genre?: string;
+    tags?: string;
+    releaseDate?: string;
+    releaseYear?: number;
+    durationSec?: number;
     musicType?: '일반' | 'Inst' | '가사만';
     priceMusicOnly?: number;
     priceLyricsOnly?: number;
@@ -30,6 +30,8 @@ type Props = {
     isrc?: string;
     coverImageUrl?: string;
     createdAt?: string;
+    lyricsText?: string;
+    lyricsFilePath?: string;
   }
 }
 
@@ -37,6 +39,16 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
   const [timeTab, setTimeTab] = useState<'daily'|'weekly'|'monthly'>('daily')
   const [selectedMonth, setSelectedMonth] = useState('3월')
   const [showLyricsModal, setShowLyricsModal] = useState(false)
+  
+  const formatDateHyphen = (s?: string) => {
+    if (!s) return '-'
+    const d = new Date(s)
+    if (isNaN(d.getTime())) return '-'
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
   
   if (!open) return null
   return (
@@ -73,9 +85,9 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                   {/* 음원 커버 이미지 */}
                   <div className="flex-shrink-0">
                     <div className="w-64 h-64 rounded-lg border border-white/10 overflow-hidden bg-white/5">
-                      {musicData?.coverImageUrl ? (
+                      {musicData?.id ? (
                         <img 
-                          src={musicData.coverImageUrl} 
+                          src={`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${musicData.id}/cover`} 
                           alt={`${musicData.title} 커버`}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -87,7 +99,7 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                           }}
                         />
                       ) : null}
-                      <div className={`w-full h-full flex items-center justify-center ${musicData?.coverImageUrl ? 'hidden' : ''}`}>
+                      <div className={`w-full h-full flex items-center justify-center ${musicData?.id ? 'hidden' : ''}`}>
                         <div className="text-center">
                           <svg className="w-20 h-20 mx-auto text-white/30 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
@@ -109,38 +121,42 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                         <div className="text-white/60 mb-1">아티스트</div>
                         <div className="text-white font-medium">{musicData?.artist || 'Unknown'}</div>
                       </div>
-                      <div>
-                        <div className="text-white/60 mb-1">앨범</div>
-                        <div className="text-white font-medium">{musicData?.album || '-'}</div>
-                      </div>
-                      <div>
-                        <div className="text-white/60 mb-1">장르</div>
-                        <div className="text-white font-medium">{musicData?.genre || 'Pop'}</div>
-                      </div>
+                        <div>
+    <div className="text-white/60 mb-1">음원 ID</div>
+    <div className="text-white font-medium">{musicData?.id || '-'}</div>
+  </div>
                       <div>
                         <div className="text-white/60 mb-1">카테고리</div>
                         <div className="text-white font-medium">{musicData?.category || '-'}</div>
                       </div>
-                      <div>
-                        <div className="text-white/60 mb-1">음원 유형</div>
-                        <div className="text-white font-medium">{musicData?.musicType || '일반'}</div>
-                      </div>
+                        <div>
+    <div className="text-white/60 mb-1">음원 유형</div>
+    <div className="text-white font-medium">
+      {(musicData?.musicType ?? '일반') === 'Inst' ? (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/15 text-blue-300 border border-blue-500/30">Inst</span>
+      ) : (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-teal-500/15 text-teal-300 border border-teal-500/30">일반</span>
+      )}
+    </div>
+  </div>
                       <div>
                         <div className="text-white/60 mb-1">재생 시간</div>
                         <div className="text-white font-medium">
-                          {musicData?.durationSec ? 
+                          {typeof musicData?.durationSec === 'number' ? 
                             `${Math.floor(musicData.durationSec / 60)}분 ${musicData.durationSec % 60}초` : 
-                            '3분 30초'
+                            '-'
                           }
                         </div>
                       </div>
-                      <div>
-                        <div className="text-white/60 mb-1">발매년도</div>
-                        <div className="text-white font-medium">{musicData?.releaseYear || '2024'}</div>
+                                              <div>
+                        <div className="text-white/60 mb-1">발매일</div>
+                        <div className="text-white font-medium">
+                          {formatDateHyphen(musicData?.releaseDate)}
+                        </div>
                       </div>
                       <div>
                         <div className="text-white/60 mb-1">ISRC</div>
-                        <div className="text-white font-medium font-mono text-xs">{musicData?.isrc || '-'}</div>
+                        <div className="text-white font-medium font-mono">{musicData?.isrc || '-'}</div>
                       </div>
                       <div>
                         <div className="text-white/60 mb-1">작사자</div>
@@ -189,21 +205,39 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                       </div>
                       <div>
                         <div className="text-white/60 mb-1">등록일</div>
-                        <div className="text-white font-medium">{musicData?.createdAt || '2024.01.15'}</div>
+                        <div className="text-white font-medium">
+                          {formatDateHyphen(musicData?.createdAt)}
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-white/60 mb-1">가사</div>
-                        <button
-                          onClick={() => setShowLyricsModal(true)}
-                          className="text-teal-400 hover:text-teal-300 text-sm font-medium transition-colors flex items-center gap-1"
-                        >
-                          가사보기
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        </button>
-                      </div>
+                      {musicData?.musicType !== 'Inst' && (
+                        <div>
+                          <div className="text-white/60 mb-1">가사</div>
+                          {musicData?.lyricsText && musicData.lyricsText.trim().length > 0 ? (
+                            <button
+                              onClick={() => setShowLyricsModal(true)}
+                              className="text-teal-400 hover:text-teal-300 text-sm font-medium transition-colors flex items-center gap-1"
+                            >
+                              가사보기
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
+                          ) : musicData?.lyricsFilePath ? (
+                            <a
+                              href={`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${musicData.id}/lyrics?mode=download`}
+                              className="text-teal-400 hover:text-teal-300 text-sm font-medium transition-colors flex items-center gap-1"
+                            >
+                              가사 다운로드
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
+                              </svg>
+                            </a>
+                          ) : (
+                            <span className="text-white/50 text-sm">가사가 없습니다.</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -292,35 +326,7 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
             {/* 가사 내용 */}
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
               <div className="text-white/80 text-base leading-relaxed whitespace-pre-line">
-                {`[Verse 1]
-This is the first verse of ${musicData?.title || title}
-A beautiful melody that touches your heart
-With lyrics that speak to your soul
-
-[Chorus]
-Sing along with the chorus
-Let the music take you away
-To a place where dreams come true
-
-[Verse 2]
-The second verse brings more emotion
-Every word carefully chosen
-To create a perfect harmony
-
-[Bridge]
-In this bridge we find
-The connection between heart and mind
-A moment of pure musical bliss
-
-[Chorus]
-Sing along with the chorus
-Let the music take you away
-To a place where dreams come true
-
-[Outro]
-As the song comes to an end
-We hope it brought you joy
-Until we meet again in melody`}
+                {musicData?.lyricsText && musicData.lyricsText.trim().length > 0 ? musicData.lyricsText : '가사가 없습니다.'}
               </div>
             </div>
           </div>

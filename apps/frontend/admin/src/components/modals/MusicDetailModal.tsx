@@ -19,8 +19,9 @@ type Music = {
   totalPlays: number
   averageRating: number
   releaseDate: string
-  duration: string
+  duration: number // 초 단위로 변경
   artist: string
+  musicType: '일반' | 'Inst' // 음원 유형 추가
 }
 
 type Props = {
@@ -147,6 +148,69 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
 
           {/* 콘텐츠 영역 */}
           <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+            {/* 기본 정보 섹션 */}
+            <div className="rounded-xl border border-white/10 p-6 mb-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
+                기본 정보
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <div className="text-sm text-white/60">음원 ID</div>
+                  <div className="text-white font-medium">{music.id}</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-white/60">제목</div>
+                  <div className="text-white font-medium">{music.title}</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-white/60">아티스트</div>
+                  <div className="text-white font-medium">{music.artist}</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-white/60">카테고리</div>
+                  <div className="text-white font-medium">{music.category}</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-white/60">음원 유형</div>
+                  <div className="text-white font-medium">
+                    {music.musicType === 'Inst' ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/15 text-blue-300 border border-blue-400/25">
+                        Inst
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-teal-500/15 text-teal-300 border border-teal-400/25">
+                        일반
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-white/60">발매일</div>
+                  <div className="text-white font-medium">
+                    {new Date(music.releaseDate).toLocaleDateString('ko-KR', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-white/60">재생시간</div>
+                  <div className="text-white font-medium">
+                    {Math.floor(music.duration / 60)}분 {music.duration % 60}초
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-white/60">상태</div>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${getStatusColor(music.status)}`}></div>
+                    <span className="text-white font-medium capitalize">{music.status}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* 사용 현황 탭 */}
             {activeTab === 'usage' && (
               <div className="space-y-6">

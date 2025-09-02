@@ -1,5 +1,5 @@
 'use client'
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import Card from '@/components/ui/Card'
 import Title from '@/components/ui/Title'
 
@@ -68,6 +68,53 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
   // API 설정
   const [accessTier, setAccessTier] = useState<'all' | 'subscribed'>(isCreateMode ? 'subscribed' : (musicData?.accessTier || 'all'))
 
+  // 카테고리 데이터
+  const [categories, setCategories] = useState<Array<{id: number, name: string}>>([])
+  
+  // 필드별 오류 상태
+  const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({})
+  
+  // 토스트 상태
+  const [showToast, setShowToast] = useState(false)
+  const [toastMessage, setToastMessage] = useState('')
+  const [toastType, setToastType] = useState<'success' | 'error'>('success')
+  
+
+
+  // 카테고리 데이터 가져오기
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        console.log('카테고리 데이터 가져오기 시작...')
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+        const response = await fetch(`${baseUrl}/admin/musics/categories`)
+        console.log('API 응답 상태:', response.status)
+        console.log('호출한 URL:', `${baseUrl}/admin/musics/categories`)
+        
+        if (response.ok) {
+          const data = await response.json()
+          console.log('받은 카테고리 데이터:', data)
+          console.log('카테고리 배열:', data.categories)
+          setCategories(data.categories || [])
+          console.log('categories 상태 설정 완료')
+        } else {
+          console.error('API 응답 실패:', response.status, response.statusText)
+        }
+      } catch (error) {
+        console.error('카테고리 조회 실패:', error)
+      }
+    }
+    
+    fetchCategories()
+  }, [])
+
+  // categories 상태 변화 감지
+  useEffect(() => {
+    console.log('categories 상태 변경됨:', categories)
+  }, [categories])
+
+
+
   // 미리보기
   const totalReward = useMemo(() => {
     const rewardPerPlayNum = Number(rewardPerPlay) || 0
@@ -82,7 +129,36 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
 
   function onSelectAudio(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
-    if (f) setAudioFile(f)
+    if (f) {
+      setAudioFile(f)
+      validateField('audioFile', f) // 실시간 검증 추가
+      
+      // 파일 크기 자동 설정
+      const fileSizeBytes = f.size
+      
+      // Web Audio API로 재생시간 자동 추출
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const fileReader = new FileReader()
+      
+      fileReader.onload = function(e) {
+        const arrayBuffer = e.target?.result as ArrayBuffer
+        audioContext.decodeAudioData(arrayBuffer, function(buffer) {
+          const duration = Math.round(buffer.duration)
+          setDurationSec(duration)
+          
+          // 파일 정보 로그
+          console.log('음원 파일 정보:', {
+            name: f.name,
+            size: fileSizeBytes,
+            duration: duration + '초'
+          })
+        }, function(error) {
+          console.error('오디오 파일 디코딩 실패:', error)
+        })
+      }
+      
+      fileReader.readAsArrayBuffer(f)
+    }
   }
 
   function onSelectThumb(e: React.ChangeEvent<HTMLInputElement>) {
@@ -95,22 +171,184 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
     if (f) setLyricsFile(f)
   }
 
-  function onSave() {
-    // 여기에 실제 수정/등록 로직 추가
+
+
+  // 음원 등록 완료 후 재생 URL 생성
+  const generatePlaybackUrls = (musicId: number) => {
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4001'
+    
+    return {
+      playMusic: `${baseUrl}/api/musics/${musicId}/play`,
+      downloadLyrics: `${baseUrl}/api/musics/${musicId}/lyrics`,
+      previewUrl: `${baseUrl}/api/musics/${musicId}/preview`
+    }
+  }
+
+  // 토스트 표시 함수
+  const showToastMessage = (message: string, type: 'success' | 'error' = 'success') => {
+    setToastMessage(message)
+    setToastType(type)
+    setShowToast(true)
+    
+    // 3초 후 자동으로 숨김
+    setTimeout(() => {
+      setShowToast(false)
+    }, 3000)
+  }
+
+  // 실시간 필드 검증
+  const validateField = (fieldName: string, value: any) => {
+    let error = ''
+    
+    switch (fieldName) {
+      case 'audioFile':
+        if (!value) error = '음원 파일을 선택해주세요'
+        break
+      case 'title':
+        if (!value?.trim()) error = '음원명을 입력해주세요'
+        break
+      case 'artist':
+        if (!value?.trim()) error = '아티스트를 입력해주세요'
+        break
+      case 'category':
+        if (!value) error = '카테고리를 선택해주세요'
+        break
+      case 'musicType':
+        if (!value) error = '음원 유형을 선택해주세요'
+        break
+      case 'releaseDate':
+        if (!value) error = '발매일을 입력해주세요'
+        break
+      case 'isrc':
+        if (!value?.trim()) error = 'ISRC를 입력해주세요'
+        break
+      case 'lyricsText':
+        if (musicType !== 'Inst' && lyricsInputType === 'text' && !value?.trim()) {
+          error = '가사를 입력해주세요'
+        }
+        break
+      case 'lyricsFile':
+        if (musicType !== 'Inst' && lyricsInputType === 'file' && !value) {
+          error = '가사 파일을 선택해주세요'
+        }
+        break
+    }
+    
+    setFieldErrors(prev => ({
+      ...prev,
+      [fieldName]: error
+    }))
+    
+    return error
+  }
+
+  // 필수 필드 검증
+  const validateRequiredFields = () => {
+    const errors: string[] = []
+    
+    if (!audioFile) errors.push('음원 파일을 선택해주세요')
+    if (!title.trim()) errors.push('음원명을 입력해주세요')
+    if (!artist.trim()) errors.push('아티스트를 입력해주세요')
+    if (!category) errors.push('카테고리를 선택해주세요')
+    if (!musicType) errors.push('음원 유형을 선택해주세요')
+    if (!releaseDate) errors.push('발매일을 입력해주세요')
+    if (!isrc?.trim()) errors.push('ISRC를 입력해주세요')
+    
+    // 가사 필드는 Inst가 아닐 때만 필수
+    if (musicType !== 'Inst') {
+      if (lyricsInputType === 'text' && !lyricsText?.trim()) {
+        errors.push('가사를 입력해주세요')
+      } else if (lyricsInputType === 'file' && !lyricsFile) {
+        errors.push('가사 파일을 선택해주세요')
+      }
+    }
+    
+    return errors
+  }
+
+  async function onSave() {
     if (isCreateMode) {
-      console.log('음원 등록됨:', {
-        title, artist, category, tags, releaseDate, durationSec, musicType,
-        lyricist, composer, arranger, isrc,
-        priceMusicOnly, priceLyricsOnly, priceBoth, rewardPerPlay, maxPlayCount, accessTier
-      })
+      // 실시간 검증으로 이미 모든 필드가 검증되었으므로 바로 진행
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+
+        // 1) 파일 업로드 (오디오/가사)
+        const formData = new FormData()
+        if (audioFile) formData.append('audio', audioFile)
+        if (lyricsInputType === 'file' && lyricsFile) formData.append('lyrics', lyricsFile)
+        if (thumbFile) formData.append('cover', thumbFile)
+
+        const uploadRes = await fetch(`${baseUrl}/admin/musics/upload`, {
+          method: 'POST',
+          body: formData
+        })
+        if (!uploadRes.ok) {
+          showToastMessage('파일 업로드에 실패했습니다.', 'error')
+          return
+        }
+        const uploadData = await uploadRes.json()
+        const audioPath = uploadData.audioFilePath
+        const lyricsPath = uploadData.lyricsFilePath
+
+        if (!audioPath) {
+          showToastMessage('오디오 파일 업로드 결과가 없습니다.', 'error')
+          return
+        }
+
+        // 2) 음원 등록
+        const response = await fetch(`${baseUrl}/admin/musics`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            artist,
+            category,
+            tags,
+            releaseDate,
+            durationSec,
+            musicType,
+            lyricist,
+            composer,
+            arranger,
+            isrc,
+            priceMusicOnly,
+            priceLyricsOnly,
+            priceBoth,
+            rewardPerPlay,
+            maxPlayCount,
+            hasRewards,
+            accessTier,
+            lyricsText: lyricsInputType === 'text' ? lyricsText : undefined,
+            lyricsInputType,
+            audioFilePath: audioPath,
+            coverImagePath: uploadData.coverImagePath || undefined,
+            lyricsFilePath: lyricsInputType === 'file' ? lyricsPath : undefined
+          })
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          console.log('음원 등록 성공:', result)
+          showToastMessage(`음원 등록이 완료되었습니다!`)
+          setTimeout(() => { onClose() }, 1000)
+        } else {
+          const errorData = await response.json().catch(() => ({}))
+          showToastMessage(`음원 등록 실패`, 'error')
+          console.error('음원 등록 실패:', errorData)
+        }
+      } catch (error) {
+        console.error('음원 등록 에러:', error)
+        // 실시간 검증으로 이미 모든 필드가 검증되었으므로 여기서는 네트워크 오류만 처리
+      }
     } else {
+      // 수정 모드
       console.log('음원 수정됨:', {
         title, artist, category, tags, releaseDate, durationSec, musicType,
         lyricist, composer, arranger, isrc,
         priceMusicOnly, priceLyricsOnly, priceBoth, rewardPerPlay, maxPlayCount, accessTier
       })
+      onClose()
     }
-    onClose()
   }
 
   return (
@@ -120,6 +358,7 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
         <div className="flex items-center justify-between p-6 pb-4 border-b border-white/10">
           <div>
             <h3 className="text-xl font-semibold text-white">{isCreateMode ? '음원 등록' : '음원 수정'}</h3>
+
           </div>
           <button 
             onClick={onClose} 
@@ -139,17 +378,25 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
               <Title>음원 기본 정보</Title>
               <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="space-y-3">
-                  <label className="block text-sm font-medium text-white/80">음원 파일 (.mp3/.wav/.flac)</label>
+                  <label className="block text-sm font-medium text-white/80">음원 파일 (.mp3/.wav/.flac) <span className="text-red-400">*</span></label>
                   <input 
                     type="file" 
                     accept=".mp3,.wav,.flac" 
                     onChange={onSelectAudio} 
-                    className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-sm text-white ring-1 ring-white/8 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-500/20 file:px-3 file:py-1.5 file:text-teal-300 hover:file:bg-teal-500/30 transition-all duration-200" 
+                    className={`w-full rounded-lg px-3 py-2.5 text-sm text-white ring-1 transition-all duration-200 ${
+                      fieldErrors.audioFile ? 'bg-red-500/20 ring-red-500/50' : 'bg-black/30 ring-white/8'
+                    } file:mr-3 file:rounded-lg file:border-0 file:bg-teal-500/20 file:px-3 file:py-1.5 file:text-teal-300 hover:file:bg-teal-500/30`}
                   />
                   {audioFile && (
                     <div className="flex items-center gap-2 text-sm text-teal-300">
                       <span className="w-2 h-2 bg-teal-400 rounded-full"></span>
                       선택됨: {audioFile.name}
+                    </div>
+                  )}
+                  {fieldErrors.audioFile && (
+                    <div className="text-sm text-red-400 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-red-400 rounded-full"></span>
+                      {fieldErrors.audioFile}
                     </div>
                   )}
                 </div>
@@ -178,38 +425,72 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                   <label className="block text-sm font-medium text-white/80">음원명 <span className="text-red-400">*</span></label>
                   <input 
                     value={title} 
-                    onChange={(e)=>setTitle(e.target.value)} 
+                    onChange={(e) => {
+                      setTitle(e.target.value)
+                      validateField('title', e.target.value)
+                    }} 
                     placeholder="음원 제목을 입력하세요" 
-                    className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white placeholder-white/50 outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200" 
+                    className={`w-full rounded-lg px-3 py-2.5 text-white placeholder-white/50 outline-none ring-1 transition-all duration-200 ${
+                      fieldErrors.title ? 'bg-red-500/20 ring-red-500/50' : 'bg-black/30 ring-white/8 focus:ring-2 focus:ring-teal-400/40'
+                    }`}
                   />
+                  {fieldErrors.title && (
+                    <div className="text-sm text-red-400 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-red-400 rounded-full"></span>
+                      {fieldErrors.title}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-white/80">아티스트</label>
+                  <label className="block text-sm font-medium text-white/80">아티스트 <span className="text-red-400">*</span></label>
                   <input 
                     value={artist} 
-                    onChange={(e)=>setArtist(e.target.value)} 
+                    onChange={(e) => {
+                      setArtist(e.target.value)
+                      validateField('artist', e.target.value)
+                    }} 
                     placeholder="아티스트명" 
-                    className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white placeholder-white/50 outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200" 
+                    className={`w-full rounded-lg px-3 py-2.5 text-white placeholder-white/50 outline-none ring-1 transition-all duration-200 ${
+                      fieldErrors.artist ? 'bg-red-500/20 ring-red-500/50' : 'bg-black/30 ring-white/8 focus:ring-2 focus:ring-teal-400/40'
+                    }`}
                   />
+                  {fieldErrors.artist && (
+                    <div className="text-sm text-red-400 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-red-400 rounded-full"></span>
+                      {fieldErrors.artist}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-white/80">카테고리 <span className="text-red-400">*</span></label>
                   <select 
                     value={category || ''} 
-                    onChange={(e)=>setCategory(e.target.value)} 
-                    className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200"
+                    onChange={(e) => {
+                      setCategory(e.target.value)
+                      validateField('category', e.target.value)
+                    }} 
+                    className={`w-full rounded-lg px-3 py-2.5 text-white outline-none ring-1 transition-all duration-200 ${
+                      fieldErrors.category ? 'bg-red-500/20 ring-red-500/50' : 'bg-black/30 ring-white/8 focus:ring-2 focus:ring-teal-400/40'
+                    }`}
                   >
                     <option value="">카테고리 선택</option>
-                    <option value="가요">가요</option>
-                    <option value="팝">팝</option>
-                    <option value="클래식">클래식</option>
-                    <option value="재즈">재즈</option>
-                    <option value="록">록</option>
-                    <option value="일렉트로닉">일렉트로닉</option>
-                    <option value="힙합">힙합</option>
-                    <option value="기타">기타</option>
+                    {categories && categories.length > 0 ? (
+                      categories.map(cat => (
+                        <option key={cat.id} value={cat.name}>
+                          {cat.name}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="" disabled>카테고리 로딩 중...</option>
+                    )}
                   </select>
+                  {fieldErrors.category && (
+                    <div className="text-sm text-red-400 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-red-400 rounded-full"></span>
+                      {fieldErrors.category}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -219,6 +500,7 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                     onChange={(e) => {
                       const newType = e.target.value as '일반' | 'Inst'
                       setMusicType(newType)
+                      validateField('musicType', newType)
                       
                       // 음원 유형에 따라 기본 가격 자동 설정
                       if (newType === '일반') {
@@ -229,20 +511,39 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                       }
                       setPriceLyricsOnly(2) // 가사만은 항상 2원
                     }} 
-                    className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200"
+                    className={`w-full rounded-lg px-3 py-2.5 text-white outline-none ring-1 transition-all duration-200 ${
+                      fieldErrors.musicType ? 'bg-red-500/20 ring-red-500/50' : 'bg-black/30 ring-white/8 focus:ring-2 focus:ring-teal-400/40'
+                    }`}
                   >
                     <option value="일반">일반</option>
                     <option value="Inst">Inst</option>
                   </select>
+                  {fieldErrors.musicType && (
+                    <div className="text-sm text-red-400 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-red-400 rounded-full"></span>
+                      {fieldErrors.musicType}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-white/80">발매일</label>
+                  <label className="block text-sm font-medium text-white/80">발매일 <span className="text-red-400">*</span></label>
                   <input 
                     value={releaseDate} 
-                    onChange={(e)=>setReleaseDate(e.target.value)} 
+                    onChange={(e) => {
+                      setReleaseDate(e.target.value)
+                      validateField('releaseDate', e.target.value)
+                    }} 
                     type="date" 
-                    className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200" 
+                    className={`w-full rounded-lg px-3 py-2.5 text-white outline-none ring-1 transition-all duration-200 ${
+                      fieldErrors.releaseDate ? 'bg-red-500/20 ring-red-500/50' : 'bg-black/30 ring-white/8 focus:ring-2 focus:ring-teal-400/40'
+                    }`}
                   />
+                  {fieldErrors.releaseDate && (
+                    <div className="text-sm text-red-400 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-red-400 rounded-full"></span>
+                      {fieldErrors.releaseDate}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-white/80">태그 (쉼표로 구분)</label>
@@ -283,17 +584,28 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-white/80">ISRC</label>
+                  <label className="block text-sm font-medium text-white/80">ISRC <span className="text-red-400">*</span></label>
                   <input 
                     value={isrc} 
-                    onChange={(e)=>setIsrc(e.target.value)} 
+                    onChange={(e) => {
+                      setIsrc(e.target.value)
+                      validateField('isrc', e.target.value)
+                    }} 
                     placeholder="KRZ0123456789" 
-                    className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white placeholder-white/50 outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200" 
+                    className={`w-full rounded-lg px-3 py-2.5 text-white placeholder-white/50 outline-none ring-1 transition-all duration-200 ${
+                      fieldErrors.isrc ? 'bg-red-500/20 ring-red-500/50' : 'bg-black/30 ring-white/8 focus:ring-2 focus:ring-teal-400/40'
+                    }`}
                   />
+                  {fieldErrors.isrc && (
+                    <div className="text-sm text-red-400 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-red-400 rounded-full"></span>
+                      {fieldErrors.isrc}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-white/80">재생 시간 (초) <span className="text-red-400">*</span></label>
+                  <label className="block text-sm font-medium text-white/80">재생 시간 (초)</label>
                   <input 
                     value={durationSec} 
                     onChange={(e)=>setDurationSec(e.target.value ? Number(e.target.value) : '')} 
@@ -302,56 +614,59 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                     className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white placeholder-white/50 outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200" 
                   />
                 </div>
-                <div className="space-y-2 md:col-span-2">
-                  <label className="block text-sm font-medium text-white/80">가사 <span className="text-red-400">*</span></label>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-2 text-white/80">
-                        <input 
-                          type="radio" 
-                          checked={lyricsInputType === 'text'} 
-                          onChange={() => setLyricsInputType('text')} 
-                          className="text-teal-500 focus:ring-teal-500/20"
-                        /> 
-                        직접 입력
-                      </label>
-                      <label className="flex items-center gap-2 text-white/80">
-                        <input 
-                          type="radio" 
-                          checked={lyricsInputType === 'file'} 
-                          onChange={() => setLyricsInputType('file')} 
-                          className="text-teal-500 focus:ring-teal-500/20"
-                        /> 
-                        파일 업로드
-                      </label>
-                    </div>
-                    
-                    {lyricsInputType === 'text' ? (
-                      <textarea 
-                        value={lyricsText}
-                        onChange={(e) => setLyricsText(e.target.value)}
-                        placeholder="가사를 직접 입력하세요..." 
-                        rows={4}
-                        className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white placeholder-white/50 outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200 resize-none" 
-                      />
-                    ) : (
-                      <div className="space-y-2">
-                        <input 
-                          type="file" 
-                          accept=".txt,.lrc,.srt" 
-                          onChange={onSelectLyrics} 
-                          className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-sm text-white ring-1 ring-white/8 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-500/20 file:px-3 file:py-1.5 file:text-teal-300 hover:file:bg-teal-500/30 transition-all duration-200" 
-                        />
-                        {lyricsFile && (
-                          <div className="flex items-center gap-2 text-sm text-teal-300">
-                            <span className="w-2 h-2 bg-teal-400 rounded-full"></span>
-                            선택됨: {lyricsFile.name}
-                          </div>
-                        )}
+                {/* 가사 필드 - Inst가 아닐 때만 표시 */}
+                {musicType !== 'Inst' && (
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="block text-sm font-medium text-white/80">가사</label>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 text-white/80">
+                          <input 
+                            type="radio" 
+                            checked={lyricsInputType === 'text'} 
+                            onChange={() => setLyricsInputType('text')} 
+                            className="text-teal-500 focus:ring-teal-500/20"
+                          /> 
+                          직접 입력
+                        </label>
+                        <label className="flex items-center gap-2 text-white/80">
+                          <input 
+                            type="radio" 
+                            checked={lyricsInputType === 'file'} 
+                            onChange={() => setLyricsInputType('file')} 
+                            className="text-teal-500 focus:ring-teal-500/20"
+                          /> 
+                          파일 업로드
+                        </label>
                       </div>
-                    )}
+                      
+                      {lyricsInputType === 'text' ? (
+                        <textarea 
+                          value={lyricsText}
+                          onChange={(e) => setLyricsText(e.target.value)}
+                          placeholder="가사를 직접 입력하세요..." 
+                          rows={4}
+                          className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white placeholder-white/50 outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200 resize-none" 
+                        />
+                      ) : (
+                        <div className="space-y-2">
+                          <input 
+                            type="file" 
+                            accept=".txt,.lrc,.srt" 
+                            onChange={onSelectLyrics} 
+                            className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-sm text-white ring-1 ring-white/8 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-500/20 file:px-3 file:py-1.5 file:text-teal-300 hover:file:bg-teal-500/30 transition-all duration-200" 
+                          />
+                          {lyricsFile && (
+                            <div className="flex items-center gap-2 text-sm text-teal-300">
+                              <span className="w-2 h-2 bg-teal-400 rounded-full"></span>
+                              선택됨: {lyricsInputType === 'file' ? lyricsFile.name : '가사 텍스트'}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </Card>
 
@@ -520,18 +835,6 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
               <Title>API 설정 <span className="text-red-400 text-sm">*</span></Title>
               <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-white/80">음원 재생 엔드포인트</label>
-                  <div className="w-full rounded-lg bg-black/20 px-3 py-2.5 text-sm text-white/60 outline-none ring-1 ring-white/8 font-mono">
-                    /api/music/{isCreateMode ? '{music_id}' : (musicData?.id || 'N/A')}/play
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-white/80">가사 다운로드 엔드포인트</label>
-                  <div className="w-full rounded-lg bg-black/20 px-3 py-2.5 text-sm text-white/60 outline-none ring-1 ring-white/8 font-mono">
-                    /api/lyric/{isCreateMode ? '{music_id}' : (musicData?.id || 'N/A')}/download
-                  </div>
-                </div>
-                <div className="space-y-2">
                   <label className="block text-sm font-medium text-white/80">API 키 권한</label>
                   <select 
                     value={accessTier} 
@@ -552,12 +855,57 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
           <div className="flex items-center justify-end">
             <button 
               onClick={onSave} 
-              className="rounded-lg bg-gradient-to-r from-teal-500 to-teal-600 px-6 py-2.5 text-sm text-white font-medium hover:from-teal-600 hover:to-teal-700 transition-all duration-200"
+              disabled={isCreateMode && (
+                !audioFile || 
+                !title.trim() || 
+                !artist.trim() || 
+                !category || 
+                !musicType || 
+                !releaseDate || 
+                !isrc?.trim()
+              )}
+              className={`rounded-lg px-6 py-2.5 text-sm font-medium transition-all duration-200 ${
+                isCreateMode && (
+                  !audioFile || 
+                  !title.trim() || 
+                  !artist.trim() || 
+                  !category || 
+                  !musicType || 
+                  !releaseDate || 
+                  !isrc?.trim()
+                )
+                  ? 'bg-gray-500/50 text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-teal-500 to-teal-600 text-white hover:from-teal-600 hover:to-teal-700'
+              }`}
             >
               {isCreateMode ? '등록 완료' : '수정 완료'}
             </button>
           </div>
         </div>
+
+        {/* 토스트 메시지 */}
+        {showToast && (
+          <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 transition-all duration-300`}>
+            <div className={`px-8 py-4 rounded-lg shadow-2xl ${
+              toastType === 'success' 
+                ? 'bg-teal-500 text-white' 
+                : 'bg-red-500 text-white'
+            }`}>
+              <div className="flex items-center gap-3">
+                <span className="text-xl">
+                  {toastType === 'success' ? '✅' : '❌'}
+                </span>
+                <span className="font-medium text-lg">{toastMessage}</span>
+                <button 
+                  onClick={() => setShowToast(false)}
+                  className="ml-3 text-white/80 hover:text-white transition-colors text-lg"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <style jsx>{`
