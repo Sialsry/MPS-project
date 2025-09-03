@@ -277,33 +277,15 @@ export default function RewardsMusicsPage() {
               className="w-full px-3 py-2 border border-white/10 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-teal-400/50 transition-colors text-sm"
             />
           </div>
-          <div className="min-w-[120px]">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-white/10 rounded-lg text-white focus:outline-none focus:border-teal-400/50 transition-colors text-sm"
-            >
-              <option value="">전체 상태</option>
-              <option value="active">활성</option>
-              <option value="inactive">비활성</option>
-            </select>
-          </div>
-          <div className="min-w-[120px]">
-            <select
-              value={`${sortBy}-${sortOrder}`}
-              onChange={(e) => {
-                const [field, order] = e.target.value.split('-')
-                setSortBy(field)
-                setSortOrder(order as 'asc' | 'desc')
-              }}
-              className="w-full px-3 py-2 border border-white/10 rounded-lg text-white focus:outline-none focus:border-teal-400/50 transition-colors text-sm"
-            >
-              <option value="title-asc">제목순 (오름차순)</option>
-              <option value="title-desc">제목순 (내림차순)</option>
-              <option value="monthlyUsed-desc">유효재생 높은순</option>
-              <option value="companies-desc">사용 기업 많은순</option>
-            </select>
-          </div>
+          <button 
+            onClick={() => {}}
+            className="rounded-lg bg-white/10 border border-white/20 px-3 py-2 text-white/90 font-medium hover:bg-white/20 hover:text-white transition-all duration-200"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
+
           {selectedMusics.length > 0 && (
             <button
               onClick={() => setBulkEditModalOpen(true)}

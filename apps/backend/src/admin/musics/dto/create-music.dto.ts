@@ -51,10 +51,6 @@ export class CreateMusicDto {
     @Min(0)
     priceLyricsOnly: number;
 
-    @IsNumber()
-    @Min(0)
-    priceBoth: number;
-
     @IsOptional()
     @IsNumber()
     @Min(0)

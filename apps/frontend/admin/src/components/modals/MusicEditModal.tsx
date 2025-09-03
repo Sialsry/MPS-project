@@ -122,13 +122,13 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
 
   useEffect(() => {
     if (!isCreateMode && musicData) {
-      if ((musicData as any).lyricsFilePath) {
-        setLyricsInputType('file')
-      } else {
-        setLyricsInputType('text')
+      if (typeof musicData.rewardPerPlay === 'number') {
+        setRewardPerPlay(musicData.rewardPerPlay)
+        setHasRewards(true)
       }
-      if ((musicData as any).lyricsText) {
-        setLyricsText((musicData as any).lyricsText as string)
+      if (typeof musicData.maxPlayCount === 'number') {
+        setMaxPlayCount(musicData.maxPlayCount)
+        setHasRewards(true)
       }
     }
   }, [isCreateMode, musicData])
@@ -366,7 +366,6 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
             isrc,
             priceMusicOnly,
             priceLyricsOnly,
-            priceBoth,
             rewardPerPlay,
             maxPlayCount,
             hasRewards,
@@ -614,12 +613,12 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                       
                       // 음원 유형에 따라 기본 가격 자동 설정
                       if (newType === '일반') {
-                        setPriceBoth(7)
                         setPriceMusicOnly(7)
+                        setPriceLyricsOnly(2)
                       } else {
                         setPriceMusicOnly(3)
+                        setPriceLyricsOnly(2)
                       }
-                      setPriceLyricsOnly(2)
                     }} 
                     disabled={!isCreateMode}
                     className={`w-full rounded-lg px-3 py-2.5 text-white outline-none ring-1 transition-all duration-200 ${
@@ -795,10 +794,10 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <div className="mb-1 text-sm text-white/60">일반 음원 가격</div>
-                      <div className="relative w-40">
+                      <div className="relative w-full max-w-[160px]">
                         <input 
-                          value={priceBoth} 
-                          onChange={(e)=>setPriceBoth(Number(e.target.value)||0)} 
+                          value={priceMusicOnly} 
+                          onChange={(e)=>setPriceMusicOnly(Number(e.target.value)||0)} 
                           type="number" 
                           placeholder="7"
                           className="w-full pr-8 rounded-lg bg-black/30 px-3 py-2 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200 text-center" 
@@ -807,8 +806,8 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                       </div>
                     </div>
                     <div>
-                      <div className="mb-1 text-sm text-white/60">가사만 가격</div>
-                      <div className="relative w-40">
+                      <div className="mb-1 text-sm text-white/60">가사 가격</div>
+                      <div className="relative w-full max-w-[160px]">
                         <input 
                           value={priceLyricsOnly} 
                           onChange={(e)=>setPriceLyricsOnly(Number(e.target.value)||0)} 
@@ -822,9 +821,9 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
                   </div>
                 )}
                 {musicType === 'Inst' && (
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-white/60">Inst 음원 가격</span>
-                    <div className="relative w-40">
+                  <div className="space-y-2">
+                    <div className="mb-1 text-sm text-white/60">Inst 음원 가격</div>
+                    <div className="relative w-full max-w-[160px]">
                       <input 
                         value={priceMusicOnly} 
                         onChange={(e)=>setPriceMusicOnly(Number(e.target.value)||0)} 
@@ -860,7 +859,7 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
               {hasRewards && (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-white/80">1회 재생당 리워드 (토큰) <span className="text-red-400">*</span></label>
+                    <label className="block text-sm font-medium text-white/80">1회 호출당 리워드 (음원 재생/가사) <span className="text-red-400">*</span></label>
                     <input 
                       value={rewardPerPlay} 
                       onChange={(e)=>setRewardPerPlay(Number(e.target.value)||0)} 
