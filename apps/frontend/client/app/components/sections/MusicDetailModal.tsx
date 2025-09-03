@@ -12,9 +12,8 @@ export type MusicDetail = {
   artist: string;
   cover?: string;
   lyrics: string;
-  company: Company;      //  타입은 유지(다른 코드 의존 가능성)
+  company: Company;
   isSubscribed?: boolean;
-  /** ▼ 간단 재생용(옵션). 없으면 placeholder로 재생 */
   audioUrl?: string;
 };
 
@@ -23,6 +22,29 @@ type UsageMetrics = {
   monthlyTotal: number;
   remaining: number;
 };
+
+/* ---------- helpers: selection / clipboard ---------- */
+function getSelectedTextIn(container: HTMLElement | null): string {
+  if (!container || typeof window === "undefined") return "";
+  const sel = window.getSelection?.();
+  if (!sel || sel.rangeCount === 0) return "";
+  const range = sel.getRangeAt(0);
+  const isInside = container.contains(range.commonAncestorContainer as Node);
+  return isInside ? sel.toString() : "";
+}
+
+async function copyToClipboard(text: string) {
+  if (!text) throw new Error("복사할 내용이 없습니다.");
+  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand("copy");
+  document.body.removeChild(ta);
+}
 
 export default function MusicDetailModal({
   open,
@@ -43,8 +65,9 @@ export default function MusicDetailModal({
   onCreatePlaylist?: (name: string) => Promise<{ id: number; name: string }> | Promise<Playlist> | void;
   usage?: UsageMetrics;
 }) {
-  const portalRoot =
-    typeof window !== "undefined" ? document.getElementById("modal-root") : null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const portalRoot = mounted && typeof window !== "undefined" ? document.getElementById("modal-root") : null;
 
   const fmt = useMemo(() => new Intl.NumberFormat("ko-KR"), []);
   const [showPicker, setShowPicker] = useState(false);
@@ -52,12 +75,25 @@ export default function MusicDetailModal({
   const [newName, setNewName] = useState("");
   const firstFocusRef = useRef<HTMLButtonElement>(null);
 
-  //  임시 태그 데이터 (원하면 props로 바꾸기 쉬움)
-  const mockTags = useMemo(
-    () => ["잔잔한", "새벽감성", "어쿠스틱", "드라이브", "여유로운", "Lo-fi"],
-    []
-  );
+  // ▶ 임시 가사 데이터: 실제 API 가사가 없으면 이걸로 표시
+  const mockLyrics =
+`[Verse 1]
+창문을 스치는 바람에 너의 온기가 남아
+아직 사라지지 못한 길 위의 작은 노래
 
+[Chorus]
+아무 말도 하지 말아, 오늘만은 그대로
+불을 끄지 않은 듯한 마음의 잔열로
+
+[Bridge]
+흐르는 불빛 사이로
+우리의 계절이 번져`;
+
+  // 가사 DOM (선택 복사용)
+  const lyricsBoxRef = useRef<HTMLPreElement>(null);
+
+  // 간단 토스트
+  const [toast, setToast] = useState("");
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -73,24 +109,26 @@ export default function MusicDetailModal({
       setShowPicker(false);
       setCreating(false);
       setNewName("");
+      setToast("");
     };
   }, [open, onClose]);
 
-  if (!open || !item || !portalRoot) return null;
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(""), 1200);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  if (!mounted || !open || !item || !portalRoot) return null;
 
   const handleSubscribe = async () => { await onSubscribe?.(item.id); };
-  const handlePick = async (playlistId: number) => {
-    await onAddToPlaylist?.(item.id, playlistId);
-    setShowPicker(false);
-  };
+  const handlePick = async (playlistId: number) => { await onAddToPlaylist?.(item.id, playlistId); setShowPicker(false); };
   const handleCreate = async () => {
     if (!newName.trim()) return;
     setCreating(true);
     try {
       const created = await onCreatePlaylist?.(newName.trim());
-      if (created && "id" in (created as any)) {
-        await onAddToPlaylist?.(item.id, (created as any).id);
-      }
+      if (created && "id" in (created as any)) await onAddToPlaylist?.(item.id, (created as any).id);
       setShowPicker(false);
     } finally {
       setCreating(false);
@@ -98,20 +136,31 @@ export default function MusicDetailModal({
     }
   };
 
-  /** ▼ 간단 재생: 전역 이벤트로 FooterPlayer에 전달 */
+  // 재생 (그대로 유지)
   const handlePlay = () => {
     const src = item.audioUrl || "/audio/placeholder-sample.mp3";
-    window.dispatchEvent(
-      new CustomEvent("app:player:play", {
-        detail: {
-          id: item.id,
-          title: item.title,
-          artist: item.artist,
-          cover: item.cover,
-          src,
-        },
-      })
-    );
+    window.dispatchEvent(new CustomEvent("app:player:play", {
+      detail: { id: item.id, title: item.title, artist: item.artist, cover: item.cover, src },
+    }));
+  };
+
+  // 가사 소스 (실데이터 우선, 없으면 mock)
+  const lyricsText = (item.lyrics && item.lyrics.trim()) ? item.lyrics : mockLyrics;
+
+  // 복사/다운로드(척) 액션
+  const copyAll = async () => {
+    try { await copyToClipboard(lyricsText); setToast("가사 전체를 복사했어요."); }
+    catch { setToast("복사에 실패했어요."); }
+  };
+  const copySelection = async () => {
+    const selected = getSelectedTextIn(lyricsBoxRef.current?.parentElement || null);
+    if (!selected.trim()) { setToast("가사에서 복사할 부분을 드래그하세요."); return; }
+    try { await copyToClipboard(selected); setToast("선택한 부분을 복사했어요."); }
+    catch { setToast("복사에 실패했어요."); }
+  };
+  const fakeDownload = () => {
+    // 실제 파일 저장 대신 “되는 척”만 토스트
+    setToast("다운로드 준비 중… (데모)");
   };
 
   const Stat = ({ label, value }: { label: string; value: number | string | undefined }) => (
@@ -126,17 +175,14 @@ export default function MusicDetailModal({
   const ui = (
     <div className="fixed inset-0 z-[1000] flex items-stretch justify-center overscroll-contain">
       {/* Dimmer */}
-      <button
-        aria-label="닫기"
-        onClick={onClose}
-        className="absolute inset-0 bg-black/50"
-      />
+      <div aria-label="닫기" onClick={onClose} className="absolute inset-0 bg-black/50" />
 
       {/* Panel */}
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="music-modal-title"
+        onClick={(e) => e.stopPropagation()}
         className="
           relative z-[1001] w-full
           h-[100dvh] md:h-[calc(100%-6rem)]
@@ -164,13 +210,9 @@ export default function MusicDetailModal({
             <h2 id="music-modal-title" className="truncate text-lg font-semibold">
               {item.title}
             </h2>
-
-            {/* 아티스트 */}
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-600 dark:text-zinc-300">
               <span className="truncate">{item.artist}</span>
             </div>
-
-            {/* ▼ 간단 재생 버튼만 */}
             <div className="mt-3">
               <button
                 ref={firstFocusRef}
@@ -183,12 +225,11 @@ export default function MusicDetailModal({
             </div>
           </div>
 
-            {/* Usage metrics (md+) */}
-            <div className="hidden gap-2 md:flex">
-              <Stat label="1회 리워드 량" value={usage?.perRead} />
-              <Stat label="총 월별 리워드 량" value={usage?.monthlyTotal} />
-              <Stat label="남은 량" value={usage?.remaining} />
-            </div>
+          <div className="hidden gap-2 md:flex">
+            <Stat label="1회 리워드 량" value={usage?.perRead} />
+            <Stat label="총 월별 리워드 량" value={usage?.monthlyTotal} />
+            <Stat label="남은 량" value={usage?.remaining} />
+          </div>
 
           <button
             onClick={onClose}
@@ -213,16 +254,35 @@ export default function MusicDetailModal({
           {/* Lyrics */}
           <div className="relative border-b border-zinc-200 md:border-b-0 md:border-r dark:border-white/10">
             <article className="h-full overflow-y-auto p-5 pr-4">
-              <h3 className="mb-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                가사
-              </h3>
+              <h3 className="mb-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">가사</h3>
+
               <pre
+                ref={lyricsBoxRef}
                 className="whitespace-pre-wrap text-[15px] leading-7 text-zinc-800 dark:text-zinc-100
                            rounded-md border border-zinc-200 dark:border-zinc-700 p-2
-                           max-h-full"
+                           max-h-full select-text"
               >
-                {item.lyrics}
+                {lyricsText}
               </pre>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={copyAll}
+                  className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50
+                             dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-white/10"
+                >
+                  전체 복사
+                </button>
+                <button
+                  onClick={fakeDownload}
+                  className="h-9 rounded-md bg-zinc-900 px-3 text-sm font-medium text-white hover:bg-zinc-800 active:bg-zinc-900
+                             dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100"
+                >
+                  TXT 다운로드 (데모)
+                </button>
+              </div>
+
+              {toast && <div className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">{toast}</div>}
             </article>
           </div>
 
@@ -297,11 +357,11 @@ export default function MusicDetailModal({
                 </div>
               </div>
 
-              {/* 태그 칩 */}
-              <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/5">
+              {/* 태그 칩 (데모) */}
+              <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg:white/5">
                 <div className="mb-2 text-sm font-medium text-zinc-900 dark:text-white">태그</div>
                 <div className="flex flex-wrap gap-2">
-                  {mockTags.map((t) => (
+                  {["잔잔한", "감성", "드라이브", "어쿠스틱", "Lo-fi"].map((t) => (
                     <span
                       key={t}
                       className="inline-flex items-center rounded-full border border-zinc-200 bg-white/80 px-2.5 py-1 text-xs font-medium text-zinc-700 backdrop-blur
@@ -316,7 +376,7 @@ export default function MusicDetailModal({
           </aside>
         </div>
       </section>
-    </div>
+    </div>  
   );
 
   return createPortal(ui, portalRoot);

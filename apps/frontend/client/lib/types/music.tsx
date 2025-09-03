@@ -28,6 +28,7 @@ export type Music = {
 export type Page<T> = {
   items: T[];
   nextCursor: number | null;
+  hasMore?: boolean; 
 };
 
 export type Category = {

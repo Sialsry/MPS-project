@@ -1,41 +1,55 @@
 import { Injectable } from '@nestjs/common';
 import { db } from '../../db/client';
-import { companies } from '../../db/schema/index';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
+import { companies, business_numbers, company_subscriptions } from '../../db/schema'; 
 
 export type CompanyRow = typeof companies.$inferSelect;
-export type CompanyInsert = typeof companies.$inferInsert;
+export type CompanySubscriptionRow = typeof company_subscriptions.$inferSelect;
 
 @Injectable()
-export class CompaniesRepository  {
-  findByEmail(email: string): Promise<CompanyRow | null> {
-    return db.select().from(companies)
-      .where(eq(companies.email, email)).limit(1)
-      .then(r => r[0] ?? null);
+export class CompaniesRepository {
+  // 중복 체크: eq/or 대신 sql 템플릿 사용 (심볼 충돌 회피)
+  findDuplicate(email: string, name: string, bizno: string) {
+    return db.query.companies.findFirst({
+      where: (c, { sql }) =>
+        sql`${c.email} = ${email} or ${c.name} = ${name} or ${c.business_number} = ${bizno}`,
+      columns: { id: true },
+    });
   }
 
-  findByBusinessNumber(bn: string): Promise<CompanyRow | null> {
-    return db.select().from(companies)
-      .where(eq(companies.businessNumber, bn)).limit(1)
-      .then(r => r[0] ?? null);
+  // HYBRID용: 로컬 허용 사업자번호 존재 여부
+  async existsBizno(bizno: string): Promise<boolean> {
+    const row = await db.query.business_numbers.findFirst({
+      where: (b, { sql }) => sql`regexp_replace(${b.number}, '\D', '', 'g') = ${bizno}`,
+      columns: { id: true },
+    });
+    return !!row;
   }
 
-  findById(id: number): Promise<CompanyRow | null> {
-    return db.select().from(companies)
-      .where(eq(companies.id, id)).limit(1)
-      .then(r => r[0] ?? null);
+  // 삽입: 전체 반환(심볼 출처 갈림 방지)
+  async insert(values: typeof companies.$inferInsert) {
+    return db.insert(companies).values(values).returning();
+  }
+  async findLatestSubscription(companyId: number) {
+    const [row] = await db
+      .select()
+      .from(company_subscriptions)
+      .where(eq(company_subscriptions.company_id, companyId))
+      .orderBy(desc(company_subscriptions.end_date))
+      .limit(1);
+    return row as CompanySubscriptionRow | undefined;
   }
 
-  async insert(values: CompanyInsert): Promise<CompanyRow> {
-    const [row] = await db.insert(companies).values(values).returning();
-    return row;
+  findById(id: number) {
+    return db.query.companies.findFirst({
+      where: (c, { sql }) => sql`${c.id} = ${id}`,   // ← operators 구조분해 말고 sql 템플릿
+    });
   }
 
-  async updatePartial(id: number, patch: Partial<CompanyInsert>): Promise<void> {
-    await db.update(companies).set(patch).where(eq(companies.id, id));
-  }
-
-  async setPasswordHash(id: number, passwordHash: string): Promise<void> {
-    await db.update(companies).set({ passwordHash }).where(eq(companies.id, id));
+  // 선택: 로그인 등에서 이메일 조회
+  findByEmail(email: string) {
+    return db.query.companies.findFirst({
+      where: (c, { sql }) => sql`${c.email} = ${email}`,
+    });
   }
 }
