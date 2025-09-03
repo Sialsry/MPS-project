@@ -213,32 +213,10 @@ export class MusicsService implements OnModuleInit {
       const tagArr = createMusicDto.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
       
       for (const tagText of tagArr) {
-        // 먼저 raw_tags에 태그 추가 (또는 기존 태그 찾기)
-        let rawTag = await this.db.select()
-          .from(raw_tags)
-          .where(eq(raw_tags.name, tagText))
-          .limit(1);
-        
-        let rawTagId: number;
-        
-        if (rawTag.length === 0) {
-          // 새 태그 생성
-          const newRawTag = await this.db.insert(raw_tags).values({
-            name: tagText,
-            slug: tagText.toLowerCase().replace(/\s+/g, '-'),
-            type: 'genre' as any
-          }).returning();
-          rawTagId = newRawTag[0].id;
-        } else {
-          // 기존 태그 사용
-          rawTagId = rawTag[0].id;
-        }
-        
-        // music_tags에 추가
         await this.db.insert(music_tags).values({
           music_id: musicId,
           text: tagText,
-          raw_tag_id: rawTagId
+          raw_tag_id: null,
         });
       }
     }
@@ -298,6 +276,7 @@ export class MusicsService implements OnModuleInit {
           m.inst AS "inst",
           mc.name AS "category",
           COALESCE(STRING_AGG(DISTINCT mt.text, ', '), '') AS "tags",
+          COALESCE(STRING_AGG(DISTINCT rt.name, ', '), '') AS "normalizedTags",
           m.release_date AS "releaseDate",
           m.duration_sec AS "durationSec",
           m.isrc AS "isrc",
@@ -311,15 +290,17 @@ export class MusicsService implements OnModuleInit {
           m.price_per_play AS "priceMusicOnly",
           m.lyrics_price AS "priceLyricsOnly",
           m.created_at AS "createdAt",
+          m.grade_required AS "grade",
           COALESCE(mmr.total_reward_count * mmr.reward_per_play, 0) AS "maxRewardLimit",
           mmr.reward_per_play AS "rewardPerPlay",
           mmr.total_reward_count AS "maxPlayCount"
         FROM musics m
         LEFT JOIN music_categories mc ON m.category_id = mc.id
         LEFT JOIN music_tags mt ON m.id = mt.music_id
+        LEFT JOIN raw_tags rt ON LOWER(rt.name) = LOWER(mt.text)
         LEFT JOIN monthly_music_rewards mmr ON m.id = mmr.music_id AND mmr.year_month = ${currentMonth}
         WHERE m.id = ${id}
-        GROUP BY m.id, m.title, m.artist, m.inst, mc.name, m.release_date, m.duration_sec, m.isrc, m.lyricist, m.composer, m.music_arranger, m.lyrics_text, m.lyrics_file_path, m.file_path, m.cover_image_url, m.price_per_play, m.lyrics_price, m.created_at, mmr.total_reward_count, mmr.reward_per_play
+        GROUP BY m.id, m.title, m.artist, m.inst, mc.name, m.release_date, m.duration_sec, m.isrc, m.lyricist, m.composer, m.music_arranger, m.lyrics_text, m.lyrics_file_path, m.file_path, m.cover_image_url, m.price_per_play, m.lyrics_price, m.created_at, m.grade_required, mmr.total_reward_count, mmr.reward_per_play
         LIMIT 1
       `;
 
@@ -338,6 +319,7 @@ export class MusicsService implements OnModuleInit {
         category: row.category,
         musicType: isInst ? 'Inst' : '일반',
         tags: row.tags,
+        normalizedTags: row.normalizedTags,
         releaseDate: row.releaseDate,
         durationSec: row.durationSec,
         isrc: row.isrc,
@@ -353,9 +335,12 @@ export class MusicsService implements OnModuleInit {
         priceLyricsOnly: row.priceLyricsOnly ? Number(row.priceLyricsOnly) : undefined,
         rewardPerPlay: row.rewardPerPlay ? Number(row.rewardPerPlay) : undefined,
         maxPlayCount: row.maxPlayCount ? Number(row.maxPlayCount) : undefined,
-        maxRewardLimit: row.maxRewardLimit ? Number(row.maxRewardLimit) : 0
+        maxRewardLimit: row.maxRewardLimit ? Number(row.maxRewardLimit) : 0,
+        grade: row.grade,
+        accessTier: Number(row.grade) === 0 ? 'all' : 'subscribed'
       };
     } catch (error) {
+      console.error('음원 상세 조회 실패:', error);
       throw new Error(`음원 상세 조회 실패: ${error.message}`);
     }
   }
@@ -571,24 +556,9 @@ export class MusicsService implements OnModuleInit {
 
       await this.db.delete(music_tags).where(eq(music_tags.music_id, id));
 
+      // 태그 재생성 (raw_tag_id는 항상 NULL로 저장)
       for (const tagText of tagArr) {
-        let raw = await this.db
-          .select({ id: raw_tags.id })
-          .from(raw_tags)
-          .where(eq(raw_tags.name, tagText))
-          .limit(1);
-        let rawId: number;
-        if (raw.length === 0) {
-          const inserted = await this.db.insert(raw_tags).values({
-            name: tagText,
-            slug: tagText.toLowerCase().replace(/\s+/g, '-'),
-            type: 'genre' as any
-          }).returning();
-          rawId = inserted[0].id;
-        } else {
-          rawId = raw[0].id;
-        }
-        await this.db.insert(music_tags).values({ music_id: id, text: tagText, raw_tag_id: rawId });
+        await this.db.insert(music_tags).values({ music_id: id, text: tagText, raw_tag_id: null });
       }
     }
 

@@ -1,8 +1,10 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import MusicStatsModal from '@/components/modals/MusicStatsModal'
-import MusicEditModal from '@/components/modals/MusicEditModal'
+import dynamic from 'next/dynamic'
+
+const MusicStatsModal = dynamic(() => import('@/components/modals/MusicStatsModal'), { ssr: false })
+const MusicEditModal = dynamic(() => import('@/components/modals/MusicEditModal'), { ssr: false })
 
 export default function MusicsPage() {
   const [statsOpen, setStatsOpen] = useState(false)
@@ -610,6 +612,7 @@ export default function MusicsPage() {
                            category: data.category,
                            genre: undefined,
                            tags: data.tags,
+                           normalizedTags: data.normalizedTags,
                            releaseDate: data.releaseDate,
                            durationSec: data.durationSec,
                            musicType: data.musicType,
@@ -623,7 +626,8 @@ export default function MusicsPage() {
                            priceMusicOnly: data.priceMusicOnly,
                            priceLyricsOnly: data.priceLyricsOnly,
                            rewardPerPlay: data.rewardPerPlay,
-                           maxPlayCount: data.maxPlayCount
+                           maxPlayCount: data.maxPlayCount,
+                           accessTier: data.accessTier
                          })
                         setStatsOpen(true)
                       } catch (e) {
@@ -699,6 +703,7 @@ export default function MusicsPage() {
                               category: data.category,
                               genre: undefined,
                               tags: data.tags,
+                              normalizedTags: data.normalizedTags,
                               releaseDate: data.releaseDate,
                               durationSec: data.durationSec,
                               musicType: data.musicType,
@@ -712,7 +717,8 @@ export default function MusicsPage() {
                               priceMusicOnly: data.priceMusicOnly,
                               priceLyricsOnly: data.priceLyricsOnly,
                               rewardPerPlay: data.rewardPerPlay,
-                              maxPlayCount: data.maxPlayCount
+                              maxPlayCount: data.maxPlayCount,
+                              accessTier: data.accessTier
                             })
                             setStatsOpen(true)
                           } catch (err) {

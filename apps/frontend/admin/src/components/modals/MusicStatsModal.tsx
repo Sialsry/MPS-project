@@ -175,19 +175,35 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                       </div>
                       <div>
                         <div className="text-white/60 mb-1">호출당 리워드</div>
-                        <div className="text-white font-medium">{musicData?.rewardPerPlay ? `${musicData.rewardPerPlay} 토큰` : '0.007 토큰'}</div>
+                        <div className="text-white font-medium">{typeof musicData?.rewardPerPlay === 'number' ? `${musicData.rewardPerPlay} 토큰` : '-'}</div>
                       </div>
                       <div>
                         <div className="text-white/60 mb-1">월 최대 한도</div>
-                        <div className="text-white font-medium">{musicData?.maxPlayCount ? `${musicData.maxPlayCount.toLocaleString()} 토큰` : '1,000 토큰'}</div>
+                        <div className="text-white font-medium">{typeof musicData?.maxPlayCount === 'number' ? `${musicData.maxPlayCount.toLocaleString()} 회` : '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-white/60 mb-1">태그</div>
+                        <div className="text-white font-medium break-words">{musicData?.tags?.trim() ? musicData.tags : '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-white/60 mb-1">정규화 태그</div>
+                        <div className="text-white font-medium break-words">{(musicData as any)?.normalizedTags?.trim() ? (musicData as any).normalizedTags : '-'}</div>
                       </div>
                       <div>
                         <div className="text-white/60 mb-1">API 접근 권한</div>
                         <div className="text-white font-medium">
                           {musicData?.accessTier === 'all' ? (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30">
-                              모든 기업
-                            </span>
+                            <div className="flex gap-1">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30">
+                                Free
+                              </span>
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                Standard
+                              </span>
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                Business
+                              </span>
+                            </div>
                           ) : (
                             <div className="flex gap-1">
                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30">
