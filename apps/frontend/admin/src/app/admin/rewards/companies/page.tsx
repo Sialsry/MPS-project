@@ -280,6 +280,14 @@ export default function CompanyRewardsPage() {
               className="w-full px-3 py-2 border border-white/10 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-teal-400/50 transition-colors text-sm"
             />
           </div>
+          <button 
+            onClick={() => {}}
+            className="rounded-lg bg-white/10 border border-white/20 px-3 py-2 text-white/90 font-medium hover:bg-white/20 hover:text-white transition-all duration-200"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
         </div>
         <div className="text-sm text-white/60">
           총 <span className="text-teal-300 font-semibold">{totalCount}</span>개 기업
@@ -640,10 +648,10 @@ export default function CompanyRewardsPage() {
                     }}
                   >
                     <td className="px-6 py-4 text-center">
-                      <div className="font-mono text-xs text-white/80 truncate max-w-[160px] mx-auto" title={company.id}>{company.id}</div>
+                      <div className="font-mono text-sm text-white/90 font-medium truncate max-w-[160px] mx-auto" title={company.id}>{company.id}</div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <div className="font-semibold text-white">{company.name}</div>
+                      <div className="text-white/90 font-medium">{company.name}</div>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${getTierColor(company.tier)}`}>
@@ -653,10 +661,10 @@ export default function CompanyRewardsPage() {
                     <td className="px-8 py-5 text-white/90 font-medium text-center">
                       {company.totalTokens.toLocaleString()}
                     </td>
-                    <td className="px-8 py-5 text-teal-400 font-medium text-center">
-                      +{company.monthlyEarned.toLocaleString()}
+                    <td className="px-8 py-5 text-white/90 font-medium text-center">
+                      {company.monthlyEarned.toLocaleString()}
                     </td>
-                    <td className="px-8 py-5 text-white/80 text-center">
+                    <td className="px-8 py-5 text-white/90 font-medium text-center">
                       {company.monthlyUsed.toLocaleString()}
                     </td>
                     <td className="px-8 py-5 text-center">
@@ -667,10 +675,10 @@ export default function CompanyRewardsPage() {
                             style={{ width: `${company.usageRate}%` }}
                           />
                         </div>
-                        <span className="text-white/70 text-xs font-medium">{company.usageRate}%</span>
+                        <span className="text-white/90 font-medium text-sm">{company.usageRate}%</span>
                       </div>
                     </td>
-                    <td className="px-8 py-5 text-white/80 text-center">
+                    <td className="px-8 py-5 text-white/90 font-medium text-center">
                       {company.activeTracks}개
                     </td>
                     <td className="px-8 py-5 text-center">

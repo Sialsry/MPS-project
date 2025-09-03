@@ -238,7 +238,7 @@ export default function MusicsPage() {
           </div>
           <button 
             onClick={fetchMusics}
-            className="rounded-lg bg-white/10 border border-white/20 px-3 py-2 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200"
+            className="rounded-lg bg-white/10 border border-white/20 px-3 py-2 text-white/90 font-medium hover:bg-white/20 hover:text-white transition-all duration-200"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -257,7 +257,7 @@ export default function MusicsPage() {
         </div>
         
         <div className="flex items-center gap-4">
-          <div className="text-sm text-white/60">
+          <div className="text-sm text-white/90 font-medium">
             총 음원: <span className="text-teal-300 font-semibold">{totalCount}</span>개 | 
             선택됨: <span className="text-teal-300 font-semibold">{selectedItems.size}</span>개
           </div>
@@ -279,7 +279,7 @@ export default function MusicsPage() {
       <div className="overflow-visible">
         {/* 로딩 상태 표시 */}
         {loading && (
-          <div className="text-center py-8 text-white/60">
+          <div className="text-center py-8 text-white/90 font-medium">
             음원 목록을 불러오는 중...
           </div>
         )}
@@ -312,7 +312,7 @@ export default function MusicsPage() {
                           <button 
                             onClick={() => { setIdSortFilter('전체'); closeDropdown(); }}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              idSortFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                              idSortFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/90 font-medium'
                             }`}
                           >
                             전체
@@ -320,7 +320,7 @@ export default function MusicsPage() {
                           <button 
                             onClick={() => { setIdSortFilter('오름차순'); closeDropdown(); }}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              idSortFilter === '오름차순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                              idSortFilter === '오름차순' ? 'text-teal-300 bg-white/5' : 'text-white/90 font-medium'
                             }`}
                           >
                             오름차순
@@ -328,7 +328,7 @@ export default function MusicsPage() {
                           <button 
                             onClick={() => { setIdSortFilter('내림차순'); closeDropdown(); }}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              idSortFilter === '내림차순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                              idSortFilter === '내림차순' ? 'text-teal-300 bg-white/5' : 'text-white/90 font-medium'
                             }`}
                           >
                             내림차순
@@ -356,7 +356,7 @@ export default function MusicsPage() {
                           <button 
                             onClick={() => { setMusicTypeFilter('전체'); closeDropdown(); }}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              musicTypeFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                              musicTypeFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/90 font-medium'
                             }`}
                           >
                             전체
@@ -364,7 +364,7 @@ export default function MusicsPage() {
                           <button 
                             onClick={() => { setMusicTypeFilter('일반'); closeDropdown(); }}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              musicTypeFilter === '일반' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                              musicTypeFilter === '일반' ? 'text-teal-300 bg-white/5' : 'text-white/90 font-medium'
                             }`}
                           >
                             일반
@@ -372,7 +372,7 @@ export default function MusicsPage() {
                           <button 
                             onClick={() => { setMusicTypeFilter('Inst'); closeDropdown(); }}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              musicTypeFilter === 'Inst' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                              musicTypeFilter === 'Inst' ? 'text-teal-300 bg-white/5' : 'text-white/90 font-medium'
                             }`}
                           >
                             Inst
@@ -398,7 +398,7 @@ export default function MusicsPage() {
                           <button 
                             onClick={() => { setGenreFilter('전체'); closeDropdown(); }}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              genreFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                              genreFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/90 font-medium'
                             }`}
                           >
                             전체
@@ -408,7 +408,7 @@ export default function MusicsPage() {
                               key={genre}
                               onClick={() => { setGenreFilter(genre); closeDropdown(); }}
                               className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                genreFilter === genre ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                                genreFilter === genre ? 'text-teal-300 bg-white/5' : 'text-white/90 font-medium'
                               }`}
                             >
                               {genre}
@@ -436,7 +436,7 @@ export default function MusicsPage() {
                           <button 
                             onClick={() => { setReleaseDateSortFilter('전체'); closeDropdown(); }}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              releaseDateSortFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                              releaseDateSortFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/90 font-medium'
                             }`}
                           >
                             전체
@@ -444,7 +444,7 @@ export default function MusicsPage() {
                           <button 
                             onClick={() => { setReleaseDateSortFilter('오름차순'); closeDropdown(); }}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              releaseDateSortFilter === '오름차순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                              releaseDateSortFilter === '오름차순' ? 'text-teal-300 bg-white/5' : 'text-white/90 font-medium'
                             }`}
                           >
                             오름차순
@@ -452,7 +452,7 @@ export default function MusicsPage() {
                           <button 
                             onClick={() => { setReleaseDateSortFilter('내림차순'); closeDropdown(); }}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              releaseDateSortFilter === '내림차순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                              releaseDateSortFilter === '내림차순' ? 'text-teal-300 bg-white/5' : 'text-white/90 font-medium'
                             }`}
                           >
                             내림차순
@@ -478,7 +478,7 @@ export default function MusicsPage() {
                           <button 
                             onClick={() => { setRewardLimitFilter('전체'); closeDropdown(); }}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              rewardLimitFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                              rewardLimitFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/90 font-medium'
                             }`}
                           >
                             전체
@@ -486,7 +486,7 @@ export default function MusicsPage() {
                           <button 
                             onClick={() => { setRewardLimitFilter('오름차순'); closeDropdown(); }}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              rewardLimitFilter === '오름차순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                              rewardLimitFilter === '오름차순' ? 'text-teal-300 bg-white/5' : 'text-white/90 font-medium'
                             }`}
                           >
                             오름차순
@@ -494,7 +494,7 @@ export default function MusicsPage() {
                           <button 
                             onClick={() => { setRewardLimitFilter('내림차순'); closeDropdown(); }}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              rewardLimitFilter === '내림차순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                              rewardLimitFilter === '내림차순' ? 'text-teal-300 bg-white/5' : 'text-white/90 font-medium'
                             }`}
                           >
                             내림차순
@@ -659,7 +659,7 @@ export default function MusicsPage() {
                     <div className="font-semibold text-white">{item.title}</div>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <div className="text-white/80">{item.artist}</div>
+                    <div className="text-white/90 font-medium">{item.artist}</div>
                   </td>
                   <td className="px-6 py-4 text-center">
                     <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gradient-to-r from-purple-400/15 to-purple-400/15 text-purple-300 border border-purple-400/25">
@@ -671,9 +671,9 @@ export default function MusicsPage() {
                       {item.genre}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-white/60 text-center">{item.tags}</td>
-                  <td className="px-6 py-4 text-white/60 text-center">{item.releaseDate}</td>
-                  <td className="px-6 py-4 text-white/80 text-center">
+                  <td className="px-6 py-4 text-white/90 font-medium text-center">{item.tags}</td>
+                  <td className="px-6 py-4 text-white/90 font-medium text-center">{item.releaseDate}</td>
+                  <td className="px-6 py-4 text-white/90 font-medium text-center">
                     {item.maxRewardLimit}
                   </td>
                   <td className="px-6 py-4 text-center">
@@ -750,7 +750,7 @@ export default function MusicsPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span className="px-5 py-2.5 bg-gradient-to-r from-white/8 to-white/5 rounded-lg border border-white/10 font-medium">1 / 25</span>
+          <span className="px-5 py-2.5 bg-gradient-to-r from-white/8 to-white/5 rounded-lg border border-white/10 font-medium">{currentPage} / {Math.max(Math.ceil(totalCount / 10), 1)}</span>
           <button className="rounded-lg bg-gradient-to-r from-teal-500 to-teal-600 p-2.5 text-white font-medium hover:from-teal-600 hover:to-teal-700 transition-all duration-200">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -789,7 +789,7 @@ export default function MusicsPage() {
                 </svg>
               </div>
               <h3 className="mb-2 text-lg font-semibold">음원 삭제 확인</h3>
-              <p className="text-sm text-white/60">
+              <p className="text-sm text-white/90 font-medium">
                 <span className="font-medium text-white">"{deleteTarget}"</span> 음원을 삭제하시겠습니까?
               </p>
               <p className="mt-2 text-xs text-red-400">이 작업은 되돌릴 수 없습니다.</p>
