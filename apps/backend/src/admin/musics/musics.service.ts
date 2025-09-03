@@ -10,6 +10,8 @@ import { throwError } from 'rxjs';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { UpdateRewardDto } from './dto/update-reward.dto';
+import { normalizePagination } from '../../common/utils/pagination.util';
+import { getDefaultYearMonthKST } from '../../common/utils/date.util';
 
 @Injectable()
 export class MusicsService implements OnModuleInit {
@@ -71,8 +73,8 @@ export class MusicsService implements OnModuleInit {
       sortOrder = 'desc'
     } = findMusicsDto;
 
-    const offset = (page - 1) * limit;
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    const { page: p, limit: l, offset } = normalizePagination(page, limit, 100);
+    const currentMonth = getDefaultYearMonthKST();
 
     const conditions: SQL<unknown>[] = [];
 
@@ -139,15 +141,15 @@ export class MusicsService implements OnModuleInit {
       ${whereClause}
       GROUP BY musics.id, musics.title, musics.artist, musics.inst, music_categories.name, musics.release_date, musics.created_at, monthly_music_rewards.total_reward_count, monthly_music_rewards.reward_per_play
       ${orderByClause}
-      LIMIT ${limit} OFFSET ${offset}
+      LIMIT ${l} OFFSET ${offset}
     `;
 
     const results = await this.db.execute(rawQuery);
 
     return {
       musics: results.rows, 
-      page,
-      limit
+      page: p,
+      limit: l
     };
   }
 

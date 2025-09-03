@@ -3,45 +3,33 @@ import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import type { DB } from '../../db/client';
 import { sql } from 'drizzle-orm';
-
-export type RewardsSummaryQuery = {
-  yearMonth?: string
-  search?: string
-  tier?: 'free' | 'standard' | 'business' | 'all'
-  page?: string
-  limit?: string
-  sortBy?: string
-  order?: 'asc' | 'desc'
-}
+import type { RewardsSummaryQueryDto } from './dto/rewards-summary.query.dto';
+import { getDefaultYearMonthKST, isValidYearMonth } from '../../common/utils/date.util';
+import { normalizePagination } from '../../common/utils/pagination.util';
+import { normalizeSort } from '../../common/utils/sort.util';
 
 @Injectable()
 export class CompanyService {
   constructor(@Inject('DB') private readonly db: DB) {}
 
-  async getRewardsSummary(params: RewardsSummaryQuery) {
+  async getRewardsSummary(params: RewardsSummaryQueryDto) {
     const tz = 'Asia/Seoul';
-    const now = new Date();
-    const kstTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-    const year = kstTime.getUTCFullYear();
-    const month = kstTime.getUTCMonth() + 1;
-    const defaultYm = `${year}-${String(month).padStart(2, '0')}`;
 
-    const yearMonth = (params.yearMonth && /^\d{4}-\d{2}$/.test(params.yearMonth)) ? params.yearMonth : defaultYm;
+    const yearMonth = isValidYearMonth(params.yearMonth) ? params.yearMonth! : getDefaultYearMonthKST();
     const [ymYear, ymMonth] = yearMonth.split('-').map(Number);
 
-    const page = Math.max(parseInt(params.page || '1', 10) || 1, 1);
-    const limit = Math.min(Math.max(parseInt(params.limit || '10', 10) || 10, 1), 100);
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = normalizePagination(params.page, params.limit, 100);
 
     const search = (params.search || '').trim();
     const hasSearch = search.length > 0;
     const tier = params.tier && params.tier !== 'all' ? params.tier : null;
 
-    // 정렬
-    const sortBy = params.sortBy || 'company_id';
-    const order = (params.order === 'desc' ? 'desc' : 'asc') as 'asc' | 'desc';
-    const validSortColumns = new Set(['company_id', 'name', 'grade', 'total_tokens', 'monthly_earned', 'monthly_used', 'usage_rate', 'active_tracks']);
-    const sortColumn = validSortColumns.has(sortBy) ? sortBy : 'company_id';
+    const { sortBy, order } = normalizeSort(
+      params.sortBy,
+      params.order,
+      ['company_id', 'name', 'grade', 'total_tokens', 'monthly_earned', 'monthly_used', 'usage_rate', 'active_tracks']
+    );
+
     const baseQuery = sql`
       WITH month_range AS (
         SELECT 
@@ -88,7 +76,7 @@ export class CompanyService {
     const totalResult = await this.db.execute(sql`SELECT COUNT(*) as count FROM (${baseQuery}) t`);
     const totalRows = (totalResult as any).rows ?? [];
     const total = Number(totalRows[0]?.count ?? 0);
-    const pageResult = await this.db.execute(sql`${baseQuery} ORDER BY ${sql.raw(sortColumn)} ${sql.raw(order)} LIMIT ${limit} OFFSET ${offset}`);
+    const pageResult = await this.db.execute(sql`${baseQuery} ORDER BY ${sql.raw(sortBy)} ${sql.raw(order)} LIMIT ${limit} OFFSET ${offset}`);
     const rows = (pageResult as any).rows ?? [];
 
     const items = rows.map((r: any) => ({
