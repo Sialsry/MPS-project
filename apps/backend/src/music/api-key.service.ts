@@ -24,7 +24,7 @@ export class ApiKeyService {
             .from(companies)
             .where(eq(companies.api_key_hash, apiKeyHash));
 
-        console.log(result, 'api 키 검증 결과')
+        // console.log(result, 'api 키 검증 결과')
         if (result.length === 0) return null;
         return result[0];
     }

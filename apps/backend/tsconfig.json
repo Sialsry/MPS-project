@@ -29,6 +29,6 @@
     "src/**/*",
     "test/**/*",
     "drizzle.config.ts",
-    "../../new/api-key.service.ts"
+    "src/music/api-key.service.old.ts"
   ]
 }

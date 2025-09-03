@@ -36,7 +36,7 @@ export class LyricController {
 
             // 2. 음원 정보 조회
             const music = await this.musicService.findById(musicId);
-            if (!music || !music.is_active) {
+            if (!music) {
                 throw new HttpException('음원을 찾을 수 없습니다.', HttpStatus.NOT_FOUND);
             }
 
@@ -52,7 +52,7 @@ export class LyricController {
             }
 
             // 5. 가사 파일 경로 확인
-            const lyricPath = join(process.cwd(), process.env.LYRIC_STORAGE_PATH || './storage/', music.lyrics_file_path);
+            const lyricPath = join(process.cwd(), './storage/', music.lyrics_file_path);
             console.log('🔍 찾고 있는 가사 파일 경로:', lyricPath);
             console.log('📝 가사 정보:', { id: music.id, lyrics_file_path: music.lyrics_file_path, title: music.title });
 

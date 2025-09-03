@@ -4,7 +4,7 @@ import { companies } from './companies'
 import { musics } from './musics'
 import { music_plays } from './music_plays'
 
-export const rewardStatusEnum = pgEnum('reward_status', ['pending', 'paid'])
+export const rewardStatusEnum = pgEnum('reward_status', ['successed', 'falied', 'pending'])
 export const rewardCodeEnum2 = pgEnum('reward_code', ['0', '1', '2', '3'])
 
 
@@ -13,7 +13,7 @@ export const rewards = pgTable('rewards', {
   company_id: bigint('company_id', { mode: 'number' }).notNull(),
   music_id: bigint('music_id', { mode: 'number' }).notNull(),
   play_id: bigint('play_id', { mode: 'number' }).notNull(),
-  reward_code: rewardCodeEnum2('reward_code').notNull(),
+  // reward_code: rewardCodeEnum2('reward_code').notNull(),
   amount: numeric('amount').notNull(),
   status: rewardStatusEnum('status').notNull().default('pending'),
   payout_tx_hash: text('payout_tx_hash'),

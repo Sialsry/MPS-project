@@ -14,7 +14,7 @@ import type { Response } from 'express';
 import { MusicService } from './music.service';
 import { createReadStream, statSync } from 'fs';
 import { join } from 'path';
-import { ApiKeyService } from './api-key.service';
+import { ApiKeyService } from './api-key.service.old';
 
 @Controller('music')
 export class MusicController {
@@ -39,8 +39,16 @@ export class MusicController {
             const music = await this.musicService.findById(musicId);
             if (!music) throw new HttpException('음원을 찾을 수 없습니다.', HttpStatus.NOT_FOUND);
 
-            const filePath = join(process.cwd(), './storage', music.file_path);
+            const filePath = join(process.cwd(), music.file_path); // 이후부터는 중간에 /music/ 추가해야 함
 
+            try {
+                const stats = statSync(filePath);
+                const fileSize = stats.size;
+
+                let playSession = await this.musicService.findActiveSession(music.id, company.id);
+            } catch (error) {
+
+            }
         } catch (error) {
 
         }

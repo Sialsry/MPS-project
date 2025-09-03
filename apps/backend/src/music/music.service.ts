@@ -1,8 +1,8 @@
 import { Injectable, Inject, HttpException, HttpStatus } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, and, gte, count, sql } from 'drizzle-orm';
-import { companies, musics, music_plays, company_subscriptions, monthly_music_rewards } from '../db/schema';
-import { ApiKeyService } from '../../../../new/api-key.service';
+import { companies, musics, music_plays, company_subscriptions, monthly_music_rewards, rewards } from '../db/schema';
+import { ApiKeyService } from './api-key.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -29,6 +29,33 @@ export class MusicService {
 
         return result[0] || null;
     }
+
+    async findRewardById(musicId: number) {
+        const result = await this.db
+            .select()
+            .from(monthly_music_rewards)
+            .where(eq(monthly_music_rewards.music_id, musicId));
+
+        return result[0] || null;
+    }
+
+    async companyCounted(companyId) {
+        await this.db
+            .update(companies)
+            .set({ remaining_reward_count: sql`${companies.remaining_reward_count} - 1` })
+            .where(eq(companies.id, companyId))
+    }
+
+    // async getRewardCode()
+
+    // async checkCompanyLimit(apiKey: string) {
+    //     const result = await this.db
+    //         .select(remaining_reward_count)
+    //         .from(companies)
+    //         .where(eq(companies.api_key_hash, apiKey));
+
+    //     return result[0] || null;
+    // }
 
     async checkPlayPermission(company: any, music: any): Promise<boolean> {
         // 1. 음원 등급 확인
@@ -61,79 +88,102 @@ export class MusicService {
         return this.checkPlayPermission(company, music);
     }
 
-    async startPlaySession(sessionData: {
+    // async startPlaySession(sessionData: {
+    //     musicId: number;
+    //     companyId: number;
+    //     startTime: Date;
+    //     useCase: '0' | '1' | '2';
+    // }) {
+    //     const playRecord = await this.db
+    //         .insert(music_plays)
+    //         .values({
+    //             music_id: sessionData.musicId,
+    //             using_company_id: sessionData.companyId,
+    //             played_at: sessionData.startTime,
+    //             reward_code: '0',
+    //             use_case: sessionData.useCase,
+    //             is_valid_play: false,
+    //             play_duration_sec: 0,
+    //         })
+    //         .returning();
+
+    //     return playRecord[0];
+    // }
+
+    async startPlay(sessionData: {
         musicId: number;
         companyId: number;
-        userAgent: string;
-        startTime: Date;
-        useCase: '0' | '1' | '2';
+        useCase;
+        rewardCode;
+        rewardAmount: string;
+        usePrice;
     }) {
         const playRecord = await this.db
             .insert(music_plays)
             .values({
-                music_id: sessionData.musicId,
-                using_company_id: sessionData.companyId,
-                played_at: sessionData.startTime,
-                reward_code: '0', // 기본값: 리워드 미지급
-                use_case: sessionData.useCase, // 0: 일반 재생, 1: Inst 재생, 2: 가사만 이용
+                music_id: Number(sessionData.musicId),
+                using_company_id: Number(sessionData.companyId),
+                reward_code: sessionData.rewardCode,
+                use_case: sessionData.useCase,
                 is_valid_play: false,
-                play_duration_sec: 0,
+                reward_amount: sessionData.rewardAmount,
+                use_price: sessionData.usePrice,
             })
             .returning();
 
         return playRecord[0];
     }
 
-    async endPlaySession(playSessionId: number, endData: {
-        playDuration: number;
-        isValidPlay: boolean;
-        endTime: Date;
-        errorMessage?: string;
-    }) {
-        try {
-            // 재생 기록 업데이트
-            await this.db
-                .update(music_plays)
-                .set({
-                    play_duration_sec: endData.playDuration,
-                    is_valid_play: endData.isValidPlay,
-                    updated_at: endData.endTime,
-                })
-                .where(eq(music_plays.id, playSessionId));
+    // async endPlaySession(playSessionId: number, endData: {
+    //     playDuration: number;
+    //     isValidPlay: boolean;
+    //     endTime: Date;
+    //     errorMessage?: string;
+    // }) {
+    //     try {
+    //         // 재생 기록 업데이트
+    //         await this.db
+    //             .update(music_plays)
+    //             .set({
+    //                 play_duration_sec: endData.playDuration,
+    //                 is_valid_play: endData.isValidPlay,
+    //                 updated_at: endData.endTime,
+    //             })
+    //             .where(eq(music_plays.id, playSessionId));
 
-            // 유효 재생인 경우 추가 처리
-            if (endData.isValidPlay) {
-                const playRecord = await this.db
-                    .select()
-                    .from(music_plays)
-                    .where(eq(music_plays.id, playSessionId));
+    //         // 유효 재생인 경우 추가 처리
+    //         if (endData.isValidPlay) {
+    //             const playRecord = await this.db
+    //                 .select()
+    //                 .from(music_plays)
+    //                 .where(eq(music_plays.id, playSessionId));
 
-                if (playRecord.length > 0) {
-                    const record = playRecord[0];
+    //             if (playRecord.length > 0) {
+    //                 const record = playRecord[0];
 
-                    // 음원 통계 업데이트
-                    await this.updateMusicStats(record.music_id, true);
+    //                 // 음원 통계 업데이트
+    //                 await this.updateMusicStats(record.music_id, true);
 
-                    // 리워드 처리
-                    await this.processReward(record);
-                }
-            } else {
-                // 무효 재생도 전체 재생 횟수에는 포함
-                const playRecord = await this.db
-                    .select()
-                    .from(music_plays)
-                    .where(eq(music_plays.id, playSessionId));
+    //                 // 리워드 처리
+    //                 await this.processReward(record);
+    //             }
+    //         } else {
+    //             // 무효 재생도 전체 재생 횟수에는 포함
+    //             const playRecord = await this.db
+    //                 .select()
+    //                 .from(music_plays)
+    //                 .where(eq(music_plays.id, playSessionId));
 
-                if (playRecord.length > 0) {
-                    await this.updateMusicStats(playRecord[0].music_id, false);
-                }
-            }
+    //             if (playRecord.length > 0) {
+    //                 await this.updateMusicStats(playRecord[0].music_id, false);
+    //             }
+    //         }
 
-            console.log(`재생 세션 종료: ${playSessionId}, 유효: ${endData.isValidPlay}, 재생시간: ${endData.playDuration}초`);
-        } catch (error) {
-            console.error('재생 세션 종료 처리 에러:', error);
-        }
-    }
+    //         console.log(`재생 세션 종료: ${playSessionId}, 유효: ${endData.isValidPlay}, 재생시간: ${endData.playDuration}초`);
+    //     } catch (error) {
+    //         console.error('재생 세션 종료 처리 에러:', error);
+    //     }
+    // }
 
     async recordLyricDownload(downloadData: {
         musicId: number;
@@ -176,15 +226,15 @@ export class MusicService {
             // lyrics_download_count는 업데이트하지 않음 (플랫폼 내 조회용이므로)
 
             // 회사 총 리워드 업데이트 (리워드가 지급된 경우)
-            if (rewardInfo.rewardAmount > 0) {
-                await this.db
-                    .update(companies)
-                    .set({
-                        total_rewards_earned: sql`${companies.total_rewards_earned} + ${rewardInfo.rewardAmount}`,
-                        updated_at: new Date(),
-                    })
-                    .where(eq(companies.id, downloadData.companyId));
-            }
+            // if (rewardInfo.rewardAmount > 0) {
+            //     await this.db
+            //         .update(companies)
+            //         .set({
+            //             total_rewards_earned: sql`${companies.total_rewards_earned} + ${rewardInfo.rewardAmount}`,
+            //             updated_at: new Date(),
+            //         })
+            //         .where(eq(companies.id, downloadData.companyId));
+            // }
 
             console.log(`가사 다운로드 기록: 음원 ${downloadData.musicId}, 회사 ${downloadData.companyId}, 리워드: ${rewardInfo.rewardAmount}`);
         } catch (error) {
@@ -196,66 +246,92 @@ export class MusicService {
      * 플랫폼 내 가사 조회 기록 (lyrics_download_count 증가용)
      * 라이브러리 플랫폼 내에서 가사를 조회할 때 사용
      */
-    async recordInternalLyricView(musicId: number) {
-        try {
-            await this.db
-                .update(musics)
-                .set({
-                    lyrics_download_count: sql`${musics.lyrics_download_count} + 1`,
-                    updated_at: new Date(),
-                })
-                .where(eq(musics.id, musicId));
+    // async recordInternalLyricView(musicId: number) {
+    //     try {
+    //         await this.db
+    //             .update(musics)
+    //             .set({
+    //                 lyrics_download_count: sql`${musics.lyrics_download_count} + 1`,
+    //                 updated_at: new Date(),
+    //             })
+    //             .where(eq(musics.id, musicId));
 
-            console.log(`플랫폼 내 가사 조회: 음원 ${musicId}`);
-        } catch (error) {
-            console.error('플랫폼 내 가사 조회 기록 에러:', error);
-        }
-    }
+    //         console.log(`플랫폼 내 가사 조회: 음원 ${musicId}`);
+    //     } catch (error) {
+    //         console.error('플랫폼 내 가사 조회 기록 에러:', error);
+    //     }
+    // }
 
     /**
      * 외부 API를 통한 가사 다운로드 횟수 조회
      * music_plays 테이블에서 use_case = '2'인 기록 개수 반환
      */
-    async getExternalLyricDownloadCount(musicId: number): Promise<number> {
-        try {
-            const result = await this.db
-                .select({ count: count() })
-                .from(music_plays)
-                .where(
-                    and(
-                        eq(music_plays.music_id, musicId),
-                        eq(music_plays.use_case, '2')
-                    )
-                );
+    // async getExternalLyricDownloadCount(musicId: number): Promise<number> {
+    //     try {
+    //         const result = await this.db
+    //             .select({ count: count() })
+    //             .from(music_plays)
+    //             .where(
+    //                 and(
+    //                     eq(music_plays.music_id, musicId),
+    //                     eq(music_plays.use_case, '2')
+    //                 )
+    //             );
 
-            return result[0]?.count || 0;
-        } catch (error) {
-            console.error('외부 가사 다운로드 횟수 조회 에러:', error);
-            return 0;
-        }
+    //         return result[0]?.count || 0;
+    //     } catch (error) {
+    //         console.error('외부 가사 다운로드 횟수 조회 에러:', error);
+    //         return 0;
+    //     }
+    // }
+
+    // async updateMusicStats(musicId: number, isValidPlay: boolean) {
+    //     if (isValidPlay) {
+    //         await this.db
+    //             .update(musics)
+    //             .set({
+    //                 total_valid_play_count: sql`${musics.total_valid_play_count} + 1`,
+    //                 total_play_count: sql`${musics.total_play_count} + 1`,
+    //                 total_revenue: sql`${musics.total_revenue} + ${musics.price_per_play}`,
+    //                 last_played_at: new Date(),
+    //                 updated_at: new Date(),
+    //             })
+    //             .where(eq(musics.id, musicId));
+    //     } else {
+    //         await this.db
+    //             .update(musics)
+    //             .set({
+    //                 total_play_count: sql`${musics.total_play_count} + 1`,
+    //                 total_revenue: sql`${musics.total_revenue} + ${musics.price_per_play}`,
+    //                 updated_at: new Date(),
+    //             })
+    //             .where(eq(musics.id, musicId));
+    //     }
+    // }
+
+    private async updateEndMusicStats(musicId) {
+        await this.db
+            .update(musics)
+            .set({
+                total_valid_play_count: sql`${musics.total_valid_play_count} + 1`,
+                last_played_at: new Date(),
+                updated_at: new Date(),
+            })
+            .where(eq(musics.id, musicId));
     }
 
-    private async updateMusicStats(musicId: number, isValidPlay: boolean) {
-        if (isValidPlay) {
-            await this.db
-                .update(musics)
-                .set({
-                    total_valid_play_count: sql`${musics.total_valid_play_count} + 1`,
-                    total_play_count: sql`${musics.total_play_count} + 1`,
-                    last_played_at: new Date(),
-                    updated_at: new Date(),
-                })
-                .where(eq(musics.id, musicId));
-        } else {
-            await this.db
-                .update(musics)
-                .set({
-                    total_play_count: sql`${musics.total_play_count} + 1`,
-                    updated_at: new Date(),
-                })
-                .where(eq(musics.id, musicId));
-        }
+    async updateInitMusicStats(musicId) {
+        await this.db
+            .update(musics)
+            .set({
+                total_play_count: sql`${musics.total_play_count} + 1`,
+                total_revenue: sql`${musics.total_revenue} + ${musics.price_per_play}`,
+                updated_at: new Date(),
+            })
+            .where(eq(musics.id, musicId));
     }
+
+
 
     private async processReward(playRecord: any) {
         try {
@@ -576,7 +652,7 @@ export class MusicService {
             .where(eq(music_plays.id, sessionId));
 
         // 음원 통계 업데이트
-        await this.updateMusicStats(session[0].music_id, true);
+        //await this.updateMusicStats(session[0].music_id, true);
 
         // 회사 총 리워드 업데이트 (리워드가 지급된 경우)
         if (rewardAmount > 0) {
@@ -629,4 +705,305 @@ export class MusicService {
         // 리워드 지급 처리
         await this.processReward(sessionId);
     }
+
+    /**
+ * 지금까지 전송된 '최대 end 바이트 인덱스'를 가져온다.
+ * - 세션 진행 중에는 music_plays.play_duration_sec를 maxEndSent 보관용으로 사용
+ * - 유효재생 처리되면 해당 필드는 실제 재생시간(초)로 복원됨
+ */
+    async getMaxEndSent(sessionId: number): Promise<number> {
+        const session = await this.db
+            .select()
+            .from(music_plays)
+            .where(eq(music_plays.id, sessionId))
+            .limit(1);
+
+        if (!session[0]) return -1;
+
+        // 진행 중에는 play_duration_sec를 maxEndSent 저장용으로 사용
+        // is_valid_play === false 인 경우에만 maxEndSent로 취급
+        if (!session[0].is_valid_play) {
+            const v = Number(session[0].play_duration_sec ?? -1);
+            return Number.isFinite(v) ? v : -1;
+        }
+
+        // 이미 유효재생이면 더 이상 트래킹할 필요 없음
+        return -1;
+    }
+
+    /**
+     * '최대 end 바이트 인덱스'를 갱신한다 (idempotent).
+     * - 기존 값보다 클 때만 업데이트
+     * - 진행 중(유효재생 전) 세션만 반영
+     */
+    async setMaxEndSent(sessionId: number, maxEnd: number): Promise<void> {
+        const session = await this.db
+            .select()
+            .from(music_plays)
+            .where(eq(music_plays.id, sessionId))
+            .limit(1);
+
+        if (!session[0]) return;
+        if (session[0].is_valid_play) return; // 이미 유효재생이면 갱신 불필요
+
+        const current = Number(session[0].play_duration_sec ?? -1);
+        const currentMax = Number.isFinite(current) ? current : -1;
+
+        if (maxEnd > currentMax) {
+            await this.db
+                .update(music_plays)
+                .set({
+                    // 진행 중에는 play_duration_sec를 maxEndSent 저장용으로 사용
+                    play_duration_sec: maxEnd,
+                    updated_at: new Date(),
+                })
+                .where(eq(music_plays.id, sessionId));
+        }
+    }
+
+    /**
+     * 누적 진행도(바이트) 50% 이상 등 요건 충족 시, 중복 없이 유효재생 처리.
+     * - 실제 재생시간(초)로 play_duration_sec를 복원
+     * - 통계/리워드 갱신까지 한 번에 수행
+     */
+    async markAsValidPlayIfNeeded(sessionId: number): Promise<void> {
+        const sessionRows = await this.db
+            .select()
+            .from(music_plays)
+            .where(eq(music_plays.id, sessionId))
+            .limit(1);
+
+        const session = sessionRows[0];
+        if (!session) {
+            console.log(`❌ markAsValidPlayIfNeeded: 세션 없음 ${sessionId}`);
+            return;
+        }
+        if (session.is_valid_play) {
+            // 이미 처리됨
+            return;
+        }
+
+        // 실제 재생 시간(초) 계산
+        let actualPlayDuration = 0;
+        if (session.played_at) {
+            const now = Date.now();
+            const started = new Date(session.played_at).getTime();
+            actualPlayDuration = Math.max(0, Math.floor((now - started) / 1000));
+        }
+
+        // 회사 등급 확인
+        const companyRows = await this.db
+            .select()
+            .from(companies)
+            .where(eq(companies.id, session.using_company_id))
+            .limit(1);
+
+        const company = companyRows[0];
+        const companyGrade = company?.grade ?? 'free';
+
+        // 리워드 가능 여부 확인 및 차감/계산
+        const { rewardCode, rewardAmount } = await this.checkAndProcessReward(
+            session.music_id,
+            session.using_company_id,
+            companyGrade
+        );
+
+        // 세션을 유효재생으로 업데이트 + play_duration_sec를 '실제 재생 시간(초)'로 복원
+        await this.db
+            .update(music_plays)
+            .set({
+                is_valid_play: true,
+                reward_code: rewardCode,
+                reward_amount: rewardAmount.toString(),
+                play_duration_sec: actualPlayDuration,
+                updated_at: new Date(),
+            })
+            .where(eq(music_plays.id, sessionId));
+
+        // 음원 통계 업데이트
+        // await this.updateMusicStats(session.music_id, true);
+
+        // 회사 총 리워드 누적
+        if (rewardAmount > 0) {
+            await this.db
+                .update(companies)
+                .set({
+                    total_rewards_earned: sql`${companies.total_rewards_earned} + ${rewardAmount}`,
+                    updated_at: new Date(),
+                })
+                .where(eq(companies.id, session.using_company_id));
+        }
+
+        console.log(
+            `✅ markAsValidPlayIfNeeded 완료: 세션 ${sessionId}, 실제 재생 ${actualPlayDuration}s, 리워드 ${rewardAmount}`
+        );
+    }
+
+    // async recordValidPlayOnce(opts: {
+    //     musicId: number;
+    //     companyId: number;
+    //     useCase: '0' | '1' | '2'; // 0=일반, 1=inst, 2=가사 등
+    //     playedAt: Date;           // 토큰 시작 시간
+    // }) {
+    //     const { musicId, companyId, useCase, playedAt } = opts;
+
+    //     // 1) 최근 15분 내 동일 회사/곡/용도(use_case) 유효재생 이미 기록됐는지 확인
+    //     const since = new Date(Date.now() - 15 * 60 * 1000);
+    //     const dup = await this.db
+    //         .select({ c: count() })
+    //         .from(music_plays)
+    //         .where(
+    //             and(
+    //                 eq(music_plays.music_id, musicId),
+    //                 eq(music_plays.using_company_id, companyId),
+    //                 eq(music_plays.use_case, useCase),
+    //                 eq(music_plays.is_valid_play, true),
+    //                 gte(music_plays.played_at, since),
+    //             )
+    //         );
+
+    //     if ((dup[0]?.c || 0) > 0) {
+    //         // 이미 유효재생 처리된 건 있음 → 다시 기록하지 않음
+    //         return;
+    //     }
+
+    //     // 2) 회사 등급 조회
+    //     const compRows = await this.db
+    //         .select()
+    //         .from(companies)
+    //         .where(eq(companies.id, companyId))
+    //         .limit(1);
+
+    //     const company = compRows[0];
+    //     const companyGrade = company?.grade ?? 'free';
+
+    //     // 3) 리워드 가능 여부 확인 및 차감
+    //     const { rewardCode, rewardAmount } = await this.checkAndProcessReward(
+    //         musicId,
+    //         companyId,
+    //         companyGrade
+    //     );
+
+    //     // 4) 유효재생 1건 기록
+    //     await this.db.insert(music_plays).values({
+    //         music_id: musicId,
+    //         using_company_id: companyId,
+    //         played_at: playedAt,
+    //         use_case: useCase,
+    //         is_valid_play: true,
+    //         play_duration_sec: 0, // (원하면 토큰 시작~현재 경과초로 기록 가능)
+    //         reward_code: rewardCode,
+    //         reward_amount: rewardAmount.toString(),
+    //     });
+
+    //     // 5) 음원 통계 업데이트
+    //     await this.updateMusicStats(musicId, true);
+
+    //     // 6) 회사 누적 리워드 업데이트
+    //     if (rewardAmount > 0) {
+    //         await this.db
+    //             .update(companies)
+    //             .set({
+    //                 total_rewards_earned: sql`${companies.total_rewards_earned} + ${rewardAmount}`,
+    //                 updated_at: new Date(),
+    //             })
+    //             .where(eq(companies.id, companyId));
+    //     }
+    // }
+
+    async recordValidPlayOnce(opts: {
+        musicId: number;
+        companyId: number;
+        useCase: '0' | '1' | '2';
+        rewardCode;
+        musicPlayId;
+        rewardAmount;
+    }) {
+        const { musicId, companyId, useCase, musicPlayId, rewardCode, rewardAmount } = opts;
+
+        // 중복 방지(최근 15분)
+        // const since = new Date(Date.now() - 15 * 60 * 1000);
+        // const dup = await this.db
+        //     .select({ c: count() })
+        //     .from(music_plays)
+        //     .where(
+        //         and(
+        //             eq(music_plays.music_id, musicId),
+        //             eq(music_plays.using_company_id, companyId),
+        //             eq(music_plays.use_case, useCase),
+        //             eq(music_plays.is_valid_play, true),
+        //             gte(music_plays.played_at, since),
+        //         )
+        //     );
+        // if ((dup[0]?.c || 0) > 0) return; // 이미 처리됨
+
+        // 회사 등급
+        const comp = await this.db
+            .select()
+            .from(companies)
+            .where(eq(companies.id, companyId))
+            .limit(1);
+        const companyGrade = comp[0]?.grade ?? 'free';
+
+        // 리워드 확인/차감
+        // const { rewardCode, rewardAmount } = await this.checkAndProcessReward(
+        //     musicId, companyId, companyGrade
+        // );
+
+        await this.db
+            .update(music_plays)
+            .set({ is_valid_play: true })
+            .where(eq(music_plays.id, musicPlayId))
+
+        // reward 테이블에 insert
+        console.log(rewardCode, '리워드코드입니다.')
+        if (rewardCode === "1") {
+            await this.db
+                .insert(rewards)
+                .values({
+                    company_id: companyId,
+                    music_id: musicId,
+                    play_id: musicPlayId,
+                    amount: rewardAmount.toString(),
+                })
+        }
+
+        await this.updateEndMusicStats(musicId);
+
+        // 음원의 남은 리워드 카운팅 -1
+
+        // 통계/리워드 누적
+        // await this.updateMusicStats(musicId, true); // 총재생, 유효재생, 수익 누적 기록
+        // if (rewardAmount > 0) {
+        //     await this.db
+        //         .update(companies)
+        //         .set({
+        //             total_rewards_earned: sql`${companies.total_rewards_earned} + ${rewardAmount}`,
+        //             updated_at: new Date(),
+        //         })
+        //         .where(eq(companies.id, companyId));
+        // }
+    }
+
+    async getStartPlay(musicPlayId) {
+        const result = await this.db
+            .select()
+            .from(music_plays)
+            .where(eq(music_plays.id, musicPlayId))
+
+        return result[0] || null;
+    }
+
+    // 회사 ID로 회사 조회 (PlayToken fallback 용)
+    async findCompanyById(companyId: number) {
+        const rows = await this.db
+            .select()
+            .from(companies)
+            .where(eq(companies.id, companyId))
+            .limit(1);
+        return rows[0] || null;
+    }
+
+
+
 }
