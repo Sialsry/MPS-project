@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ValidationPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ValidationPipe, ParseIntPipe } from '@nestjs/common';
 import { CompanyService } from './company.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { RewardsSummaryQueryDto } from './dto/rewards-summary.query.dto';
+import { RewardsDetailQueryDto } from './dto/rewards-detail.query.dto';
 
 @Controller('/admin/companies')
 export class CompanyController {
@@ -23,6 +24,14 @@ export class CompanyController {
     @Query(new ValidationPipe({ transform: true, whitelist: true })) query: RewardsSummaryQueryDto,
   ) {
     return this.companyService.getRewardsSummary(query);
+  }
+
+  @Get(':id/rewards/detail')
+  async getRewardsDetail(
+    @Param('id', ParseIntPipe) id: number,
+    @Query(new ValidationPipe({ transform: true, whitelist: true })) query: RewardsDetailQueryDto,
+  ) {
+    return this.companyService.getRewardsDetail(id, query.yearMonth);
   }
 
   @Get(':id')

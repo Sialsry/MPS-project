@@ -7,3 +7,6 @@ export const getDefaultYearMonthKST = () => {
   const m = String(kst.getUTCMonth() + 1).padStart(2, '0')
   return `${y}-${m}`
 }
+
+export const resolveYearMonthKST = (ym?: string) =>
+  isValidYearMonth(ym) ? ym! : getDefaultYearMonthKST()

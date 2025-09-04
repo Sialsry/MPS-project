@@ -54,6 +54,13 @@ type ApiResponse = {
   yearMonth: string
 }
 
+type CompanyRewardsDetail = {
+  company: { id: number; name: string; tier: 'free'|'standard'|'business' }
+  summary: { totalTokens: number; monthlyEarned: number; monthlyUsed: number; usageRate: number; activeTracks: number; yearMonth: string }
+  daily: Array<{ date: string; earned: number; used: number }>
+  byMusic: Array<{ musicId: number; title: string; artist: string; category: string | null; validPlays: number; earned: number }>
+}
+
 export default function CompanyRewardsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTier, setSelectedTier] = useState('all')
@@ -80,6 +87,11 @@ export default function CompanyRewardsPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // 상세 상태 추가
+  const [detail, setDetail] = React.useState<CompanyRewardsDetail | null>(null)
+  const [detailLoading, setDetailLoading] = React.useState(false)
+  const [detailError, setDetailError] = React.useState<string | null>(null)
 
   // 드롭다운 관련 함수들
   const toggleDropdown = (dropdown: string, e: React.MouseEvent) => {
@@ -259,10 +271,28 @@ export default function CompanyRewardsPage() {
 
   const getTierColor = (tier: string) => {
     switch (tier) {
-      case 'Business': return 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-      case 'Standard': return 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-      case 'Free': return 'bg-gray-500/20 text-gray-300 border-gray-500/30'
-      default: return 'bg-white/10 text-white/80 border-white/20'
+      case 'Business': return 'bg-purple-500/20 text-purple-300'
+      case 'Standard': return 'bg-blue-500/20 text-blue-300'
+      case 'Free': return 'bg-gray-500/20 text-gray-300'
+      default: return 'bg-white/10 text-white/80'
+    }
+  }
+
+  const fetchCompanyDetail = async (companyId: string, yearMonth?: string) => {
+    try {
+      setDetailLoading(true)
+      setDetailError(null)
+      const params = new URLSearchParams()
+      if (yearMonth) params.set('yearMonth', yearMonth)
+      const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/companies/${companyId}/rewards/detail?${params.toString()}`
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setDetail(data)
+    } catch (e: any) {
+      setDetailError(e.message || '상세 조회 실패')
+    } finally {
+      setDetailLoading(false)
     }
   }
 
@@ -644,6 +674,7 @@ export default function CompanyRewardsPage() {
                     } hover:bg-white/8`}
                     onClick={() => {
                       setSelectedCompany(company)
+                      fetchCompanyDetail(company.id)
                       setModalOpen(true)
                     }}
                   >
@@ -687,6 +718,7 @@ export default function CompanyRewardsPage() {
                         onClick={(e) => {
                           e.stopPropagation()
                           setSelectedCompany(company)
+                          fetchCompanyDetail(company.id)
                           setModalOpen(true)
                         }}
                       >
@@ -752,6 +784,9 @@ export default function CompanyRewardsPage() {
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           company={selectedCompany}
+          detail={detail}
+          loading={detailLoading}
+          error={detailError}
         />
       )}
     </div>
