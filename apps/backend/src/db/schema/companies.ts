@@ -1,4 +1,4 @@
-import { pgTable, bigserial, text, timestamp, pgEnum, numeric, integer } from 'drizzle-orm/pg-core'
+import { pgTable, bigserial, text, timestamp, pgEnum, numeric } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { company_subscriptions } from './company_subscriptions'
 import { playlists } from './playlists'
