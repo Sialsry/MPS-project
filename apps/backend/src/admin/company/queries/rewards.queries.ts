@@ -144,15 +144,17 @@ export const buildByMusicQuery = (companyId: number, ymYear: number, ymMonth: nu
     m.id AS music_id,
     m.title,
     m.artist,
-    m.category_id::text AS category,
+    COALESCE(mc.name, '') AS category,
     COUNT(*) FILTER (WHERE mp.is_valid_play = true) AS valid_plays,
-    COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned
+    COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned,
+    to_char(MAX(mp.created_at AT TIME ZONE ${tz}), 'YYYY-MM-DD') AS last_used_at
   FROM music_plays mp
   JOIN musics m ON m.id = mp.music_id
+  LEFT JOIN music_categories mc ON mc.id = m.category_id
   , month_range mr
   WHERE mp.using_company_id = ${companyId}
     AND mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
-  GROUP BY m.id, m.title, m.artist, m.category_id
+  GROUP BY m.id, m.title, m.artist, mc.name
   ORDER BY earned DESC, valid_plays DESC
   LIMIT 100;
 `

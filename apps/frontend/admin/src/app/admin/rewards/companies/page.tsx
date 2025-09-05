@@ -89,9 +89,10 @@ export default function CompanyRewardsPage() {
   const [error, setError] = useState<string | null>(null)
 
   // 상세 상태 추가
-  const [detail, setDetail] = React.useState<CompanyRewardsDetail | null>(null)
-  const [detailLoading, setDetailLoading] = React.useState(false)
-  const [detailError, setDetailError] = React.useState<string | null>(null)
+  const [detail, setDetail] = useState<CompanyRewardsDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const [detailYearMonth, setDetailYearMonth] = useState<string | undefined>(undefined)
 
   // 드롭다운 관련 함수들
   const toggleDropdown = (dropdown: string, e: React.MouseEvent) => {
@@ -278,17 +279,26 @@ export default function CompanyRewardsPage() {
     }
   }
 
+  const getDefaultYearMonth = () => {
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = String(now.getMonth() + 1).padStart(2, '0')
+    return `${y}-${m}`
+  }
+
   const fetchCompanyDetail = async (companyId: string, yearMonth?: string) => {
     try {
       setDetailLoading(true)
       setDetailError(null)
       const params = new URLSearchParams()
-      if (yearMonth) params.set('yearMonth', yearMonth)
+      const ym = yearMonth ?? detailYearMonth ?? getDefaultYearMonth()
+      if (ym) params.set('yearMonth', ym)
       const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/companies/${companyId}/rewards/detail?${params.toString()}`
       const res = await fetch(url)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setDetail(data)
+      setDetailYearMonth(ym)
     } catch (e: any) {
       setDetailError(e.message || '상세 조회 실패')
     } finally {
@@ -787,6 +797,12 @@ export default function CompanyRewardsPage() {
           detail={detail}
           loading={detailLoading}
           error={detailError}
+          currentYearMonth={detailYearMonth}
+          onChangeYearMonth={(ym) => {
+            if (!selectedCompany) return
+            setDetailYearMonth(ym)
+            fetchCompanyDetail(selectedCompany.id, ym)
+          }}
         />
       )}
     </div>

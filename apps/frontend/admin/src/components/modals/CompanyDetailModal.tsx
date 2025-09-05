@@ -51,9 +51,11 @@ type Props = {
   detail?: CompanyRewardsDetail | null
   loading?: boolean
   error?: string | null
+  currentYearMonth?: string
+  onChangeYearMonth?: (ym: string) => void
 }
 
-export default function CompanyDetailModal({ open, onClose, company, detail, loading, error }: Props) {
+export default function CompanyDetailModal({ open, onClose, company, detail, loading, error, currentYearMonth, onChangeYearMonth }: Props) {
   const [activeTab, setActiveTab] = useState<'info' | 'usage' | 'rewards'>('info')
   const [chartFilter, setChartFilter] = useState<'daily' | 'monthly'>('daily')
 
@@ -418,68 +420,63 @@ export default function CompanyDetailModal({ open, onClose, company, detail, loa
                     </h3>
                     <select 
                       className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-teal-400/50 transition-colors"
+                      value={(() => {
+                        const ym = currentYearMonth || detail?.summary.yearMonth
+                        if (!ym) return ''
+                        const [, mm] = ym.split('-')
+                        return String(Number(mm))
+                      })()}
                       onChange={(e) => {
-                        // 월별 필터링 로직 구현 예정
+                        const m = Number(e.target.value)
+                        const baseYm = currentYearMonth || detail?.summary.yearMonth
+                        const year = baseYm ? baseYm.split('-')[0] : String(new Date().getFullYear())
+                        const nextYm = `${year}-${String(m).padStart(2, '0')}`
+                        onChangeYearMonth?.(nextYm)
                       }}
                     >
-                      <option value="all">전체 기간</option>
-                      <option value="1">1월</option>
-                      <option value="2">2월</option>
-                      <option value="3">3월</option>
-                      <option value="4">4월</option>
-                      <option value="5">5월</option>
-                      <option value="6">6월</option>
-                      <option value="7">7월</option>
-                      <option value="8">8월</option>
-                      <option value="9">9월</option>
-                      <option value="10">10월</option>
-                      <option value="11">11월</option>
-                      <option value="12">12월</option>
+                      {[1,2,3,4,5,6,7,8,9,10,11,12].map((m)=> (
+                        <option key={m} value={m}>{m}월</option>
+                      ))}
                     </select>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="text-left">
                         <tr className="border-b border-white/10">
-                          <th className="px-4 py-3 text-white/80 font-medium">순위</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">음원명</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">카테고리</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">리워드 발생 횟수(유효재생)</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">적립 리워드</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">최근 사용</th>
+                          <th className="px-4 py-3 text-white/80 font-medium text-center">순위</th>
+                          <th className="px-4 py-3 text-white/80 font-medium text-center">음원명</th>
+                          <th className="px-4 py-3 text-white/80 font-medium text-center">아티스트</th>
+                          <th className="px-4 py-3 text-white/80 font-medium text-center">카테고리</th>
+                          <th className="px-4 py-3 text-white/80 font-medium text-center">리워드 발생 횟수(유효재생)</th>
+                          <th className="px-4 py-3 text-white/80 font-medium text-center">적립 리워드</th>
+                          <th className="px-4 py-3 text-white/80 font-medium text-center">최근 사용</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {company.topTracks.map((track, index) => {
-                          const usagePercentage = Math.round((track.usage / Math.max(...company.topTracks.map(t => t.usage))) * 100)
-                          return (
-                            <tr key={track.title} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                              <td className="px-4 py-3">
-                                <span className={`text-sm font-bold ${
-                                  index === 0 ? 'text-teal-400' :
-                                  index === 1 ? 'text-teal-400' :
-                                  index === 2 ? 'text-teal-400' :
-                                  'text-white'
-                                }`}>
-                                  {index + 1}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 font-medium text-white">{track.title}</td>
-                              <td className="px-4 py-3">
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white/10 text-white/80">
-                                  {track.category}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-teal-400 font-medium">{track.usage.toLocaleString()}</td>
-                              <td className="px-4 py-3 text-teal-400 font-medium">
-                                {(track.usage * 0.007).toFixed(1)} 토큰
-                              </td>
-                              <td className="px-4 py-3 text-white/60 text-xs">
-                                {new Date().toLocaleDateString('ko-KR')}
-                              </td>
-                            </tr>
-                          )
-                        })}
+                        {(detail?.byMusic || []).map((row, index) => (
+                          <tr key={row.musicId} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <td className="px-4 py-3 text-center">
+                              <span className={`text-sm font-bold ${
+                                index === 0 ? 'text-teal-400' : index === 1 ? 'text-teal-400' : index === 2 ? 'text-teal-400' : 'text-white'
+                              }`}>{index + 1}</span>
+                            </td>
+                            <td className="px-4 py-3 font-medium text-white truncate max-w-[220px] text-center" title={row.title}>{row.title}</td>
+                            <td className="px-4 py-3 text-white/80 truncate max-w-[180px] text-center" title={row.artist}>{row.artist}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white/10 text-white/80">
+                                {row.category ?? '-'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-teal-400 font-medium text-center">{row.validPlays.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-teal-400 font-medium text-center">{row.earned.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-white/60 text-xs text-center">{(row as any).lastUsedAt || '-'}</td>
+                          </tr>
+                        ))}
+                        {(!detail?.byMusic || detail.byMusic.length === 0) && (
+                          <tr>
+                            <td colSpan={7} className="px-4 py-8 text-center text-white/50">데이터가 없습니다</td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
