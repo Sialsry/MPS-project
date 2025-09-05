@@ -1,7 +1,8 @@
 .DS_Store
 .env*
 node_modules/
-
+apps/backend/scripts/
+apps/backend/uploads/
 # -------------- contract branch에서 추가함 -------
 artifacts/
 cache/

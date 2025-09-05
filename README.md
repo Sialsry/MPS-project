@@ -14,18 +14,21 @@ MPS는 기업들이 음원을 안전하고 투명하게 이용할 수 있도록 
 - 서버 기반 실시간 재생 추적
 
 ### 🎵 Range 기반 재생 추적 시스템
-- **단일 API 구조**: GET 요청만으로 재생 추적 완료
-- **Range 요청 분석**: 클라이언트의 HTTP Range 패턴으로 재생 진행도 파악
-- **자동 세션 관리**: 브라우저의 자연스러운 스트리밍 동작 활용
-- **유효재생 판정**: 파일의 60% 이상 요청 시 리워드 지급 대상
-- **실시간 추적**: 각 Range 요청마다 서버에서 진행도 계산
+- **단일 API 구조**: GET 요청만으로 재생 추적 및 판정
+- **Range 요청 분석**: 클라이언트의 HTTP Range 패턴(바이트 구간)으로 진행도 계산
+- **자동 세션 토큰**: 서버가 `X-Play-Token` + 쿠키(`pt`)를 발급/재사용하여 상태 최소화
+- **유효재생 판정 규칙**:
+  - (A) 전송된 누적 바이트가 파일의 60% 이상이 되는 순간, 또는
+  - (B) 전송 누적 50% 이상 & 시작 후 30초 이상 경과
+  - (C) 가사 다운로드는 파일 전송 완료 즉시 유효재생(=리워드 판정) 처리
+- **실시간 추적**: 매 Range 응답마다 서버에서 현재 진행도/조건 평가
 
 ### 🔐 등급별 서비스 체계
 - **Free**: 제한된 음원, 리워드 없음
 - **Standard/Business**: 전체 음원 이용, 리워드 지급, 월간 구독제
 
 ### ⛓️ 블록체인 트래킹
-- 유효 재생 조건: 60초 이상 재생 또는 가사 파일 전송 완료
+- 유효 재생 조건: 위 유효재생 판정 규칙(A/B) 충족 또는 가사 파일 전송 완료
 - Sepolia 테스트넷 기반 투명한 사용 내역 기록
 - ERC20 토큰 리워드 시스템
 
@@ -159,67 +162,46 @@ npm run dev
 ### 인증
 모든 API 요청에는 `x-api-key` 헤더가 필요합니다.
 
-### 음원 재생 (Range 요청 기반)
+### 음원 재생 (Range 기반 스트리밍)
 
-#### 기본 사용법
+기본 요청:
 ```http
 GET /api/music/{music_id}/play
 Headers:
   x-api-key: YOUR_API_KEY
+  Range: bytes=0-1048575   # (선택) 브라우저가 자동 부여
 
-Response Headers:
-  X-Session-ID: 12345  # 재생 세션 고유 ID
-  X-Progress: 25       # 현재 재생 진행도 (%)
+Response (206 Partial Content):
+  Content-Range: bytes 0-1048575/FILE_SIZE
+  Accept-Ranges: bytes
+  Content-Type: audio/mpeg
+  X-Play-Token: <재생 토큰>
+  Set-Cookie: pt=<토큰>; Path=/; HttpOnly; SameSite=Lax
 ```
 
-#### Range 요청 자동 처리
-브라우저의 오디오 플레이어는 자동으로 HTTP Range 요청을 보냅니다:
+이후 브라우저는 연속적으로 `Range` 요청을 보내며 서버는 진행도를 내부 계산 후 조건 충족 시 유효재생 처리(리워드 기록)를 1회 수행합니다.
 
-```http
-GET /api/music/{music_id}/play
-Headers:
-  x-api-key: YOUR_API_KEY
-  Range: bytes=0-1023    # 첫 번째 청크
+유효재생이 확정되는 즉시:
+- 해당 `music_plays` 레코드가 `is_valid_play=true` 로 업데이트
+- 리워드가 가능하면 `rewards` 테이블에 1건 삽입 및 월별 잔여 횟수 감소
 
-Response:
-  Status: 206 Partial Content
-  Content-Range: bytes 0-1023/5242880
-  X-Session-ID: 12345
-  X-Progress: 0
-```
+추가적인 클라이언트 제어/콜백은 필요 없습니다.
 
-```http
-GET /api/music/{music_id}/play
-Headers:
-  x-api-key: YOUR_API_KEY
-  Range: bytes=1024-2047  # 두 번째 청크
-
-Response:
-  Status: 206 Partial Content
-  Content-Range: bytes 1024-2047/5242880
-  X-Session-ID: 12345
-  X-Progress: 15
-```
-
-#### 유효재생 자동 판정
-```http
-GET /api/music/{music_id}/play
-Headers:
-  x-api-key: YOUR_API_KEY
-  Range: bytes=3145728-  # 파일의 60% 이상 요청
-
-Response:
-  Status: 206 Partial Content
-  X-Session-ID: 12345
-  X-Progress: 65         # 60% 이상 → 자동으로 유효재생 처리
-```
-
-### 가사 다운로드
+### 가사 다운로드 (즉시 유효재생)
 ```http
 GET /api/lyric/{music_id}/download
 Headers:
   x-api-key: YOUR_API_KEY
+
+Response:
+  Status: 200 OK
+  Content-Type: text/plain; charset=utf-8
+  Content-Disposition: attachment; filename="lyrics_<id>.txt"
 ```
+처리 흐름:
+1. 재생 로직과 동일하게 리워드 코드 산출(getRewardCode)
+2. `use_case = '2'`, `use_price = lyrics_price` 로 재생 시작 레코드 생성
+3. 파일 전송 직후 즉시 유효재생 처리 및 (가능 시) 리워드 지급
 
 ### 클라이언트 구현 예시
 
@@ -259,9 +241,11 @@ audio.addEventListener('loadstart', async () => {
 ## 💰 리워드 시스템
 
 ### 유효 재생 조건
-- **음원 재생**: 파일의 60% 이상 Range 요청 시 자동 인정
-- **가사 이용**: 파일 다운로드 완료
-- **자동 추적**: 서버에서 Range 요청 패턴 분석으로 진행도 계산
+- **음원 재생**:
+  - 누적 전송 ≥ 60% (즉시 인정) 또는
+  - 누적 전송 ≥ 50% && 재생 시작 경과 ≥ 30초 (보조 조건) 
+- **가사 다운로드**: 파일(전체) 전송 완료 즉시 인정
+- **자동 추적**: 서버 Range 분석 + 시간 조건 결합
 
 ### Range 기반 재생 추적 원리
 1. **초기 요청**: 클라이언트가 음원 재생 시작
@@ -275,10 +259,10 @@ audio.addEventListener('loadstart', async () => {
 - **자연스러움**: 브라우저의 기본 동작 활용
 
 ### 리워드 지급
-- **주기**: 매일 자정 일괄 처리
-- **토큰**: ERC20 기반 리워드 토큰
-- **용도**: 월간 구독료 할인
-- **투명성**: 모든 지급 내역 블록체인 기록
+- **트리거**: 유효재생 확정 시 즉시 레코드 생성 (온체인 배치 기록/토큰 전송은 별도 프로세스 예정)
+- **토큰**: ERC20 (테스트넷) 기반, 발행/이관 배치 잡
+- **용도**: 월간 구독료 할인 차감
+- **투명성**: 온체인 전송 Tx 해시로 추적
 
 ## 📊 모니터링 & 통계
 

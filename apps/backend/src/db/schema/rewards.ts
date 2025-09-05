@@ -13,7 +13,7 @@ export const rewards = pgTable('rewards', {
   company_id: bigint('company_id', { mode: 'number' }).notNull(),
   music_id: bigint('music_id', { mode: 'number' }).notNull(),
   play_id: bigint('play_id', { mode: 'number' }).notNull(),
-  // reward_code: rewardCodeEnum2('reward_code').notNull(),
+  reward_code: rewardCodeEnum2('reward_code').notNull(),
   amount: numeric('amount').notNull(),
   status: rewardStatusEnum('status').notNull().default('pending'),
   payout_tx_hash: text('payout_tx_hash'),

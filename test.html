@@ -614,9 +614,12 @@
 
                     addLog(`음원 ${musicId}번 가사 다운로드 요청 시작`, 'request');
                     
-                    const response = await makeActualRequest(endpoint, apiKey, serverUrl);
-                    
-                    // 가사 파일 다운로드
+                    const { response } = await makeActualRequest(endpoint, apiKey, serverUrl);
+
+                    // 가사 파일 다운로드 (Response 객체 확인)
+                    if (!response || typeof response.text !== 'function') {
+                        throw new Error('가사 응답 객체가 올바르지 않습니다.');
+                    }
                     const lyricsText = await response.text();
                     downloadFile(lyricsText, `lyrics_${musicId}.txt`, 'text/plain');
                     

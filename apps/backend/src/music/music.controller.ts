@@ -59,7 +59,6 @@ export class MusicController {
     async playMusic(
         @Param('music_id', ParseIntPipe) musicId: number,
         @Headers('x-api-key') headerApiKey: string,
-        @Query('api-key') queryapikey: string,
         @Headers('range') range: string,
         @Headers('x-play-token') playTokenHeader: string,
         @Query('pt') playTokenQuery: string,
@@ -105,7 +104,7 @@ export class MusicController {
                 rewardInfo = activeSession.reward_code;
                 rewardAmount = activeSession.reward_amount ?? 0;
             } else {
-                rewardInfo = await this.getRewardCode(company.remaining_reward_count, musicId, company.id);
+                rewardInfo = await this.musicService.getRewardCode(musicId, company.id)
                 const rewardRow = await this.musicService.findRewardById(musicId);
                 rewardAmount = rewardRow ? rewardRow.reward_per_play : 0;
                 const startPlay = await this.musicService.startPlay({
@@ -119,9 +118,8 @@ export class MusicController {
                 musicPlayId = startPlay.id;
                 await this.musicService.updateInitMusicStats(music.id)
             }
-            // console.log(rewardInfo, '리워드인포임2')
             // 3) 파일
-            const filePath = join(process.cwd(), music.file_path);
+            const filePath = join(process.cwd(), '/uploads/music/', music.file_path);
             const fileSize = statSync(filePath).size;
 
             // 4) 토큰 획득(쿠키/쿼리/헤더) → 없거나 music/company 불일치 시 재발급
@@ -149,7 +147,6 @@ export class MusicController {
             });
 
             // let endPlay = await this.musicService.getStartPlay(musicPlayId)
-
             //await this.musicService.updateMusicStats(musicId, endPlay.is_valid_play ?? false)
 
             return musicDataResult;
@@ -158,27 +155,6 @@ export class MusicController {
             console.error('음원 재생 에러:', e);
             if (e instanceof HttpException) throw e;
             throw new HttpException('음원 재생 중 오류', HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    // 리워드코드를 반환하는 메서드. 
-    // 0: 리워드가 발생하는 음원이 아닌 경우
-    // 1: 리워드가 정상적으로 발생한 경우
-    // 2: 음원의 리워드 제공 횟수가 소진된 경우
-    // 3: 기업의 리워드 수령 횟수가 소진된 경우 
-    private async getRewardCode(companyCount, musicId, companyId) {
-        if (companyCount === 0) {
-            return "3"
-        } else {
-            const reward = await this.musicService.findRewardById(musicId);
-            if (!reward) {
-                return "0"
-            } else if (reward.remaining_reward_count === 0) {
-                return "2"
-            } else if (reward.remaining_reward_count > 0) {
-                await this.musicService.companyCounted(companyId)
-                return "1"
-            }
         }
     }
 

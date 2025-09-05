@@ -23,7 +23,6 @@ export const companies = pgTable('companies', {
   api_key_hash: text('api_key_hash'),
   total_rewards_earned: numeric('total_rewards_earned').default('0'), // 전체 누적 적립 리워드
   total_rewards_used: numeric('total_rewards_used').default('0'), // 전체 누적 사용 리워드 (할인용)
-  remaining_reward_count: integer('remaining_reward_count').default(5000),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 })

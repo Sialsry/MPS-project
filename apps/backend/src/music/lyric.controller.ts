@@ -52,7 +52,7 @@ export class LyricController {
             }
 
             // 5. 가사 파일 경로 확인
-            const lyricPath = join(process.cwd(), './storage/', music.lyrics_file_path);
+            const lyricPath = join(process.cwd(), './uploads/lyrics/', music.lyrics_file_path);
             console.log('🔍 찾고 있는 가사 파일 경로:', lyricPath);
             console.log('📝 가사 정보:', { id: music.id, lyrics_file_path: music.lyrics_file_path, title: music.title });
 
@@ -69,12 +69,34 @@ export class LyricController {
                 response.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
                 console.log('📁 다운로드 파일명:', safeFileName);
 
-                // 7. 가사 다운로드 기록
-                await this.musicService.recordLyricDownload({
+                // 7. 음원 재생과 동일한 비즈니스 로직으로 처리: startPlay -> 즉시 유효재생 처리
+                // rewardCode 산출 (side-effect 없음)
+                const rewardCode = await this.musicService.getRewardCode(music.id, company.id);
+
+                // reward 금액 조회 (월별 리워드 설정)
+                const rewardRow = await this.musicService.findRewardById(music.id);
+                const rewardAmount = rewardRow ? rewardRow.reward_per_play : 0;
+
+                // startPlay (useCase '2', usePrice = lyrics_price)
+                const playRow = await this.musicService.startPlay({
                     musicId: music.id,
                     companyId: company.id,
-                    userAgent,
-                    downloadTime: new Date(),
+                    useCase: '2',
+                    rewardCode,
+                    rewardAmount: rewardAmount.toString(),
+                    usePrice: music.lyrics_price,
+                });
+
+                await this.musicService.lyricUseStat(music.id);
+
+                // 즉시 유효재생 처리 (리워드 차감, rewards insert 등)
+                await this.musicService.recordValidPlayOnce({
+                    musicId: music.id,
+                    companyId: company.id,
+                    useCase: '2',
+                    rewardCode,
+                    musicPlayId: playRow.id,
+                    rewardAmount,
                 });
 
                 // 8. 파일 스트림 반환

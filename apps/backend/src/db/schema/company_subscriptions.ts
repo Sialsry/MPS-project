@@ -1,11 +1,11 @@
-import { pgTable, bigserial, bigint, varchar, timestamp, decimal, integer, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, bigserial, bigint, varchar, timestamp, decimal, integer } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { companies } from './companies'
 
 export const company_subscriptions = pgTable('company_subscriptions', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
   company_id: bigint('company_id', { mode: 'number' }).notNull(),
-  tier: varchar('tier', { length: 20 }).notNull(), // 'free', 'standard', 'business'
+  tier: varchar('tier', { length: 20 }).notNull(), // 'standard', 'business'
   start_date: timestamp('start_date', { withTimezone: true }).notNull(), // 구독 시작일
   end_date: timestamp('end_date', { withTimezone: true }).notNull(), // 구독 종료일
   total_paid_amount: decimal('total_paid_amount', { precision: 10, scale: 2 }),
@@ -16,7 +16,7 @@ export const company_subscriptions = pgTable('company_subscriptions', {
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 })
 
-export const company_subscriptionsRelations = relations(company_subscriptions, ({ one, many }) => ({
+export const company_subscriptionsRelations = relations(company_subscriptions, ({ one }) => ({
   company: one(companies, {
     fields: [company_subscriptions.company_id],
     references: [companies.id],
