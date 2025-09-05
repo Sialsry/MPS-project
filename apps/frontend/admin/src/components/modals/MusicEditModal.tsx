@@ -61,14 +61,14 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
   const [priceMusicOnly, setPriceMusicOnly] = useState(isCreateMode ? 7 : (musicData?.priceMusicOnly || 7))
   const [priceLyricsOnly, setPriceLyricsOnly] = useState(isCreateMode ? 2 : (musicData?.priceLyricsOnly || 2))
   const [priceBoth, setPriceBoth] = useState(isCreateMode ? 7 : (musicData?.priceBoth || 7))
-  const [hasRewards, setHasRewards] = useState(isCreateMode ? true : true)
+  const [hasRewards, setHasRewards] = useState(isCreateMode ? true : (musicData?.grade === 1))
   const [rewardPerPlay, setRewardPerPlay] = useState(isCreateMode ? 0.007 : (musicData?.rewardPerPlay || 0.007))
   const [maxPlayCount, setMaxPlayCount] = useState<number | ''>(isCreateMode ? '' : (musicData?.maxPlayCount || ''))
 
   // API 설정
   const [grade, setGrade] = useState<0 | 1 | 2>(isCreateMode ? 1 : (musicData?.grade || 0))
   const [apiTier, setApiTier] = useState<'all' | 'premium'>(isCreateMode ? 'premium' : (musicData?.grade === 0 ? 'all' : 'premium'))
-  const [rewardsDisabled, setRewardsDisabled] = useState(false)
+  const [rewardsDisabled, setRewardsDisabled] = useState(isCreateMode ? false : (musicData?.grade === 0))
 
 
   // 카테고리 데이터
@@ -83,6 +83,23 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   
   const getBasename = (p?: string) => (p ? p.split('/').pop() || '' : '')
+  // 수정 모드일 때 musicData에 따른 초기 상태 설정
+  useEffect(() => {
+    if (!isCreateMode && musicData) {
+      const musicGrade = musicData.grade || 0;
+      setGrade(musicGrade);
+      
+      if (musicGrade === 0) {
+        setApiTier('all');
+        setHasRewards(false);
+        setRewardsDisabled(true);
+      } else {
+        setApiTier('premium');
+        setHasRewards(musicGrade === 1);
+        setRewardsDisabled(false);
+      }
+    }
+  }, [isCreateMode, musicData]);
   const handleApiTierChange = (tier: 'all' | 'premium') => {
     setApiTier(tier)
     if (tier === 'all') {

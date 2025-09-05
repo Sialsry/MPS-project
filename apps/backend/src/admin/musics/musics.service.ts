@@ -199,16 +199,16 @@ export class MusicsService implements OnModuleInit {
         // 음원아이디 추출
     const musicId = newMusic[0].id;
     
-    // 리워드 생성 (grade가 1일 때만)
-    if (createMusicDto.grade === 1 && createMusicDto.maxPlayCount) {
-      await this.db.insert(monthly_music_rewards).values({
-        music_id: musicId as any,
-        year_month: new Date().toISOString().slice(0, 7),
-        total_reward_count: createMusicDto.maxPlayCount,
-        remaining_reward_count: createMusicDto.maxPlayCount,
-        reward_per_play: createMusicDto.rewardPerPlay.toString()
-      });
-    }
+    // 리워드 생성 
+    const rewardData = {
+      music_id: musicId as any,
+      year_month: new Date().toISOString().slice(0, 7),
+      total_reward_count: createMusicDto.grade === 1 ? createMusicDto.maxPlayCount || 0 : 0,
+      remaining_reward_count: createMusicDto.grade === 1 ? createMusicDto.maxPlayCount || 0 : 0,
+      reward_per_play: createMusicDto.grade === 1 ? createMusicDto.rewardPerPlay.toString() : '0'
+    };
+    
+    await this.db.insert(monthly_music_rewards).values(rewardData);
 
     // 태그 생성
     if (createMusicDto.tags && createMusicDto.tags.trim()) {
@@ -238,7 +238,7 @@ export class MusicsService implements OnModuleInit {
 
         rewardPerPlay: createMusicDto.rewardPerPlay,
         maxPlayCount: createMusicDto.maxPlayCount,
-        accessTier: createMusicDto.accessTier,
+        grade: createMusicDto.grade,
         audioFilePath: createMusicDto.audioFilePath
       },
       id: musicId
@@ -338,8 +338,7 @@ export class MusicsService implements OnModuleInit {
         rewardPerPlay: row.rewardPerPlay ? Number(row.rewardPerPlay) : undefined,
         maxPlayCount: row.maxPlayCount ? Number(row.maxPlayCount) : undefined,
         maxRewardLimit: row.maxRewardLimit ? Number(row.maxRewardLimit) : 0,
-        grade: row.grade,
-        accessTier: Number(row.grade) === 0 ? 'all' : 'subscribed'
+        grade: row.grade
       };
     } catch (error) {
       console.error('음원 상세 조회 실패:', error);
@@ -518,7 +517,7 @@ export class MusicsService implements OnModuleInit {
     if (updateMusicDto.releaseDate !== undefined) updates.release_date = updateMusicDto.releaseDate || null;
     if (updateMusicDto.priceMusicOnly !== undefined) updates.price_per_play = updateMusicDto.priceMusicOnly.toString();
     if (updateMusicDto.priceLyricsOnly !== undefined) updates.lyrics_price = updateMusicDto.priceLyricsOnly.toString();
-    if (updateMusicDto.accessTier !== undefined) updates.grade = updateMusicDto.accessTier === 'all' ? 0 : 1;
+    if (updateMusicDto.grade !== undefined) updates.grade = updateMusicDto.grade;
 
     if (updateMusicDto.lyricsFilePath !== undefined) {
       updates.lyrics_file_path = updateMusicDto.lyricsFilePath || null;
