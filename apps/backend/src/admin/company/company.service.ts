@@ -7,7 +7,7 @@ import type { RewardsSummaryQueryDto } from './dto/rewards-summary.query.dto';
 import { getDefaultYearMonthKST, isValidYearMonth, resolveYearMonthKST } from '../../common/utils/date.util';
 import { normalizePagination } from '../../common/utils/pagination.util';
 import { normalizeSort } from '../../common/utils/sort.util';
-import { buildSummaryQuery, buildDailyQuery, buildByMusicQuery, buildSummaryListBaseQuery } from './queries/rewards.queries';
+import { buildSummaryQuery, buildDailyQuery, buildByMusicQuery, buildSummaryListBaseQuery, buildDailyIndustryAvgQuery, buildMonthlyCompanyQuery, buildMonthlyIndustryAvgQuery } from './queries/rewards.queries';
 
 @Injectable()
 export class CompanyService {
@@ -67,11 +67,16 @@ export class CompanyService {
     const summaryRes = await this.db.execute(buildSummaryQuery(companyId, ymYear, ymMonth, tz))
     const base = (summaryRes as any).rows?.[0]
     if (!base) {
-      return { company: { id: companyId, name: '', tier: 'free' }, summary: { totalTokens: 0, monthlyEarned: 0, monthlyUsed: 0, usageRate: 0, activeTracks: 0, yearMonth: ym }, daily: [], byMusic: [] }
+      return { company: { id: companyId, name: '', tier: 'free' }, summary: { totalTokens: 0, monthlyEarned: 0, monthlyUsed: 0, usageRate: 0, activeTracks: 0, yearMonth: ym }, daily: [], dailyIndustryAvg: [], monthly: [], monthlyIndustryAvg: [], byMusic: [] }
     }
 
-    const dailyRes = await this.db.execute(buildDailyQuery(companyId, ymYear, ymMonth, tz))
-    const byMusicRes = await this.db.execute(buildByMusicQuery(companyId, ymYear, ymMonth, tz))
+    const [dailyRes, dailyIndustryRes, byMusicRes, monthlyCompanyRes, monthlyIndustryRes] = await Promise.all([
+      this.db.execute(buildDailyQuery(companyId, ymYear, ymMonth, tz)),
+      this.db.execute(buildDailyIndustryAvgQuery(ymYear, ymMonth, tz)),
+      this.db.execute(buildByMusicQuery(companyId, ymYear, ymMonth, tz)),
+      this.db.execute(buildMonthlyCompanyQuery(companyId, ymYear, ymMonth, 12, tz)),
+      this.db.execute(buildMonthlyIndustryAvgQuery(ymYear, ymMonth, 12, tz)),
+    ])
 
     const tierText = String(base.grade) === 'business' ? 'Business' : String(base.grade) === 'standard' ? 'Standard' : 'Free'
 
@@ -105,6 +110,9 @@ export class CompanyService {
         usedTotal: Number(base.used_total || 0),
       },
       daily: ((dailyRes as any).rows || []).map((r: any) => ({ date: r.date, earned: Number(r.earned || 0), used: Number(r.used || 0) })),
+      dailyIndustryAvg: ((dailyIndustryRes as any).rows || []).map((r: any) => ({ date: r.date, earned: Number(r.earned || 0) })),
+      monthly: ((monthlyCompanyRes as any).rows || []).map((r: any) => ({ yearMonth: r.year_month, earned: Number(r.earned || 0) })),
+      monthlyIndustryAvg: ((monthlyIndustryRes as any).rows || []).map((r: any) => ({ yearMonth: r.year_month, earned: Number(r.earned || 0) })),
       byMusic: ((byMusicRes as any).rows || []).map((r: any) => ({ musicId: Number(r.music_id), title: r.title, artist: r.artist, category: r.category ?? null, validPlays: Number(r.valid_plays || 0), earned: Number(r.earned || 0) })),
     }
   }

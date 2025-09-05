@@ -100,6 +100,40 @@ export const buildDailyQuery = (companyId: number, ymYear: number, ymMonth: numb
   ORDER BY days.d ASC;
 `
 
+export const buildDailyIndustryAvgQuery = (ymYear: number, ymMonth: number, tz: string) => sql`
+  WITH month_range AS (
+    SELECT 
+      make_timestamptz(${ymYear}, ${ymMonth}, 1, 0, 0, 0, ${tz}) AS month_start,
+      (make_timestamptz(${ymYear}, ${ymMonth}, 1, 0, 0, 0, ${tz}) + interval '1 month') - interval '1 second' AS month_end
+  ),
+  days AS (
+    SELECT generate_series(
+      (SELECT month_start FROM month_range),
+      (SELECT month_end FROM month_range),
+      interval '1 day'
+    )::date AS d
+  ),
+  earned_by_company AS (
+    SELECT DATE(mp.created_at AT TIME ZONE ${tz}) AS d,
+           mp.using_company_id,
+           COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned
+    FROM music_plays mp, month_range mr
+    WHERE mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
+    GROUP BY 1, mp.using_company_id
+  ),
+  avg_earned AS (
+    SELECT d, AVG(earned) AS avg_earned
+    FROM earned_by_company
+    GROUP BY d
+  )
+  SELECT 
+    to_char(days.d, 'YYYY-MM-DD') AS date,
+    COALESCE(a.avg_earned, 0) AS earned
+  FROM days
+  LEFT JOIN avg_earned a ON a.d = days.d
+  ORDER BY days.d ASC;
+`
+
 export const buildByMusicQuery = (companyId: number, ymYear: number, ymMonth: number, tz: string) => sql`
   WITH month_range AS (
     SELECT 
@@ -121,6 +155,58 @@ export const buildByMusicQuery = (companyId: number, ymYear: number, ymMonth: nu
   GROUP BY m.id, m.title, m.artist, m.category_id
   ORDER BY earned DESC, valid_plays DESC
   LIMIT 100;
+`
+
+export const buildMonthlyCompanyQuery = (companyId: number, ymYear: number, ymMonth: number, months: number, tz: string) => sql`
+  WITH anchor AS (
+    SELECT make_timestamptz(${ymYear}, ${ymMonth}, 1, 0, 0, 0, ${tz}) AS anchor_month
+  ),
+  month_series AS (
+    SELECT 
+      (DATE_TRUNC('month', (SELECT anchor_month FROM anchor) - (i || ' month')::interval)) AS m_start
+    FROM generate_series(0, ${months} - 1) AS g(i)
+  ),
+  earned_company AS (
+    SELECT DATE_TRUNC('month', mp.created_at AT TIME ZONE ${tz}) AS m,
+           COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned
+    FROM music_plays mp
+    WHERE mp.using_company_id = ${companyId}
+    GROUP BY 1
+  )
+  SELECT to_char(ms.m_start, 'YYYY-MM') AS year_month,
+         COALESCE(ec.earned, 0) AS earned
+  FROM month_series ms
+  LEFT JOIN earned_company ec ON ec.m = ms.m_start
+  ORDER BY ms.m_start ASC;
+`
+
+export const buildMonthlyIndustryAvgQuery = (ymYear: number, ymMonth: number, months: number, tz: string) => sql`
+  WITH anchor AS (
+    SELECT make_timestamptz(${ymYear}, ${ymMonth}, 1, 0, 0, 0, ${tz}) AS anchor_month
+  ),
+  month_series AS (
+    SELECT 
+      (DATE_TRUNC('month', (SELECT anchor_month FROM anchor) - (i || ' month')::interval)) AS m_start,
+      (DATE_TRUNC('month', (SELECT anchor_month FROM anchor) - (i || ' month')::interval) + interval '1 month' - interval '1 second') AS m_end
+    FROM generate_series(0, ${months} - 1) AS g(i)
+  ),
+  earned_by_company AS (
+    SELECT DATE_TRUNC('month', mp.created_at AT TIME ZONE ${tz}) AS m,
+           mp.using_company_id,
+           COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned
+    FROM music_plays mp
+    GROUP BY 1, mp.using_company_id
+  ),
+  avg_earned AS (
+    SELECT m, AVG(earned) AS avg_earned
+    FROM earned_by_company
+    GROUP BY m
+  )
+  SELECT to_char(ms.m_start, 'YYYY-MM') AS year_month,
+         COALESCE(a.avg_earned, 0) AS earned
+  FROM month_series ms
+  LEFT JOIN avg_earned a ON a.m = ms.m_start
+  ORDER BY ms.m_start ASC;
 `
 
 export const buildSummaryListBaseQuery = (ymYear: number, ymMonth: number, tz: string) => sql`

@@ -5,9 +5,12 @@ import SimpleLineChart from '@/components/charts/SimpleLineChart'
 
 // 상세 타입 정의 추가
 type CompanyRewardsDetail = {
-  company: { id: number; name: string; tier: 'free'|'standard'|'business'; businessNumber?: string; contactEmail?: string; contactPhone?: string; homepageUrl?: string; profileImageUrl?: string; smartAccountAddress?: string; ceoName?: string; createdAt?: string; updatedAt?: string }
+  company: { id: number; name: string; tier: 'free'|'standard'|'business'; businessNumber?: string; contactEmail?: string; contactPhone?: string; homepageUrl?: string; profileImageUrl?: string; smartAccountAddress?: string; ceoName?: string; createdAt?: string; updatedAt?: string; subscriptionStart?: string; subscriptionEnd?: string }
   summary: { totalTokens: number; monthlyEarned: number; monthlyUsed: number; usageRate: number; activeTracks: number; yearMonth: string; earnedTotal?: number; usedTotal?: number }
   daily: Array<{ date: string; earned: number; used: number }>
+  dailyIndustryAvg?: Array<{ date: string; earned: number }>
+  monthly?: Array<{ yearMonth: string; earned: number }>
+  monthlyIndustryAvg?: Array<{ yearMonth: string; earned: number }>
   byMusic: Array<{ musicId: number; title: string; artist: string; category: string | null; validPlays: number; earned: number }>
 }
 
@@ -367,87 +370,32 @@ export default function CompanyDetailModal({ open, onClose, company, detail, loa
                     </div>
                   </div>
                   <div className="h-64">
-                    {detail && detail.daily && detail.daily.length > 0 ? (
-                      <SimpleLineChart 
-                        labels={(() => {
-                          if (chartFilter === 'daily') {
-                            return detail.daily.map(item => {
-                              const date = new Date(item.date)
-                              return `${date.getMonth() + 1}/${date.getDate()}`
-                            })
-                          } else {
-                            // 월별 데이터 집계
-                            const monthlyData = detail.daily.reduce((acc, item) => {
-                              const date = new Date(item.date)
-                              const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-                              if (!acc[monthKey]) {
-                                acc[monthKey] = { earned: 0, count: 0 }
-                              }
-                              acc[monthKey].earned += item.earned
-                              acc[monthKey].count += 1
-                              return acc
-                            }, {})
-                            
-                            return Object.keys(monthlyData).sort().map(monthKey => {
-                              const date = new Date(monthKey + '-01')
-                              return `${date.getFullYear()}/${date.getMonth() + 1}`
-                            })
-                          }
-                        })()}
-                        series={[
-                          { 
-                            label: '현재 기업', 
-                            data: (() => {
-                              if (chartFilter === 'daily') {
-                                return detail.daily.map(item => item.earned)
-                              } else {
-                                // 월별 데이터 집계
-                                const monthlyData = detail.daily.reduce((acc, item) => {
-                                  const date = new Date(item.date)
-                                  const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-                                  if (!acc[monthKey]) {
-                                    acc[monthKey] = 0
-                                  }
-                                  acc[monthKey] += item.earned
-                                  return acc
-                                }, {})
-                                
-                                return Object.keys(monthlyData).sort().map(monthKey => monthlyData[monthKey])
-                              }
-                            })()
-                          },
-                          { 
-                            label: '업계 평균', 
-                            data: (() => {
-                              if (chartFilter === 'daily') {
-                                return detail.daily.map(() => {
-                                  const baseEarned = detail.daily.reduce((sum, item) => sum + item.earned, 0) / detail.daily.length
-                                  const variation = 0.8 + Math.random() * 0.4
-                                  return Math.round(baseEarned * variation)
-                                })
-                              } else {
-                                // 월별 업계 평균
-                                const monthlyData = detail.daily.reduce((acc, item) => {
-                                  const date = new Date(item.date)
-                                  const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-                                  if (!acc[monthKey]) {
-                                    acc[monthKey] = 0
-                                  }
-                                  acc[monthKey] += item.earned
-                                  return acc
-                                }, {})
-                                
-                                return Object.keys(monthlyData).sort().map(monthKey => {
-                                  const baseEarned = monthlyData[monthKey]
-                                  const variation = 0.8 + Math.random() * 0.4
-                                  return Math.round(baseEarned * variation)
-                                })
-                              }
-                            })()
-                          }
-                        ]}
-                        colors={['#14b8a6', '#9ca3af']}
-                      />
+                    {detail ? (
+                      chartFilter === 'daily' ? (
+                        <SimpleLineChart 
+                          labels={(detail.daily || []).map(item => {
+                            const date = new Date(item.date)
+                            return `${date.getMonth() + 1}/${date.getDate()}`
+                          })}
+                          series={[
+                            { label: '현재 기업', data: (detail.daily || []).map(item => item.earned) },
+                            { label: '업계 평균', data: (detail.dailyIndustryAvg || []).map(item => item.earned) },
+                          ]}
+                          colors={["#14b8a6", "#9ca3af"]}
+                        />
+                      ) : (
+                        <SimpleLineChart 
+                          labels={(detail.monthly || []).map(m => {
+                            const [y, mm] = m.yearMonth.split('-')
+                            return `${y}/${Number(mm)}`
+                          })}
+                          series={[
+                            { label: '현재 기업', data: (detail.monthly || []).map(m => m.earned) },
+                            { label: '업계 평균', data: (detail.monthlyIndustryAvg || []).map(m => m.earned) },
+                          ]}
+                          colors={["#14b8a6", "#9ca3af"]}
+                        />
+                      )
                     ) : (
                       <div className="h-full flex items-center justify-center text-white/60">
                         <div className="text-center">
