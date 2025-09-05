@@ -52,6 +52,7 @@ type Props = {
 
 export default function CompanyDetailModal({ open, onClose, company, detail, loading, error }: Props) {
   const [activeTab, setActiveTab] = useState<'info' | 'usage' | 'rewards'>('info')
+  const [chartFilter, setChartFilter] = useState<'daily' | 'monthly'>('daily')
 
   if (!open || !company) return null
 
@@ -135,7 +136,7 @@ export default function CompanyDetailModal({ open, onClose, company, detail, loa
           <div className="flex border-b border-white/10 flex-shrink-0">
             {[
               { id: 'info', label: '기업 기본 정보' },
-              { id: 'usage', label: '음원 사용 현황' },
+              { id: 'usage', label: '리워드 현황' },
               { id: 'rewards', label: '사용 기업 현황' }
             ].map((tab) => (
               <button
@@ -335,21 +336,128 @@ export default function CompanyDetailModal({ open, onClose, company, detail, loa
             {/* 음원 사용 현황 탭 */}
             {activeTab === 'usage' && (
               <div className="space-y-6">
-                {/* 월별 API 사용량 차트 */}
+                {/* 리워드 적립 추이 차트 */}
                 <div className="rounded-xl border border-white/10 p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
-                    <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
-                    월별 리워드 발생 API호출 추이
-                  </h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-3">
+                      <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
+                      리워드 적립 추이
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setChartFilter('daily')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                          chartFilter === 'daily'
+                            ? 'bg-teal-500 text-white'
+                            : 'bg-white/10 text-white/60 hover:bg-white/20 hover:text-white/80'
+                        }`}
+                      >
+                        일별
+                      </button>
+                      <button
+                        onClick={() => setChartFilter('monthly')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                          chartFilter === 'monthly'
+                            ? 'bg-teal-500 text-white'
+                            : 'bg-white/10 text-white/60 hover:bg-white/20 hover:text-white/80'
+                        }`}
+                      >
+                        월별
+                      </button>
+                    </div>
+                  </div>
                   <div className="h-64">
-                    <SimpleLineChart 
-                      labels={months}
-                      series={[
-                        { label: '현재 기업', data: company.monthlyUsage },
-                        { label: '업계 평균', data: [1200, 1350, 1100, 1400, 1600, 1800, 2000, 1900, 2100, 1950, 2200, 2400] }
-                      ]}
-                      colors={['#14b8a6', '#9ca3af']}
-                    />
+                    {detail && detail.daily && detail.daily.length > 0 ? (
+                      <SimpleLineChart 
+                        labels={(() => {
+                          if (chartFilter === 'daily') {
+                            return detail.daily.map(item => {
+                              const date = new Date(item.date)
+                              return `${date.getMonth() + 1}/${date.getDate()}`
+                            })
+                          } else {
+                            // 월별 데이터 집계
+                            const monthlyData = detail.daily.reduce((acc, item) => {
+                              const date = new Date(item.date)
+                              const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+                              if (!acc[monthKey]) {
+                                acc[monthKey] = { earned: 0, count: 0 }
+                              }
+                              acc[monthKey].earned += item.earned
+                              acc[monthKey].count += 1
+                              return acc
+                            }, {})
+                            
+                            return Object.keys(monthlyData).sort().map(monthKey => {
+                              const date = new Date(monthKey + '-01')
+                              return `${date.getFullYear()}/${date.getMonth() + 1}`
+                            })
+                          }
+                        })()}
+                        series={[
+                          { 
+                            label: '현재 기업', 
+                            data: (() => {
+                              if (chartFilter === 'daily') {
+                                return detail.daily.map(item => item.earned)
+                              } else {
+                                // 월별 데이터 집계
+                                const monthlyData = detail.daily.reduce((acc, item) => {
+                                  const date = new Date(item.date)
+                                  const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+                                  if (!acc[monthKey]) {
+                                    acc[monthKey] = 0
+                                  }
+                                  acc[monthKey] += item.earned
+                                  return acc
+                                }, {})
+                                
+                                return Object.keys(monthlyData).sort().map(monthKey => monthlyData[monthKey])
+                              }
+                            })()
+                          },
+                          { 
+                            label: '업계 평균', 
+                            data: (() => {
+                              if (chartFilter === 'daily') {
+                                return detail.daily.map(() => {
+                                  const baseEarned = detail.daily.reduce((sum, item) => sum + item.earned, 0) / detail.daily.length
+                                  const variation = 0.8 + Math.random() * 0.4
+                                  return Math.round(baseEarned * variation)
+                                })
+                              } else {
+                                // 월별 업계 평균
+                                const monthlyData = detail.daily.reduce((acc, item) => {
+                                  const date = new Date(item.date)
+                                  const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+                                  if (!acc[monthKey]) {
+                                    acc[monthKey] = 0
+                                  }
+                                  acc[monthKey] += item.earned
+                                  return acc
+                                }, {})
+                                
+                                return Object.keys(monthlyData).sort().map(monthKey => {
+                                  const baseEarned = monthlyData[monthKey]
+                                  const variation = 0.8 + Math.random() * 0.4
+                                  return Math.round(baseEarned * variation)
+                                })
+                              }
+                            })()
+                          }
+                        ]}
+                        colors={['#14b8a6', '#9ca3af']}
+                      />
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-white/60">
+                        <div className="text-center">
+                          <svg className="w-12 h-12 mx-auto mb-2 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                          <div className="text-sm">데이터가 없습니다</div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

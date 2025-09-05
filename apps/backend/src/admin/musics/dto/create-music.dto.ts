@@ -69,8 +69,8 @@ export class CreateMusicDto {
     @IsBoolean()
     hasRewards?: boolean;
 
-    @IsEnum(['all', 'subscribed'])
-    accessTier: 'all' | 'subscribed';
+    @IsEnum([0, 1, 2])
+    grade: 0 | 1 | 2; 
 
     @IsOptional()
     @IsString()

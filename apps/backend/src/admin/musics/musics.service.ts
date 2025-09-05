@@ -192,15 +192,15 @@ export class MusicsService implements OnModuleInit {
           total_play_count: 0,
           total_rewarded_amount: '0',
           total_revenue: '0',
-          grade: createMusicDto.accessTier === 'all' ? 0 : 1,
+          grade: createMusicDto.grade,
           file_size_bytes: 0,
           last_played_at: null
         }).returning();
         // 음원아이디 추출
     const musicId = newMusic[0].id;
     
-    // 리워드 생성
-    if (createMusicDto.hasRewards && createMusicDto.maxPlayCount) {
+    // 리워드 생성 (grade가 1일 때만)
+    if (createMusicDto.grade === 1 && createMusicDto.maxPlayCount) {
       await this.db.insert(monthly_music_rewards).values({
         music_id: musicId as any,
         year_month: new Date().toISOString().slice(0, 7),

@@ -28,7 +28,7 @@ export const musics = pgTable('musics', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   category_id: integer('category_id'),
-  grade: integer('grade_required').notNull().default(0), // 0: free 가능, 1: standard 이상
+  grade: integer('grade_required').notNull().default(0), // 0: free, standard, business | 1: standard, business (리워드 있음) | 2: standard, business (리워드 없음)
   total_valid_play_count: bigint('valid_play_count', { mode: 'number' }).default(0),
   total_play_count: bigint('total_play_count', { mode: 'number' }).default(0),
   total_rewarded_amount: numeric('total_rewarded_amount').default('0'), // 누적 지급된 리워드 금액

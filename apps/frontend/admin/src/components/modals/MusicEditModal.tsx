@@ -22,7 +22,7 @@ type Props = {
     priceRef?: number;
     rewardPerPlay: number;
     maxPlayCount: number;
-    accessTier: 'all' | 'subscribed';
+    grade: 0 | 1 | 2;
     lyricsText?: string;
     lyricist?: string;
     composer?: string;
@@ -66,7 +66,10 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
   const [maxPlayCount, setMaxPlayCount] = useState<number | ''>(isCreateMode ? '' : (musicData?.maxPlayCount || ''))
 
   // API 설정
-  const [accessTier, setAccessTier] = useState<'all' | 'subscribed'>(isCreateMode ? 'subscribed' : (musicData?.accessTier || 'all'))
+  const [grade, setGrade] = useState<0 | 1 | 2>(isCreateMode ? 1 : (musicData?.grade || 0))
+  const [apiTier, setApiTier] = useState<'all' | 'premium'>(isCreateMode ? 'premium' : (musicData?.grade === 0 ? 'all' : 'premium'))
+  const [rewardsDisabled, setRewardsDisabled] = useState(false)
+
 
   // 카테고리 데이터
   const [categories, setCategories] = useState<Array<{id: number, name: string}>>([])
@@ -80,6 +83,27 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   
   const getBasename = (p?: string) => (p ? p.split('/').pop() || '' : '')
+  const handleApiTierChange = (tier: 'all' | 'premium') => {
+    setApiTier(tier)
+    if (tier === 'all') {
+      // 모든 등급 선택 시
+      setGrade(0)
+      setHasRewards(false)
+      setRewardsDisabled(true)
+    } else {
+      // standard+ 등급 선택 시
+      setRewardsDisabled(false)
+      // 리워드 체크박스 상태에 따라 grade 설정
+      setGrade(hasRewards ? 1 : 2)
+    }
+  }
+
+  const handleRewardsChange = (checked: boolean) => {
+    setHasRewards(checked)
+    if (apiTier === 'premium') {
+      setGrade(checked ? 1 : 2)
+    }
+  }
 
   // 카테고리 인라인 생성 UI 상태
   const [showAddCategory, setShowAddCategory] = useState(false)
@@ -369,7 +393,7 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
             rewardPerPlay,
             maxPlayCount,
             hasRewards,
-            accessTier,
+            grade,
             lyricsText: lyricsInputType === 'text' ? lyricsText : undefined,
             lyricsInputType,
             audioFilePath: audioPath,
@@ -399,7 +423,7 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
         if (!musicData?.id) throw new Error('수정 대상 ID가 없습니다.')
         const payload: any = {
           title, artist, category, tags, releaseDate,
-          accessTier, lyricsText,
+          grade, lyricsText,
           // 가격류는 필요 시에만 보냄
         }
         const res = await fetch(`${baseUrl}/admin/musics/${musicData.id}`, {
@@ -838,25 +862,65 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
               </div>
             </Card>
 
-            {/* 리워드 설정 */}
+            {/* API 권한 설정 */}
+            <Card>
+              <Title>API 권한 설정</Title>
+              <div className="mt-3 space-y-3">
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="radio" 
+                    id="api-all" 
+                    name="apiTier" 
+                    value="all"
+                    checked={apiTier === 'all'}
+                    onChange={() => handleApiTierChange('all')}
+                    className="text-teal-400 focus:ring-teal-500/20"
+                  />
+                  <label htmlFor="api-all" className="text-sm text-white/80">
+                    모든 등급 (free, standard, business)
+                  </label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="radio" 
+                    id="api-premium" 
+                    name="apiTier" 
+                    value="premium"
+                    checked={apiTier === 'premium'}
+                    onChange={() => handleApiTierChange('premium')}
+                    className="text-teal-400 focus:ring-teal-500/20"
+                  />
+                  <label htmlFor="api-premium" className="text-sm text-white/80">
+                    standard, business 등급만 사용 가능
+                  </label>
+                </div>
+              </div>
+            </Card>
+
+                        {/* 리워드 설정 */}
             <Card>
               <Title>리워드 설정</Title>
-              <div className="mt-3 mb-4">
+              <div className={`mt-3 mb-4 ${rewardsDisabled ? 'opacity-50' : ''}`}>
                 <label className="flex items-center gap-2 text-sm text-white/80">
                   <input 
                     type="checkbox" 
                     checked={hasRewards} 
-                    onChange={(e) => {
-                      const checked = e.target.checked
-                      setHasRewards(checked)
-                      setAccessTier(checked ? 'subscribed' : 'all')
-                    }} 
-                    className="text-teal-400 focus:ring-teal-500/20 rounded"
+                    onChange={(e) => handleRewardsChange(e.target.checked)}
+                    disabled={rewardsDisabled}
+                    className="text-teal-400 focus:ring-teal-500/20 rounded disabled:opacity-50"
                   /> 
                   이 음원에 리워드 시스템 적용
                 </label>
+                {rewardsDisabled && (
+                  <p className="text-xs text-white/60 mt-1">
+                    모든 등급 접근 가능한 음원은 리워드 시스템을 적용할 수 없습니다.
+                  </p>
+                )}
               </div>
-              {hasRewards && (
+              <div className="mt-3 mb-4">
+
+              </div>
+              {hasRewards && !rewardsDisabled && (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-white/80">1회 호출당 리워드 (음원 재생/가사) <span className="text-red-400">*</span></label>
@@ -894,23 +958,7 @@ export default function MusicEditModal({ open, onClose, isCreateMode = false, mu
               )}
             </Card>
 
-            {/* API 설정 섹션 */}
-            <Card>
-              <Title>API 설정 <span className="text-red-400 text-sm">*</span></Title>
-              <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-white/80">API 키 권한</label>
-                  <select 
-                    value={accessTier} 
-                    onChange={(e)=>setAccessTier(e.target.value as any)} 
-                    className="w-full rounded-lg bg-black/30 px-3 py-2.5 text-white outline-none ring-1 ring-white/8 focus:ring-2 focus:ring-teal-400/40 transition-all duration-200"
-                  >
-                    <option value="all">Free 등급 사용 가능</option>
-                    <option value="subscribed">Standard, Business 등급 사용 가능</option>
-                  </select>
-                </div>
-              </div>
-            </Card>
+
           </div>
         </div>
 
