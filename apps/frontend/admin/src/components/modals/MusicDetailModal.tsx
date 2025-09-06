@@ -40,6 +40,17 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
   const [lyricsLoading, setLyricsLoading] = useState(false)
   const [musicError, setMusicError] = useState<string | null>(null)
   const [lyricsError, setLyricsError] = useState<string | null>(null)
+  const [monthlyLoading, setMonthlyLoading] = useState(false)
+  const [monthlyError, setMonthlyError] = useState<string | null>(null)
+  const [monthlyItems, setMonthlyItems] = useState<Array<{
+    label: string
+    validPlays: number
+    companiesUsing: number
+    monthlyLimit: number | null
+    usageRate: number | null
+    earned: number
+    rewardPerPlay: number | null
+  }> | null>(null)
 
   if (!open || !music) return null
 
@@ -54,6 +65,44 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
   const daysInMonth = new Date(year, month, 0).getDate()
   const dailyLabels = Array.from({ length: daysInMonth }, (_, i) => `${i + 1}일`)
   const defaultYearMonth = `${year}-${String(month).padStart(2, '0')}`
+
+  // 월별 리워드 현황 API 페칭
+  useEffect(() => {
+    if (!open || !music) return
+    let aborted = false
+    const fetchMonthly = async () => {
+      try {
+        setMonthlyLoading(true)
+        setMonthlyError(null)
+        const params = new URLSearchParams()
+        params.set('endYearMonth', defaultYearMonth)
+        params.set('months', '12')
+        const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${music.id}/rewards/monthly?` + params.toString()
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        if (aborted) return
+        const items = Array.isArray(data.items) ? data.items.map((it: any) => ({
+          label: String(it.label ?? ''),
+          validPlays: Number(it.validPlays ?? it.valid_plays ?? 0),
+          companiesUsing: Number(it.companiesUsing ?? it.companies_using ?? 0),
+          monthlyLimit: it.monthlyLimit ?? it.monthly_limit ?? null,
+          usageRate: it.usageRate ?? it.usage_rate ?? null,
+          earned: Number(it.earned ?? 0),
+          rewardPerPlay: it.rewardPerPlay ?? it.reward_per_play ?? null,
+        })) : []
+        setMonthlyItems(items)
+      } catch (e: any) {
+        if (aborted) return
+        setMonthlyError(e.message || '조회 실패')
+        setMonthlyItems([])
+      } finally {
+        if (!aborted) setMonthlyLoading(false)
+      }
+    }
+    fetchMonthly()
+    return () => { aborted = true }
+  }, [open, music?.id, defaultYearMonth])
 
   // 트렌드 API 페칭 함수
   useEffect(() => {
@@ -315,54 +364,57 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                     월별 리워드 발생 현황
                   </h3>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="text-center">
-                        <tr className="border-b border-white/10">
-                          <th className="px-4 py-3 text-white/80 font-medium">월</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">유효재생수</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">사용 기업</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">월 한도</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">사용률</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">월 리워드 지급액</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {months.map((month, index) => {
-                          const usageRaw = Array.isArray(music.monthlyUsage) ? music.monthlyUsage[index] : 0
-                          const usage = typeof usageRaw === 'number' && isFinite(usageRaw) ? usageRaw : 0
-                          const monthlyLimit = typeof (music as any).monthlyLimit === 'number' && isFinite((music as any).monthlyLimit) ? (music as any).monthlyLimit as number : null
-                          const usageRate = monthlyLimit ? Math.round((Math.min(usage, monthlyLimit) / monthlyLimit) * 100) : null
-                          const rpp = typeof (music as any).rewardPerPlay === 'number' && isFinite((music as any).rewardPerPlay) ? (music as any).rewardPerPlay as number : 0
-                          const usedCount = monthlyLimit ? Math.min(usage, monthlyLimit) : usage
-                          const monthlyReward = usedCount * rpp
-                          
-                          return (
-                            <tr key={month} className="border-b border-white/5">
-                              <td className="px-4 py-3 font-medium text-white text-center">{month}</td>
-                              <td className="px-4 py-3 text-teal-400 font-medium text-center">{usage.toLocaleString()}</td>
-                              <td className="px-4 py-3 text-white/80 text-center">{Math.floor(usage / 100)}개</td>
-                              <td className="px-4 py-3 text-white/80 text-center">{monthlyLimit !== null ? monthlyLimit.toLocaleString() : '-'}</td>
-                              <td className="px-4 py-3 text-white/80 text-center">
-                                {monthlyLimit !== null ? (
-                                  <div className="flex items-center justify-center gap-3">
-                                    <div className="w-20 bg-white/10 rounded-full h-1.5">
-                                      <div
-                                        className="bg-gradient-to-r from-teal-400 to-blue-400 h-1.5 rounded-full transition-all duration-300"
-                                        style={{ width: `${Math.min(usageRate || 0, 100)}%` }}
-                                      />
+                    {monthlyLoading ? (
+                      <div className="py-10 text-center text-white/60">로딩중...</div>
+                    ) : monthlyError ? (
+                      <div className="py-10 text-center text-red-400">{monthlyError}</div>
+                    ) : monthlyItems && monthlyItems.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <thead className="text-center">
+                          <tr className="border-b border-white/10">
+                            <th className="px-4 py-3 text-white/80 font-medium">월</th>
+                            <th className="px-4 py-3 text-white/80 font-medium">유효재생수</th>
+                            <th className="px-4 py-3 text-white/80 font-medium">사용 기업</th>
+                            <th className="px-4 py-3 text-white/80 font-medium">월 한도</th>
+                            <th className="px-4 py-3 text-white/80 font-medium">사용률</th>
+                            <th className="px-4 py-3 text-white/80 font-medium">월 리워드 지급액</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {monthlyItems.map((it) => {
+                            const monthlyLimit = typeof it.monthlyLimit === 'number' && isFinite(it.monthlyLimit) ? it.monthlyLimit : null
+                            const usageRate = monthlyLimit !== null && typeof it.usageRate === 'number' && isFinite(it.usageRate) ? Math.min(it.usageRate, 100) : null
+                            const earned = typeof it.earned === 'number' && isFinite(it.earned) ? it.earned : 0
+                            return (
+                              <tr key={it.label} className="border-b border-white/5">
+                                <td className="px-4 py-3 font-medium text-white text-center">{it.label}</td>
+                                <td className="px-4 py-3 text-teal-400 font-medium text-center">{it.validPlays.toLocaleString()}</td>
+                                <td className="px-4 py-3 text-white/80 text-center">{it.companiesUsing.toLocaleString()}개</td>
+                                <td className="px-4 py-3 text-white/80 text-center">{monthlyLimit !== null ? monthlyLimit.toLocaleString() : '-'}</td>
+                                <td className="px-4 py-3 text-white/80 text-center">
+                                  {monthlyLimit !== null && usageRate !== null ? (
+                                    <div className="flex items-center justify-center gap-3">
+                                      <div className="w-20 bg-white/10 rounded-full h-1.5">
+                                        <div
+                                          className="bg-gradient-to-r from-teal-400 to-blue-400 h-1.5 rounded-full transition-all duration-300"
+                                          style={{ width: `${usageRate}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-white/70 text-xs font-medium">{Math.round(usageRate)}%</span>
                                     </div>
-                                    <span className="text-white/70 text-xs font-medium">{usageRate}%</span>
-                                  </div>
-                                ) : (
-                                  <span className="text-white/40 text-xs">-</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-teal-400 font-medium text-center">{monthlyReward.toLocaleString()} 토큰</td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
+                                  ) : (
+                                    <span className="text-white/40 text-xs">-</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-teal-400 font-medium text-center">{earned.toLocaleString()} 토큰</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="py-10 text-center text-white/60">데이터가 없습니다</div>
+                    )}
                   </div>
                 </div>
               </div>

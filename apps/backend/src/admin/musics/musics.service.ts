@@ -16,9 +16,11 @@ import { resolveYearMonthKST } from '../../common/utils/date.util';
 import { normalizeSort } from '../../common/utils/sort.util';
 import { MusicRewardsSummaryQueryDto, MusicRewardsSummaryResponseDto } from './dto/music-rewards-summary.dto';
 import { MusicRewardsTrendQueryDto, MusicRewardsTrendResponseDto } from './dto/music-rewards-trend.dto';
+import { MusicMonthlyRewardsQueryDto, MusicMonthlyRewardsResponseDto } from './dto/music-monthly-rewards.dto';
 import { buildMusicRewardsSummaryQuery, buildMusicRewardsSummaryCountQuery } from './queries/rewards.queries';
 import { buildFindAllQuery, buildFindOneQuery, buildUpsertNextMonthRewardsQuery, buildCleanupOrphanCategoriesQuery } from './queries/musics.queries';
 import { buildMusicTrendDailyQuery, buildMusicTrendMonthlyQuery } from './queries/trend.queries';
+import { buildMusicMonthlyRewardsQuery } from './queries/monthly.queries';
 
 @Injectable()
 export class MusicsService implements OnModuleInit {
@@ -219,6 +221,66 @@ export class MusicsService implements OnModuleInit {
     const total = Number((countRes.rows?.[0] as any)?.total || 0)
 
     return { yearMonth: ym, total, page: p, limit: l, items }
+  }
+
+  async getMonthlyRewards(musicId: number, query: MusicMonthlyRewardsQueryDto): Promise<MusicMonthlyRewardsResponseDto> {
+    const endYM = query.endYearMonth ? resolveYearMonthKST(query.endYearMonth) : getDefaultYearMonthKST()
+    const [endYear, endMonth] = endYM.split('-').map(Number)
+    const months = Math.min(Math.max(query.months ?? 12, 1), 24)
+
+    const sqlQuery = buildMusicMonthlyRewardsQuery({
+      musicId,
+      endYear,
+      endMonth,
+      months,
+    })
+
+    const res = await this.db.execute(sqlQuery)
+    const rows = res.rows || []
+
+    const items = rows.map((r: any) => {
+      const label: string = r.label
+      const validPlays: number = Number(r.valid_plays || 0)
+      const companiesUsing: number = Number(r.companies_using || 0)
+      const monthlyLimit: number | null = r.monthly_limit !== null && r.monthly_limit !== undefined ? Number(r.monthly_limit) : null
+      const monthlyRemaining: number | null = r.monthly_remaining !== null && r.monthly_remaining !== undefined ? Number(r.monthly_remaining) : null
+      const rewardPerPlay: number | null = r.reward_per_play !== null && r.reward_per_play !== undefined ? Number(r.reward_per_play) : null
+      const earned: number = Number(r.earned || 0)
+
+      // usageRate 계산: 잔여 사용분이 있으면 (used/total), 아니면 지급액/호출당리워드, 아니면 유효재생수 기준
+      const usageRate: number | null = (() => {
+        if (monthlyLimit === null || monthlyLimit <= 0) return null
+        if (monthlyRemaining !== null && monthlyRemaining >= 0) {
+          const used = Math.max(monthlyLimit - monthlyRemaining, 0)
+          if (used > 0) return Math.min(100, Math.round((used / monthlyLimit) * 100))
+        }
+        if (rewardPerPlay !== null && rewardPerPlay > 0 && earned > 0) {
+          const usedEst = Math.floor(earned / rewardPerPlay)
+          return Math.min(100, Math.round((usedEst / monthlyLimit) * 100))
+        }
+        if (validPlays > 0) {
+          const usedEst = Math.min(validPlays, monthlyLimit)
+          return Math.min(100, Math.round((usedEst / monthlyLimit) * 100))
+        }
+        return 0
+      })()
+
+      return {
+        label,
+        validPlays,
+        companiesUsing,
+        monthlyLimit,
+        usageRate,
+        earned,
+        rewardPerPlay,
+      }
+    })
+
+    return {
+      labels: items.map(i => i.label),
+      items,
+      meta: { endYearMonth: endYM, months },
+    }
   }
 
   async create(createMusicDto: CreateMusicDto) {
