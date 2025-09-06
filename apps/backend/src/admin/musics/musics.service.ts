@@ -12,6 +12,10 @@ import * as path from 'path';
 import { UpdateRewardDto } from './dto/update-reward.dto';
 import { normalizePagination } from '../../common/utils/pagination.util';
 import { getDefaultYearMonthKST } from '../../common/utils/date.util';
+import { resolveYearMonthKST } from '../../common/utils/date.util';
+import { normalizeSort } from '../../common/utils/sort.util';
+import { MusicRewardsSummaryQueryDto, MusicRewardsSummaryResponseDto } from './dto/music-rewards-summary.dto';
+import { buildMusicRewardsSummaryQuery, buildMusicRewardsSummaryCountQuery } from './queries/rewards.queries';
 
 @Injectable()
 export class MusicsService implements OnModuleInit {
@@ -151,6 +155,87 @@ export class MusicsService implements OnModuleInit {
       page: p,
       limit: l
     };
+  }
+
+  async getRewardsSummary(query: MusicRewardsSummaryQueryDto): Promise<MusicRewardsSummaryResponseDto> {
+    const ym = resolveYearMonthKST(query.yearMonth)
+    const [y, m] = ym.split('-').map(Number)
+    const { page = 1, limit = 20 } = query
+    const { offset, page: p, limit: l } = normalizePagination(page, limit, 100)
+
+    const sortAllow = ['music_id','title','artist','category','grade','validPlays','earned','companiesUsing','lastUsedAt']
+    const { sortBy, order } = normalizeSort(query.sortBy, query.order, sortAllow)
+
+    // order by SQL 안전 매핑
+    const orderSql: SQL = (() => {
+      const dir = order === 'desc' ? sql`DESC` : sql`ASC`
+      switch (sortBy) {
+        case 'music_id': return sql`m.id ${dir}`
+        case 'title': return sql`m.title ${dir}`
+        case 'artist': return sql`m.artist ${dir}`
+        case 'category': return sql`mc.name ${dir}`
+        case 'grade': return sql`m.grade_required ${dir}`
+        case 'validPlays': return sql`valid_plays ${dir}`
+        case 'earned': return sql`earned ${dir}`
+        case 'companiesUsing': return sql`companies_using ${dir}`
+        case 'lastUsedAt': return sql`last_used_at ${dir} NULLS LAST`
+        default: return sql`earned DESC, valid_plays DESC`
+      }
+    })()
+
+    const gradeNum = query.grade && query.grade !== 'all' ? Number(query.grade) : undefined
+
+    const listSql = buildMusicRewardsSummaryQuery({
+      year: y,
+      month: m,
+      search: query.search,
+      categoryId: query.categoryId,
+      grade: gradeNum,
+      offset,
+      limit: l,
+      orderBySql: orderSql,
+    })
+
+    const countSql = buildMusicRewardsSummaryCountQuery({
+      year: y,
+      month: m,
+      search: query.search,
+      categoryId: query.categoryId,
+      grade: gradeNum,
+    })
+
+    const [rowsRes, countRes] = await Promise.all([
+      this.db.execute(listSql),
+      this.db.execute(countSql),
+    ])
+
+    const items = (rowsRes.rows || []).map((r: any) => ({
+      musicId: Number(r.music_id),
+      title: r.title,
+      artist: r.artist,
+      category: r.category ?? null,
+      grade: Number(r.grade) as 0|1|2,
+      validPlays: Number(r.valid_plays || 0),
+      earned: Number(r.earned || 0),
+      companiesUsing: Number(r.companies_using || 0),
+      lastUsedAt: r.last_used_at ?? null,
+      monthlyLimit: r.monthly_limit !== null && r.monthly_limit !== undefined ? Number(r.monthly_limit) : null,
+      usageRate: r.usage_rate !== null && r.usage_rate !== undefined
+        ? Number(r.usage_rate)
+        : (() => {
+            const total = r.monthly_limit !== null && r.monthly_limit !== undefined ? Number(r.monthly_limit) : null
+            const remaining = r.monthly_remaining !== null && r.monthly_remaining !== undefined ? Number(r.monthly_remaining) : null
+            if (total === null || total <= 0) return null
+            if (remaining === null || remaining < 0) return null
+            const used = Math.max(total - remaining, 0)
+            return Math.min(100, Math.round((used / total) * 100))
+          })(),
+      rewardPerPlay: r.reward_per_play !== null && r.reward_per_play !== undefined ? Number(r.reward_per_play) : null,
+    }))
+
+    const total = Number((countRes.rows?.[0] as any)?.total || 0)
+
+    return { yearMonth: ym, total, page: p, limit: l, items }
   }
 
   async create(createMusicDto: CreateMusicDto) {

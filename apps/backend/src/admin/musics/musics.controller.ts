@@ -10,6 +10,8 @@ import { memoryStorage } from 'multer';
 import * as fs from 'fs';
 import { UpdateRewardDto } from './dto/update-reward.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { MusicRewardsSummaryQueryDto } from './dto/music-rewards-summary.dto';
+import { ValidationPipe } from '@nestjs/common';
 
 @Controller('/admin/musics')
 export class MusicsController {
@@ -23,6 +25,11 @@ export class MusicsController {
   @Get('categories')
   async getCategories() {
     return this.musicsService.getCategories();
+  }
+
+  @Get('rewards/summary')
+  async getRewardsSummary(@Query(new ValidationPipe({ transform: true })) query: MusicRewardsSummaryQueryDto) {
+    return this.musicsService.getRewardsSummary(query);
   }
 
   @Post('categories')

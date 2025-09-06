@@ -248,9 +248,12 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                       </thead>
                       <tbody>
                         {months.map((month, index) => {
-                          const usage = music.monthlyUsage[index]
-                          const usageRate = music.monthlyLimit ? Math.round((usage / music.monthlyLimit) * 100) : null
-                          const monthlyReward = usage * music.rewardPerPlay
+                          const usageRaw = Array.isArray(music.monthlyUsage) ? music.monthlyUsage[index] : 0
+                          const usage = typeof usageRaw === 'number' && isFinite(usageRaw) ? usageRaw : 0
+                          const monthlyLimit = typeof (music as any).monthlyLimit === 'number' && isFinite((music as any).monthlyLimit) ? (music as any).monthlyLimit as number : null
+                          const usageRate = monthlyLimit ? Math.round((usage / monthlyLimit) * 100) : null
+                          const rpp = typeof (music as any).rewardPerPlay === 'number' && isFinite((music as any).rewardPerPlay) ? (music as any).rewardPerPlay as number : 0
+                          const monthlyReward = usage * rpp
                           
                           return (
                             <tr key={month} className="border-b border-white/5">

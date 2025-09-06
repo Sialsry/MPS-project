@@ -56,7 +56,7 @@ type Props = {
 }
 
 export default function CompanyDetailModal({ open, onClose, company, detail, loading, error, currentYearMonth, onChangeYearMonth }: Props) {
-  const [activeTab, setActiveTab] = useState<'info' | 'usage' | 'rewards'>('info')
+  const [activeTab, setActiveTab] = useState<'info' | 'usage'>('info')
   const [chartFilter, setChartFilter] = useState<'daily' | 'monthly'>('daily')
 
   if (!open || !company) return null
@@ -141,8 +141,7 @@ export default function CompanyDetailModal({ open, onClose, company, detail, loa
           <div className="flex border-b border-white/10 flex-shrink-0">
             {[
               { id: 'info', label: '기업 기본 정보' },
-              { id: 'usage', label: '리워드 현황' },
-              { id: 'rewards', label: '사용 기업 현황' }
+              { id: 'usage', label: '리워드 현황' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -479,96 +478,6 @@ export default function CompanyDetailModal({ open, onClose, company, detail, loa
                         )}
                       </tbody>
                     </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 리워드 현황 탭 */}
-            {activeTab === 'rewards' && (
-              <div className="space-y-6">
-                {/* 월별 리워드 상세 현황 */}
-                <div className="rounded-xl border border-white/10 p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
-                    <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
-                    월별 리워드 상세 현황
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="text-left">
-                        <tr className="border-b border-white/10">
-                          <th className="px-4 py-3 text-white/80 font-medium">월</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">총 적립</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">월별 적립</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">구독제 할인 사용</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">남은 리워드</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">누적 잔액</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {months.map((month, index) => {
-                          const monthlyReward = company.monthlyRewards[index]
-                          const subscriptionDiscount = Math.floor(monthlyReward * 0.3) // 30% 할인 사용 가정
-                          const remainingReward = monthlyReward - subscriptionDiscount
-                          const cumulativeBalance = company.monthlyRewards.slice(0, index + 1).reduce((sum, reward) => sum + reward, 0)
-                          
-                          return (
-                            <tr key={month} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                              <td className="px-4 py-3 font-medium text-white">{month}</td>
-                              <td className="px-4 py-3 text-teal-400 font-medium">
-                                {monthlyReward.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-3 text-white/80">
-                                +{monthlyReward.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-3 text-teal-400">
-                                -{subscriptionDiscount.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-3 text-white/80">
-                                {remainingReward.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-3 text-teal-400 font-medium">
-                                {cumulativeBalance.toLocaleString()}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* 연간 요약 */}
-                <div className="rounded-xl border border-white/10 p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
-                    <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
-                    연간 리워드 요약
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="text-center p-4 rounded-lg border border-white/10">
-                      <div className="text-2xl font-bold text-teal-400 mb-1">
-                        {company.monthlyRewards.reduce((sum, reward) => sum + reward, 0).toLocaleString()}
-                      </div>
-                      <div className="text-sm text-white/80">총 적립 리워드</div>
-                    </div>
-                    <div className="text-center p-4 rounded-lg border border-white/10">
-                      <div className="text-2xl font-bold text-teal-400 mb-1">
-                        {company.monthlyRewards.reduce((sum, reward) => sum + Math.floor(reward * 0.3), 0).toLocaleString()}
-                      </div>
-                      <div className="text-sm text-white/80">총 할인 사용</div>
-                    </div>
-                    <div className="text-center p-4 rounded-lg border border-white/10">
-                      <div className="text-2xl font-bold text-white mb-1">
-                        {company.monthlyRewards.reduce((sum, reward) => sum + (reward - Math.floor(reward * 0.3)), 0).toLocaleString()}
-                      </div>
-                      <div className="text-sm text-white/80">총 남은 리워드</div>
-                    </div>
-                    <div className="text-center p-4 rounded-lg border border-white/10">
-                      <div className="text-2xl font-bold text-teal-400 mb-1">
-                        {Math.round(company.monthlyRewards.reduce((sum, reward) => sum + reward, 0) / 12).toLocaleString()}
-                      </div>
-                      <div className="text-sm text-white/80">월 평균 적립</div>
-                    </div>
                   </div>
                 </div>
               </div>
