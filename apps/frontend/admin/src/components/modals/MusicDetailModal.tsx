@@ -32,6 +32,8 @@ type Props = {
 
 export default function MusicDetailModal({ open, onClose, music }: Props) {
   const [activeTab, setActiveTab] = useState<'usage' | 'rewards'>('usage')
+  const [musicGranularity, setMusicGranularity] = useState<'monthly' | 'daily'>('monthly')
+  const [lyricsGranularity, setLyricsGranularity] = useState<'monthly' | 'daily'>('monthly')
 
   if (!open || !music) return null
 
@@ -42,6 +44,75 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
     series: [
       { label: '현재 음원', data: music.monthlyUsage },
       { label: '업계 평균', data: [800, 950, 1100, 1200, 1350, 1500, 1600, 1550, 1700, 1650, 1800, 2000] }
+    ]
+  }
+
+  // 임시 분리 데이터 (프론트 미리보기용): 음악 호출 60%, 가사 호출 40%
+  const industryAvg = [800, 950, 1100, 1200, 1350, 1500, 1600, 1550, 1700, 1650, 1800, 2000]
+  const musicCalls = (music.monthlyUsage || []).map(v => Math.round(v * 0.6))
+  const lyricsCalls = (music.monthlyUsage || []).map((v, i) => Math.max(0, v - (musicCalls[i] || 0)))
+  const industryMusicCalls = industryAvg.map(v => Math.round(v * 0.6))
+  const industryLyricsCalls = industryAvg.map((v, i) => Math.max(0, v - industryMusicCalls[i]))
+
+  // 이번 달(KST) 기준 일수와 인덱스 계산
+  const now = new Date()
+  const kst = new Date(now.getTime() + 9 * 3600 * 1000)
+  const currentMonthIndex = kst.getUTCMonth() // 0-11
+  const year = kst.getUTCFullYear()
+  const month = currentMonthIndex + 1
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const dailyLabels = Array.from({ length: daysInMonth }, (_, i) => `${i + 1}일`)
+
+  // 월 값을 일별로 균등 분배(미리보기)
+  const distributeMonthlyToDaily = (total: number, days: number) => {
+    if (!total || total <= 0 || !days) return Array.from({ length: days }, () => 0)
+    const base = Math.floor(total / days)
+    let rem = total - base * days
+    return Array.from({ length: days }, (_, i) => {
+      if (rem > 0) { rem -= 1; return base + 1 }
+      return base
+    })
+  }
+
+  const monthMusicTotal = Number(musicCalls[currentMonthIndex] || 0)
+  const monthLyricsTotal = Number(lyricsCalls[currentMonthIndex] || 0)
+  const monthIndustryMusicTotal = Number(industryMusicCalls[currentMonthIndex] || 0)
+  const monthIndustryLyricsTotal = Number(industryLyricsCalls[currentMonthIndex] || 0)
+
+  const musicCallsDaily = distributeMonthlyToDaily(monthMusicTotal, daysInMonth)
+  const lyricsCallsDaily = distributeMonthlyToDaily(monthLyricsTotal, daysInMonth)
+  const industryMusicCallsDaily = distributeMonthlyToDaily(monthIndustryMusicTotal, daysInMonth)
+  const industryLyricsCallsDaily = distributeMonthlyToDaily(monthIndustryLyricsTotal, daysInMonth)
+
+  const musicCallsData = {
+    labels: months,
+    series: [
+      { label: '현재 음원', data: musicCalls },
+      { label: '업계 평균', data: industryMusicCalls }
+    ]
+  }
+
+  const lyricsCallsData = {
+    labels: months,
+    series: [
+      { label: '현재 음원', data: lyricsCalls },
+      { label: '업계 평균', data: industryLyricsCalls }
+    ]
+  }
+
+  const musicCallsDataDaily = {
+    labels: dailyLabels,
+    series: [
+      { label: '현재 음원', data: musicCallsDaily },
+      { label: '업계 평균', data: industryMusicCallsDaily }
+    ]
+  }
+
+  const lyricsCallsDataDaily = {
+    labels: dailyLabels,
+    series: [
+      { label: '현재 음원', data: lyricsCallsDaily },
+      { label: '업계 평균', data: industryLyricsCallsDaily }
     ]
   }
 
@@ -114,7 +185,11 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
           {/* 헤더 */}
           <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0">
             <div>
-              <h2 className="text-xl font-semibold text-white">{music.title} 상세 정보</h2>
+              <h2 className="text-xl font-semibold text-white">
+                {music.title}
+                <span className="text-white/50 font-normal"> · </span>
+                <span className="text-white/70 font-medium">{music.artist}</span>
+              </h2>
             </div>
             <button
               onClick={onClose}
@@ -128,10 +203,10 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
 
           {/* 탭 네비게이션 */}
           <div className="flex border-b border-white/10 flex-shrink-0">
-                          {[
-                { id: 'usage', label: '리워드 발생 현황' },
-                { id: 'rewards', label: '사용 기업 현황' }
-              ].map((tab) => (
+            {[
+              { id: 'usage', label: '리워드 발생 현황' },
+              { id: 'rewards', label: '사용 기업 현황' }
+            ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
@@ -148,84 +223,86 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
 
           {/* 콘텐츠 영역 */}
           <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-            {/* 기본 정보 섹션 */}
-            <div className="rounded-xl border border-white/10 p-6 mb-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
-                <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
-                기본 정보
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">음원 ID</div>
-                  <div className="text-white font-medium">{music.id}</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">제목</div>
-                  <div className="text-white font-medium">{music.title}</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">아티스트</div>
-                  <div className="text-white font-medium">{music.artist}</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">카테고리</div>
-                  <div className="text-white font-medium">{music.category}</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">음원 유형</div>
-                  <div className="text-white font-medium">
-                    {music.musicType === 'Inst' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/15 text-blue-300 border border-blue-400/25">
-                        Inst
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-teal-500/15 text-teal-300 border border-teal-400/25">
-                        일반
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">발매일</div>
-                  <div className="text-white font-medium">
-                    {new Date(music.releaseDate).toLocaleDateString('ko-KR', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">재생시간</div>
-                  <div className="text-white font-medium">
-                    {Math.floor(music.duration / 60)}분 {music.duration % 60}초
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">상태</div>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${getStatusColor(music.status)}`}></div>
-                    <span className="text-white font-medium capitalize">{music.status}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* 기본 정보 섹션 제거 */}
 
             {/* 사용 현황 탭 */}
             {activeTab === 'usage' && (
               <div className="space-y-6">
-                {/* 월별 API 사용량 차트 */}
-                <div className="rounded-xl border border-white/10 p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
-                    <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
-                    월별 리워드 발생 API호출 추이
-                  </h3>
-                  <div className="h-64">
-                    <SimpleLineChart 
-                      labels={months}
-                      series={usageData.series}
-                      colors={['#14b8a6', '#9ca3af']}
-                    />
+                {/* 월별 API 사용량 차트: 음악/가사 분리 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="rounded-xl border border-white/10 p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-white flex items-center gap-3">
+                        <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
+                        음악 호출 추이
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setMusicGranularity('daily')}
+                          className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                            musicGranularity === 'daily'
+                              ? 'bg-teal-500 text-white'
+                              : 'bg-white/10 text-white/60 hover:bg-white/20 hover:text-white/80'
+                          }`}
+                        >
+                          일별
+                        </button>
+                        <button
+                          onClick={() => setMusicGranularity('monthly')}
+                          className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                            musicGranularity === 'monthly'
+                              ? 'bg-teal-500 text-white'
+                              : 'bg-white/10 text-white/60 hover:bg-white/20 hover:text-white/80'
+                          }`}
+                        >
+                          월별
+                        </button>
+                      </div>
+                    </div>
+                    <div className="h-64">
+                      <SimpleLineChart 
+                        labels={musicGranularity === 'daily' ? musicCallsDataDaily.labels : musicCallsData.labels}
+                        series={musicGranularity === 'daily' ? musicCallsDataDaily.series : musicCallsData.series}
+                        colors={['#14b8a6', '#9ca3af']}
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-white/10 p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-white flex items-center gap-3">
+                        <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
+                        가사 호출 추이
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setLyricsGranularity('daily')}
+                          className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                            lyricsGranularity === 'daily'
+                              ? 'bg-teal-500 text-white'
+                              : 'bg-white/10 text-white/60 hover:bg-white/20 hover:text-white/80'
+                          }`}
+                        >
+                          일별
+                        </button>
+                        <button
+                          onClick={() => setLyricsGranularity('monthly')}
+                          className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                            lyricsGranularity === 'monthly'
+                              ? 'bg-teal-500 text-white'
+                              : 'bg-white/10 text-white/60 hover:bg-white/20 hover:text-white/80'
+                          }`}
+                        >
+                          월별
+                        </button>
+                      </div>
+                    </div>
+                    <div className="h-64">
+                      <SimpleLineChart 
+                        labels={lyricsGranularity === 'daily' ? lyricsCallsDataDaily.labels : lyricsCallsData.labels}
+                        series={lyricsGranularity === 'daily' ? lyricsCallsDataDaily.series : lyricsCallsData.series}
+                        colors={['#14b8a6', '#9ca3af']}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -240,10 +317,11 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                       <thead className="text-center">
                         <tr className="border-b border-white/10">
                           <th className="px-4 py-3 text-white/80 font-medium">월</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">리워드 발생 횟수(유효재생)</th>
+                          <th className="px-4 py-3 text-white/80 font-medium">유효재생수</th>
                           <th className="px-4 py-3 text-white/80 font-medium">사용 기업</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">리워드 발생률</th>
-                          <th className="px-4 py-3 text-white/80 font-medium">월별 리워드 지급액</th>
+                          <th className="px-4 py-3 text-white/80 font-medium">월 한도</th>
+                          <th className="px-4 py-3 text-white/80 font-medium">사용률</th>
+                          <th className="px-4 py-3 text-white/80 font-medium">월 리워드 지급액</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -251,33 +329,33 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                           const usageRaw = Array.isArray(music.monthlyUsage) ? music.monthlyUsage[index] : 0
                           const usage = typeof usageRaw === 'number' && isFinite(usageRaw) ? usageRaw : 0
                           const monthlyLimit = typeof (music as any).monthlyLimit === 'number' && isFinite((music as any).monthlyLimit) ? (music as any).monthlyLimit as number : null
-                          const usageRate = monthlyLimit ? Math.round((usage / monthlyLimit) * 100) : null
+                          const usageRate = monthlyLimit ? Math.round((Math.min(usage, monthlyLimit) / monthlyLimit) * 100) : null
                           const rpp = typeof (music as any).rewardPerPlay === 'number' && isFinite((music as any).rewardPerPlay) ? (music as any).rewardPerPlay as number : 0
-                          const monthlyReward = usage * rpp
+                          const usedCount = monthlyLimit ? Math.min(usage, monthlyLimit) : usage
+                          const monthlyReward = usedCount * rpp
                           
                           return (
                             <tr key={month} className="border-b border-white/5">
                               <td className="px-4 py-3 font-medium text-white text-center">{month}</td>
                               <td className="px-4 py-3 text-teal-400 font-medium text-center">{usage.toLocaleString()}</td>
                               <td className="px-4 py-3 text-white/80 text-center">{Math.floor(usage / 100)}개</td>
-                              <td className="px-4 py-3 text-center">
-                                {usageRate !== null ? (
+                              <td className="px-4 py-3 text-white/80 text-center">{monthlyLimit !== null ? monthlyLimit.toLocaleString() : '-'}</td>
+                              <td className="px-4 py-3 text-white/80 text-center">
+                                {monthlyLimit !== null ? (
                                   <div className="flex items-center justify-center gap-3">
                                     <div className="w-20 bg-white/10 rounded-full h-1.5">
                                       <div
                                         className="bg-gradient-to-r from-teal-400 to-blue-400 h-1.5 rounded-full transition-all duration-300"
-                                        style={{ width: `${Math.min(usageRate, 100)}%` }}
+                                        style={{ width: `${Math.min(usageRate || 0, 100)}%` }}
                                       />
                                     </div>
                                     <span className="text-white/70 text-xs font-medium">{usageRate}%</span>
                                   </div>
                                 ) : (
-                                  <span className="text-white/50 text-xs">-</span>
+                                  <span className="text-white/40 text-xs">-</span>
                                 )}
                               </td>
-                              <td className="px-4 py-3 text-teal-400 font-medium text-center">
-                                {monthlyReward.toLocaleString()} 토큰
-                              </td>
+                              <td className="px-4 py-3 text-teal-400 font-medium text-center">{monthlyReward.toLocaleString()} 토큰</td>
                             </tr>
                           )
                         })}
@@ -288,7 +366,7 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
               </div>
             )}
 
-            {/* 기업별 리워드 적립 현황 탭 */}
+            {/* 기업별 리워드 적립 현황 탭 복원 */}
             {activeTab === 'rewards' && (
               <div className="space-y-6">
                 {/* 사용 기업 현황 */}
@@ -326,29 +404,18 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                       </thead>
                       <tbody>
                         {music.topCompanies.map((company, index) => {
-                          // 리워드 기반 데이터 생성
-                          const monthlyReward = Math.floor(company.usage * music.rewardPerPlay * 1000) / 1000 // 소수점 3자리
-                          const prevMonthReward = Math.floor(company.usage * music.rewardPerPlay * 0.8 * 1000) / 1000 // 전월은 80% 가정
+                          const monthlyReward = Math.floor(company.usage * music.rewardPerPlay * 1000) / 1000
+                          const prevMonthReward = Math.floor(company.usage * music.rewardPerPlay * 0.8 * 1000) / 1000
                           const rewardChange = monthlyReward - prevMonthReward
-                          const rewardChangePercent = Math.round((rewardChange / prevMonthReward) * 100)
-                          
-                          // 전체 리워드 대비 비율 계산
-                          const totalMonthlyReward = music.topCompanies.reduce((sum, c) => 
+                          const rewardChangePercent = Math.round((rewardChange / (prevMonthReward || 1)) * 100)
+                          const totalMonthlyReward = music.topCompanies.reduce((sum, c) =>
                             sum + Math.floor(c.usage * music.rewardPerPlay * 1000) / 1000, 0
                           )
-                          const rewardShare = Math.round((monthlyReward / totalMonthlyReward) * 100)
-                          
+                          const rewardShare = totalMonthlyReward > 0 ? Math.round((monthlyReward / totalMonthlyReward) * 100) : 0
                           return (
                             <tr key={company.name} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                               <td className="px-4 py-3 text-center">
-                                <span className={`text-sm font-bold ${
-                                  index === 0 ? 'text-teal-400' :
-                                  index === 1 ? 'text-teal-400' :
-                                  index === 2 ? 'text-teal-400' :
-                                  'text-white'
-                                }`}>
-                                  {index + 1}
-                                </span>
+                                <span className={`text-sm font-bold ${index < 3 ? 'text-teal-400' : 'text-white'}`}>{index + 1}</span>
                               </td>
                               <td className="px-4 py-3 font-medium text-white text-center">{company.name}</td>
                               <td className="px-4 py-3 text-center">
@@ -383,8 +450,6 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                       </tbody>
                     </table>
                   </div>
-
-
                 </div>
               </div>
             )}

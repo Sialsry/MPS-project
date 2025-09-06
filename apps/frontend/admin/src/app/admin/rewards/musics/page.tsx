@@ -371,13 +371,18 @@ export default function RewardsMusicsPage() {
                 const validRate = Math.round((music.validPlays / totalPlays) * 100)
                 
                 return (
-                  <tr key={music.musicId} className={`border-b border-white/5 transition-all duration-200 ${
-                    index % 2 === 0 ? 'bg-white/2' : 'bg-white/1'
-                  } hover:bg-white/8`}>
+                  <tr
+                    key={music.musicId}
+                    className={`border-b border-white/5 transition-all duration-200 ${
+                      index % 2 === 0 ? 'bg-white/2' : 'bg-white/1'
+                    } hover:bg-white/8 cursor-pointer`}
+                    onClick={() => { setSelectedMusic(music); setModalOpen(true) }}
+                  >
                     <td className="px-8 py-5 text-center">
                       <input 
                         type="checkbox" 
                         checked={selectedMusics.includes(String(music.musicId))}
+                        onClick={(e) => e.stopPropagation()}
                         onChange={() => handleSelectMusic(String(music.musicId))}
                         className="accent-teal-400 rounded" 
                       />
@@ -419,13 +424,14 @@ export default function RewardsMusicsPage() {
                       <div className="flex gap-1.5 justify-center">
                         <button 
                           className="rounded-md bg-teal-500/90 px-2.5 py-1.5 text-xs text-white font-medium hover:bg-teal-400 transition-all duration-200"
-                          onClick={() => { setSelectedMusic(music); setModalOpen(true) }}
+                          onClick={(e) => { e.stopPropagation(); setSelectedMusic(music); setModalOpen(true) }}
                         >
                           상세
                         </button>
                         <button 
                           className="rounded-md bg-white/10 px-2.5 py-1.5 text-xs text-white font-medium hover:bg-white/20 transition-all duration-200"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setSelectedMusicForEdit(music)
                             setRewardEditModalOpen(true)
                           }}
