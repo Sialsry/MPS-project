@@ -23,6 +23,7 @@ import { buildMusicTrendDailyQuery, buildMusicTrendMonthlyQuery } from './querie
 import { buildMusicMonthlyRewardsQuery } from './queries/monthly.queries';
 import { buildMusicCompanyUsageListQuery, buildMusicCompanyUsageCountQuery } from './queries/company-usage.queries';
 import { MusicTotalStatsQueryDto, MusicTotalStatsResponseDto } from './dto/music-stats.dto';
+import { PlaysValidStatsQueryDto, PlaysValidStatsResponseDto } from './dto/plays-valid-stats.dto';
 
 @Injectable()
 export class MusicsService implements OnModuleInit {
@@ -546,6 +547,29 @@ export class MusicsService implements OnModuleInit {
     const res = await this.db.execute(q)
     const total = Number((res.rows?.[0] as any)?.total ?? 0)
     return { total, asOf: ym }
+  }
+
+  async getValidPlaysStats(query: PlaysValidStatsQueryDto): Promise<PlaysValidStatsResponseDto> {
+    const ym = query.yearMonth ?? getDefaultYearMonthKST()
+    const [y, m] = ym.split('-').map(Number)
+    const q = sql`
+      WITH month_range AS (
+        SELECT make_timestamptz(${y}, ${m}, 1, 0, 0, 0, 'Asia/Seoul') AS month_start,
+               (make_timestamptz(${y}, ${m}, 1, 0, 0, 0, 'Asia/Seoul') + interval '1 month') - interval '1 second' AS month_end
+      )
+      SELECT
+        COUNT(*) FILTER (WHERE mp.is_valid_play = true)::bigint AS valid_plays,
+        COUNT(*)::bigint AS total_plays
+      FROM music_plays mp, month_range mr
+      WHERE mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
+    `
+    const res = await this.db.execute(q)
+    const row = (res.rows?.[0] as any) || {}
+    return {
+      validPlays: Number(row.valid_plays ?? 0),
+      totalPlays: Number(row.total_plays ?? 0),
+      asOf: ym,
+    }
   }
 
   private sanitizeFilename(name: string): string {
