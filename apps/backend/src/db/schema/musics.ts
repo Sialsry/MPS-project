@@ -1,71 +1,51 @@
-import {
-  pgTable,
-  bigserial,
-  text,
-  integer,
-  timestamp,
-  numeric,
-  uniqueIndex,
-  index,
-  boolean,
-  bigint,
-} from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { pgTable, bigserial, text, timestamp, integer, numeric, boolean, date, varchar, bigint } from 'drizzle-orm/pg-core'
+import { relations } from 'drizzle-orm'
+import { music_categories } from './music_categories'
+import { music_tags } from './music_tags'
+import { music_plays } from './music_plays'
+import { rewards } from './rewards'
+import { playlist_items } from './playlist_items'
+import { monthly_music_rewards } from './monthly_music_rewards'
 
-export const musicCategories = pgTable(
-  'music_categories',
-  {
-    id: bigserial('id', { mode: 'number' }).primaryKey(),
-    name: text('name').notNull(),
-  },
-  (table) => ({
-    uqName: uniqueIndex('music_categories_name_uq').on(table.name),
+export const musics = pgTable('musics', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  file_path: varchar('file_path', { length: 255 }).notNull().unique(),
+  title: text('title').notNull(),
+  artist: text('artist').notNull(),
+  composer: text('composer'),
+  music_arranger: text('music_arranger'),
+  lyricist: text('lyricist'),
+  lyrics_text: text('lyrics_text'),
+  lyrics_file_path: text('lyrics_file_path'), // 가사 파일 경로 (기존 lyrics_file에서 변경)
+  inst: boolean('inst').notNull().default(false), // true: instrumental, false: with vocal. 가사가 없으면 true
+  isrc: text('isrc').unique(),
+  duration_sec: integer('duration_sec'),
+  release_date: date('release_date'),
+  cover_image_url: text('cover_image_url'),
+  lyrics_download_count: bigint('lyrics_download_count', { mode: 'number' }).default(0),
+  price_per_play: numeric('price_per_play'),
+  lyrics_price: numeric('lyrics_price'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  category_id: integer('category_id'),
+  grade: integer('grade_required').notNull().default(0), // 0: free 가능, 1: standard 이상
+  is_active: boolean('is_active').default(true),
+  total_valid_play_count: bigint('valid_play_count', { mode: 'number' }).default(0),
+  total_play_count: bigint('total_play_count', { mode: 'number' }).default(0),
+  total_rewarded_amount: numeric('total_rewarded_amount').default('0'), // 누적 지급된 리워드 금액
+  total_revenue: numeric('total_revenue').default('0'),
+  file_size_bytes: bigint('file_size_bytes', { mode: 'number' }),
+  last_played_at: timestamp('last_played_at', { withTimezone: true }),
+})
+
+export const musicsRelations = relations(musics, ({ many, one }) => ({
+  category: one(music_categories, {
+    fields: [musics.category_id],
+    references: [music_categories.id],
   }),
-);
-
-export const musics = pgTable(
-  'musics',
-  {
-    id: bigserial('id', { mode: 'number' }).primaryKey(),
-
-    title: text('title').notNull(),
-    artist: text('artist'),                       // 아티스트 명
-    lyricsText: text('lyrics_text'),              // 가사 텍스트
-    lyricsFile: text('lyrics_file'),              // 가사 파일 경로(txt)
-
-    durationSec: integer('duration_sec'),         // 재생 길이(초)
-    coverImageUrl: text('cover_image_url'),       // 커버 이미지
-    streamEndpoint: text('stream_endpoint'),      // 스트림/파일 엔드포인트
-
-    // (보류) 활성/비활성 — 필요 시 default(true)로 바꿔도 됨
-    isValid: boolean('is_valid'),
-
-    // (MVP) 건당 단가 — KRW 정수면 scale:0, 소수 필요하면 2 등으로 조정
-    pricePerPlay: numeric('price_per_play', { precision: 12, scale: 0 }),
-
-    // 구독 음원일 때만 의미 있음(검증은 서비스 레벨에서 처리)
-    rewardAmount: integer('reward_amount'),
-    rewardCount: integer('reward_count'),
-
-    // 단일 카테고리 FK
-    categoryId: bigint('category_id', { mode: 'number' })
-      .references(() => musicCategories.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
-
-    // 0: 프리, 1: 구독
-    grade: integer('grade').notNull().default(0),
-
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .defaultNow()
-      .notNull()
-      .$onUpdate(() => new Date()),
-  },
-  (table) => ({
-    // 권장 인덱스
-    ixTitle: index('musics_title_idx').on(table.title),
-    ixCreatedAt: index('musics_created_at_idx').on(table.createdAt),
-
-    // grade 값 제약(0,1만 허용)
-    ckGrade: sql`CHECK (${table.grade} IN (0,1))`,
-  }),
-);
+  tags: many(music_tags),
+  plays: many(music_plays),
+  rewards: many(rewards),
+  playlist_items: many(playlist_items),
+  monthly_rewards: many(monthly_music_rewards),
+}))

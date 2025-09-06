@@ -1,58 +1,55 @@
+// app/login/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { login, me } from "@/lib/api";          
+import { setAccessToken } from "../../lib/api/auth/token";
+import { normalizeLoginError}  from "../../lib/api/core/error"
+
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const r = useRouter();
 
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
+    return () => { document.body.style.overflow = prev; };
   }, []);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (loading) return; // 중복 제출 방지
     setErr("");
     setLoading(true);
 
     const fd = new FormData(e.currentTarget);
     const payload = {
-      email: String(fd.get("email") || ""),
+      email: String(fd.get("email") || "").trim().toLowerCase(),
       password: String(fd.get("password") || ""),
     };
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.message || "로그인에 실패했습니다.");
-      }
-
-      window.location.href = "/";
+      const resp = await login(payload);     // POST /auth/login
+      setAccessToken(resp.accessToken);      // 토큰 저장(sessionStorage)
+      window.dispatchEvent(new Event('mps:auth:changed'));
+      try { await me(); } catch {}           // 헤더 즉시 갱신 원하면 me() 한번
+      r.replace("/");                        // 홈으로 이동
     } catch (e: any) {
-      setErr(e.message);
+      setErr(normalizeLoginError(e));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    // 전체 화면 래퍼
     <div className="relative h-dvh w-full overflow-hidden text-white">
       {/* 배경 비디오 */}
       <video
         className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-        src="/videos/blockchain.mp4"           
+        src="/videos/blockchain.mp4"
         poster="/images/hero-poster.jpg"
         autoPlay
         muted
@@ -60,13 +57,10 @@ export default function LoginPage() {
         playsInline
         preload="metadata"
       />
-
-      {/* 가독성 오버레이 (원하면 투명도 조절) */}
       <div className="pointer-events-none absolute inset-0 bg-black/40" />
 
       {/* 콘텐츠 */}
       <div className="relative z-10 grid h-full place-items-center p-6">
-        {/* <div className="w-[min(920px,92vw)] h-[520px] rounded-2xl bg-black/30 shadow-[0_10px_40px_rgba(0,0,0,0.45)] overflow-hidden mb-20"> */}
         <div className="w-[min(920px,92vw)] h-[520px] rounded-2xl overflow-hidden mb-20">
           {/* 타이틀 */}
           <div className="pt-6 text-center">
@@ -78,7 +72,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* 중앙 카드 */}
+          {/* 카드 */}
           <div
             className="mx-auto mt-10 w-[360px] rounded-xl p-6"
             style={{
@@ -95,6 +89,7 @@ export default function LoginPage() {
                 type="email"
                 name="email"
                 placeholder="you@example.com"
+                autoComplete="username"
                 required
               />
 
@@ -104,6 +99,7 @@ export default function LoginPage() {
                 type="password"
                 name="password"
                 placeholder="비밀번호를 입력하세요"
+                autoComplete="current-password"
                 required
               />
 

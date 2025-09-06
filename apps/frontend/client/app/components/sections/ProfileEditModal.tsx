@@ -2,110 +2,109 @@
 import { useEffect, useRef, useState } from "react";
 
 export type ProfileEditValues = {
-  name: string;
-  bio?: string;
-  avatarUrl?: string;
+  ceo_name: string;
+  phone: string;
+  homepage_url: string;
+  profile_image_url: string; // 서버 저장용 (상대/절대 모두 허용)
+  avatarUrl?: string;        // 프론트 미리보기용
 };
 
 export default function ProfileEditModal({
   open,
   onClose,
   initial,
-  onSave,
-  uploadEndpoint = `${process.env.NEXT_PUBLIC_API_URL}/upload/profile-image`,
+  onSave, // (values, file?) => 부모에서 PATCH 처리
 }: {
   open: boolean;
   onClose: () => void;
   initial: ProfileEditValues;
-  onSave: (values: ProfileEditValues) => void;
-  uploadEndpoint?: string;
+  onSave: (
+    values: Pick<
+      ProfileEditValues,
+      "ceo_name" | "phone" | "homepage_url" | "profile_image_url"
+    >,
+    file?: File
+  ) => void;
 }) {
   const [v, setV] = useState<ProfileEditValues>(initial);
-  const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const [pickedFile, setPickedFile] = useState<File | null>(null);
+  const [localPreview, setLocalPreview] = useState<string>("");
 
+  // 모달 열릴 때 initial 반영 + 이전 선택파일 초기화
   useEffect(() => {
-    if (open) setV(initial);
+    if (!open) return;
+    setV(initial);
+    setPickedFile(null);
+    setErr("");
   }, [open, initial]);
 
-  // ESC 닫기 + 스크롤 잠금
+  // ESC 닫기 + 포커스 + 스크롤 잠금
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
+    dialogRef.current?.focus();
     return () => {
       document.body.style.overflow = prev;
       window.removeEventListener("keydown", onKey);
     };
   }, [open, onClose]);
 
-  useEffect(() => {
-    if (open) dialogRef.current?.focus();
-  }, [open]);
-
+  // 파일 선택
   const openPicker = () => fileRef.current?.click();
-
   const handlePick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPickedFile(file);
-    void upload(file);
+    const f = e.target.files?.[0];
+    if (f) setPickedFile(f);
   };
 
-  const upload = async (file: File) => {
-    setUploading(true);
-    setErr("");
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch(uploadEndpoint, { method: "POST", body: fd });
-
-      let text = "";
-      try { text = await res.text(); } catch {}
-      let data: any = {};
-      try { data = text ? JSON.parse(text) : {}; } catch {}
-
-      if (!res.ok) {
-        throw new Error(
-          data?.message || `Upload failed (HTTP ${res.status})${text ? " | " + text : ""}`
-        );
-      }
-
-      const url = data.url || data.location || data.secure_url;
-      if (!url) throw new Error("서버 응답에 url 필드가 없습니다.");
-      setV((p) => ({ ...p, avatarUrl: url }));
-    } catch (e: any) {
-      setErr(e.message || "이미지 업로드 실패");
-    } finally {
-      setUploading(false);
+  // 로컬 미리보기 URL 생성/해제
+  useEffect(() => {
+    if (!pickedFile) {
+      setLocalPreview("");
+      return;
     }
-  };
+    const url = URL.createObjectURL(pickedFile);
+    setLocalPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pickedFile]);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErr("");
-    if (!v.name.trim()) {
-      setErr("이름을 입력해 주세요.");
+
+    if (!v.ceo_name?.trim()) {
+      setErr("대표자명을 입력해 주세요.");
       return;
     }
-    onSave(v);
+
+    onSave(
+      {
+        ceo_name: v.ceo_name?.trim(),
+        phone: v.phone?.trim() ?? "",
+        homepage_url: v.homepage_url?.trim() ?? "",
+        // 파일을 보낼 거면 profile_image_url이 비어 있어도 OK
+        profile_image_url: v.profile_image_url ?? v.avatarUrl ?? "",
+      },
+      pickedFile || undefined
+    );
     onClose();
   };
 
   if (!open) return null;
 
+  const previewSrc =
+    localPreview || v.avatarUrl || v.profile_image_url || "";
+
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center">
       {/* Overlay */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
       {/* Dialog */}
       <div
         ref={dialogRef}
@@ -128,12 +127,8 @@ export default function ProfileEditModal({
             {/* Avatar */}
             <div className="shrink-0">
               <div className="h-20 w-20 rounded-xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-zinc-800">
-                {pickedFile || v.avatarUrl ? (
-                  <img
-                    alt="avatar"
-                    src={pickedFile ? URL.createObjectURL(pickedFile) : v.avatarUrl}
-                    className="h-full w-full object-cover"
-                  />
+                {previewSrc ? (
+                  <img alt="avatar" src={previewSrc} className="h-full w-full object-cover" />
                 ) : (
                   <div className="h-full w-full grid place-items-center text-xs text-zinc-400">
                     No Image
@@ -150,61 +145,45 @@ export default function ProfileEditModal({
               <button
                 type="button"
                 onClick={openPicker}
-                disabled={uploading}
-                className="mt-2 h-8 w-full rounded-lg border border-zinc-300 text-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-white/10 dark:hover:bg-white/10"
+                className="mt-2 h-8 w-full rounded-lg border border-zinc-300 text-sm hover:bg-zinc-50 dark:border-white/10 dark:hover:bg-white/10"
               >
-                {uploading ? "업로드 중…" : (pickedFile || v.avatarUrl ? "이미지 변경" : "이미지 선택")}
+                {previewSrc ? "이미지 변경" : "이미지 선택"}
               </button>
             </div>
 
             {/* Fields */}
             <div className="grow space-y-4">
               <div>
-                <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">
-                  이름
-                </label>
+                <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">대표자명</label>
                 <input
-                  value={v.name}
-                  onChange={(e) => setV((p) => ({ ...p, name: e.target.value }))}
+                  value={v.ceo_name}
+                  onChange={(e) => setV((p) => ({ ...p, ceo_name: e.target.value }))}
                   className="w-full h-10 rounded-lg border border-zinc-300 px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-white/10 dark:bg-zinc-900"
-                  placeholder="이름"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">
-                  이메일
-                </label>
-                <input
-                  value={v.name}
-                  onChange={(e) => setV((p) => ({ ...p, email: e.target.value }))}
-                  className="w-full h-10 rounded-lg border border-zinc-300 px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-white/10 dark:bg-zinc-900"
-                  placeholder="이메일"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">
-                  전화번호 
-                </label>
-                <input
-                  value={v.name}
-                  onChange={(e) => setV((p) => ({ ...p, companyNumber: e.target.value }))}
-                  className="w-full h-10 rounded-lg border border-zinc-300 px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-white/10 dark:bg-zinc-900"
-                  placeholder="전화번호"
+                  placeholder="홍길동"
                 />
               </div>
 
-              {/* <div>
-                <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">
-                  소개
-                </label>
-                <textarea
-                  rows={4}
-                  value={v.bio ?? ""}
-                  onChange={(e) => setV((p) => ({ ...p, bio: e.target.value }))}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-white/10 dark:bg-zinc-900"
-                  placeholder="간단한 소개를 작성하세요"
+              <div>
+                <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">대표 전화</label>
+                <input
+                  value={v.phone}
+                  onChange={(e) => setV((p) => ({ ...p, phone: e.target.value }))}
+                  inputMode="tel"
+                  className="w-full h-10 rounded-lg border border-zinc-300 px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-white/10 dark:bg-zinc-900"
+                  placeholder="02-123-4567 / 010-1234-5678"
                 />
-              </div> */}
+              </div>
+
+              <div>
+                <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">홈페이지 URL</label>
+                <input
+                  value={v.homepage_url}
+                  onChange={(e) => setV((p) => ({ ...p, homepage_url: e.target.value }))}
+                  inputMode="url"
+                  className="w-full h-10 rounded-lg border border-zinc-300 px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-white/10 dark:bg-zinc-900"
+                  placeholder="https://example.com"
+                />
+              </div>
             </div>
           </div>
 

@@ -445,7 +445,7 @@ export default function MusicExploreSection({
         <div className="mb-8 overflow-hidden rounded-3xl border border-zinc-200 dark:border-white/10 bg-gradient-to-r from-indigo-50 via-sky-50 to-cyan-50 dark:from-zinc-900 dark:via-zinc-800 dark:to-zinc-900 p-8 text-zinc-900 dark:text-white shadow">
           <div className="flex flex-col gap-2">
             <span className="text-sm leading-5 text-zinc-600 dark:text-white/70">둘러보기</span>
-            <h2 className="text-2xl font-extrabold tracking-tight">지금 막 나온 트랙 · 에디터 추천 · 인기 급상승</h2>
+            <h2 className="text-2xl font-extrabold tracking-tight">지금 막 나온 트랙 · 카테고리별 차트 · 인기 급상승</h2>
             <p className="text-zinc-600 dark:text-white/70">섹션(선반)별 캐러셀로 탐색하세요.</p>
             <div className="mt-4 flex gap-2">
               <Badge tone="amber" shine>NEW 오늘 업데이트</Badge>

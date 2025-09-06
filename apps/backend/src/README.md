@@ -15,3 +15,11 @@ npx drizzle-kit migrate --config=drizzle.config.ts
 npm run seed:categories  
 
 npm run start:dev
+
+# 삭제 
+dropdb   -U postgres DBNAME
+# 만들기 
+createdb -U postgres DBNAME
+
+
+npx drizzle-kit migrate

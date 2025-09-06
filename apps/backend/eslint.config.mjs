@@ -1,11 +1,6 @@
-// @ts-check
-import eslint from '@eslint/js';
-import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
-import globals from 'globals';
-import tseslint from 'typescript-eslint';
-
+// eslint.config.ts (또는 .mjs)
 export default tseslint.config(
-  // 1) 무시할 경로
+  // 1) ignores ...
   {
     ignores: [
       'node_modules/**',
@@ -16,18 +11,17 @@ export default tseslint.config(
     ],
   },
 
-  // 2) 기본/TS 권장 규칙 + Prettier
+  // 2) base/recommended + prettier
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   eslintPluginPrettierRecommended,
 
-  // 3) TS 파일에 파서/옵션 적용
+  // 3) TS 파일 공통 설정
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
-        // tsconfig를 자동 탐색 (v8 권장)
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
@@ -39,7 +33,7 @@ export default tseslint.config(
     },
   },
 
-  // 4) 테스트 파일은 완화 (no-unsafe-* 끄기)
+  // 4) 테스트 파일 완화
   {
     files: ['**/*.spec.ts', 'test/**/*.ts'],
     rules: {
@@ -50,13 +44,26 @@ export default tseslint.config(
     },
   },
 
-  // 5) 프로젝트 공통 규칙(원하던 설정 유지 + 약간 완화)
+  // 5) DTO만 완화(여기 추가하세요!)
+  {
+    files: [
+      'apps/backend/src/**/*.dto.ts',
+      'apps/backend/src/**/dto/**/*.ts',
+      'apps/backend/src/**/dtos/**/*.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+    },
+  },
+
+  // 6) 공통 규칙(원래 있던 부분 유지)
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'warn',
-      // 필요하면 아래 3개를 'warn'으로 낮춰 일단 진행 가능
       '@typescript-eslint/no-unsafe-assignment': 'warn',
       '@typescript-eslint/no-unsafe-call': 'warn',
       '@typescript-eslint/no-unsafe-member-access': 'warn',

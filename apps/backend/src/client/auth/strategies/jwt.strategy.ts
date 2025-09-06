@@ -1,24 +1,20 @@
+// src/modules/auth/strategies/jwt.strategy.ts
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { Strategy as JwtStrategyBase } from 'passport-jwt';
+import { Strategy as JwtStrategyBase, ExtractJwt } from 'passport-jwt';
+import type { Request } from 'express';
 
-const fromAuthHeaderAsBearerToken: (req: any) => string | null = (req) => {
-  const raw = (req?.get?.('authorization') ?? req?.headers?.authorization) as
-    | string
-    | string[]
-    | undefined;
-
-  const header = Array.isArray(raw) ? raw[0] : raw;
-  if (!header) return null;
-
-  const m = /^Bearer\s+(.+)$/i.exec(header);
-  return m?.[1] ?? null;
-};
+function fromCookie(req: Request) {
+  return req?.cookies?.['mps_at'] ?? null;
+}
 
 type JwtPayload = {
-  sub: string;
+  sub: number;            // 숫자로 두는 걸 권장
   grade: string;
-  subscriptionStatus: string;
+  name?: string;
+  email?: string;
+  profile_image_url?: string | null;
+  subscriptionStatus?: string | null;
   iat?: number;
   exp?: number;
 };
@@ -27,15 +23,20 @@ type JwtPayload = {
 export class JwtStrategy extends PassportStrategy(JwtStrategyBase, 'jwt') {
   constructor() {
     super({
-      jwtFromRequest: fromAuthHeaderAsBearerToken, 
-      secretOrKey: process.env.JWT_SECRET!,
-      ignoreExpiration: false,
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        fromCookie,                              
+        ExtractJwt.fromAuthHeaderAsBearerToken(), 
+      ]),
+      secretOrKey: process.env.JWT_SECRET!,       
       issuer: 'mps',
       audience: 'mps-client',
+      ignoreExpiration: false,
     });
   }
 
-  validate(payload: JwtPayload) {
-    return { sub: payload.sub, grade: payload.grade, subscriptionStatus: payload.subscriptionStatus };
+ // jwt.strategy.ts
+async validate(payload: JwtPayload) {
+  console.log('[JWT OK]', { sub: payload.sub, grade: payload.grade, exp: payload.exp });
+  return payload; // req.user
   }
 }

@@ -1,6 +1,7 @@
 # compiled output
 /dist
 /node_modules
+*/node_modules
 /build
 
 # Logs
@@ -48,9 +49,14 @@ lerna-debug.log*
 
 # Runtime data
 pids
+*/.next
 *.pid
 *.seed
 *.pid.lock
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+**/admin/**
+**/admin/*
+next-env.d.ts
