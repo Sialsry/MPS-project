@@ -1,4 +1,3 @@
-// src/lib/auth/token.ts
 const KEY = 'mps:accessToken';
 
 export const getAccessToken = () =>

@@ -8,6 +8,8 @@ import {
   Query,
   UploadedFile,
   UseInterceptors,
+  Param, 
+  ParseIntPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -76,5 +78,12 @@ export class CompaniesController {
   ) {
     const shouldSkip = skipNts === '1' || skipNts === 'true';
     return this.companiesService.verifyBizno(bNo, shouldSkip);
+  }
+
+  @Post(':id/regenerate-api-key')
+  async rotateById(@Param('id', ParseIntPipe) id: number) {
+    // 응답: { api_key: string, last4: string }
+    console.log("들어온다")
+    return this.companiesService.regenerateApiKey(id);
   }
 }

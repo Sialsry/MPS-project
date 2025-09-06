@@ -1,4 +1,3 @@
-// app/components/Header.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -8,6 +7,8 @@ import { RxHamburgerMenu } from "react-icons/rx";
 import { ThemeSwitch } from "../ThemeSwitch";
 import { useAuthStore } from "@/lib/store/auth";
 import { assetUrl } from "@/lib/asset";
+import { subscribeMe } from "@/lib/api/me";
+import { useMeOverview } from "@/hooks/useMeOverview";
 
 function NavItem({
   href,
@@ -32,7 +33,7 @@ function NavItem({
   );
 }
 
-type Plan = { name: string; price: number };
+type Plan = { name: "Standard" | "Business"; price: number };
 
 function getInitial(s?: string) {
   const t = (s ?? "").trim();
@@ -63,6 +64,9 @@ export default function Header() {
   const isLoggedIn = !!profile;
   const companyLabel = profile?.name || profile?.email || "사용자";
 
+  // ==== overview (보유 리워드/구독 최신 소스) ====
+  const { data: overview, refresh: refreshOverview } = useMeOverview();
+
   // ==== UI ====
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -70,12 +74,12 @@ export default function Header() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingPlan, setPendingPlan] = useState<Plan | null>(null);
   const [useLeaders, setUseLeaders] = useState<number>(0);
-  const balance = 100000; // TODO: 실제 리워드 잔액으로 대체
+  const [subscribing, setSubscribing] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
 
-  // mount/토큰변경 시 me 동기화
+  // mount/토큰변경 시 auth me 동기화
   useEffect(() => {
     let alive = true;
     fetchMe();
@@ -90,17 +94,87 @@ export default function Header() {
     router.replace("/login");
   };
 
-  // 요금제 모달
+  // 숫자 변환
+  const toNum = (v: any) => (v == null ? 0 : Number(v) || 0);
+
+  // ✅ balance 계산
+  const balance = useMemo(() => {
+    const c = overview?.company;
+    if (c) {
+      if (typeof c.rewardBalance === "number" && !Number.isNaN(c.rewardBalance)) {
+        return Math.max(0, c.rewardBalance);
+      }
+      const earned = toNum(c.totalRewardsEarned);
+      const used = toNum(c.totalRewardsUsed);
+      return Math.max(0, earned - used);
+    }
+    const p: any = profile || {};
+    const rb = p.reward_balance ?? p.rewardBalance;
+    if (rb != null) return Math.max(0, toNum(rb));
+    const earned = toNum(p.total_rewards_earned ?? p.totalRewardsEarned);
+    const used = toNum(p.total_rewards_used ?? p.totalRewardsUsed);
+    return Math.max(0, earned - used);
+  }, [overview, profile]);
+
+  // 현재 플랜/상태
+  const { currentPlan, isActiveSub } = useMemo(() => {
+    const plan = String(overview?.subscription?.plan ?? profile?.grade ?? "free").toLowerCase();
+    const status = String(overview?.subscription?.status ?? "none").toLowerCase();
+    const remainingDays = Number(overview?.subscription?.remainingDays ?? 0);
+  
+    const normalizedPlan: "free" | "standard" | "business" =
+      (["free", "standard", "business"] as const).includes(plan as any) ? (plan as any) : "free";
+  
+    const active = status === "active" || status === "trialing" || remainingDays > 0 || normalizedPlan !== "free";
+  
+    return { currentPlan: normalizedPlan, isActiveSub: active };
+  }, [overview, profile]);
+
+  // 구매 가능 규칙
+  const purchasingRules = useMemo(() => {
+    let stdLabel = "구독하기";
+    let bizLabel = "구독하기";
+
+    if (!isActiveSub) {
+      return { canBuyStandard: true, canBuyBusiness: true, stdLabel, bizLabel };
+    }
+
+    if (currentPlan === "standard") {
+      stdLabel = "구독 중";
+      bizLabel = "업그레이드";
+      return { canBuyStandard: false, canBuyBusiness: true, stdLabel, bizLabel };
+    }
+    if (currentPlan === "business") {
+      stdLabel = "구독 중";
+      bizLabel = "구독 중";
+      return { canBuyStandard: false, canBuyBusiness: false, stdLabel, bizLabel };
+    }
+
+    return { canBuyStandard: true, canBuyBusiness: true, stdLabel, bizLabel };
+  }, [currentPlan, isActiveSub]);
+
+  // 요금제 모달 열기: 최신 overview 먼저 갱신 + 즉시 가드
   const openConfirm = (plan: Plan) => {
+    if (plan.name === "Standard" && !purchasingRules.canBuyStandard) {
+      alert("이미 구독 중이거나 업그레이드만 가능합니다.");
+      return;
+    }
+    if (plan.name === "Business" && !purchasingRules.canBuyBusiness) {
+      alert("이미 Business 구독 중입니다.");
+      return;
+    }
     setPendingPlan(plan);
     setUseLeaders(0);
+    refreshOverview?.(); // 최신 보유 리워드 당겨오기
     setConfirmOpen(true);
   };
 
   // 결제(마일리지 확인) 계산
   const { maxUsable, clampedUse, remainingAfterUse, remainingToPay } = useMemo(() => {
-    if (!pendingPlan) return { maxUsable: 0, clampedUse: 0, remainingAfterUse: balance, remainingToPay: 0 };
-    const policyCap = Math.floor(pendingPlan.price * 0.3);
+    if (!pendingPlan) {
+      return { maxUsable: 0, clampedUse: 0, remainingAfterUse: balance, remainingToPay: 0 };
+    }
+    const policyCap = Math.floor(pendingPlan.price * 0.3); // 요금의 30%
     const max = Math.min(policyCap, balance);
     const use = Math.max(0, Math.min(useLeaders || 0, max));
     const left = balance - use;
@@ -139,7 +213,7 @@ export default function Header() {
               <ThemeSwitch />
             </div>
 
-            {/*  “요금제 보기”는 항상 표시 */}
+            {/* “요금제 보기”는 항상 표시 */}
             <button
               onClick={() => setShowPricing(true)}
               className="hidden md:inline-block rounded-full bg-teal-400 px-4 py-2 text-sm font-semibold text-black hover:bg-teal-300"
@@ -335,7 +409,7 @@ export default function Header() {
               <h2 className="text-xl font-bold text-zinc-900 dark:text-white">요금제</h2>
               <button
                 onClick={() => setShowPricing(false)}
-                className="rounded-md px-2 py-1 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg:white/10"
+                className="rounded-md px-2 py-1 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-white/10"
                 aria-label="close pricing modal"
               >
                 ✕
@@ -366,13 +440,18 @@ export default function Header() {
                   <li>리워드 적립</li>
                 </ul>
 
-                {/* 로그인된 경우만 구독 버튼 표시 */}
                 {isLoggedIn ? (
                   <button
                     onClick={() => openConfirm({ name: "Standard", price: 19000 })}
-                    className="mt-5 h-10 w-full rounded-lg border border-zinc-200 bg-white text-sm font-medium text-zinc-800 transition hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-white/10"
+                    disabled={!purchasingRules.canBuyStandard}
+                    title={!purchasingRules.canBuyStandard ? "이미 구독 중이거나 업그레이드만 가능합니다." : undefined}
+                    className={`mt-5 h-10 w-full rounded-lg border text-sm font-medium transition
+                               ${purchasingRules.canBuyStandard
+                                  ? "border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-white/10"
+                                  : "cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400 dark:border-white/10 dark:bg-white/10 dark:text-zinc-500"
+                                }`}
                   >
-                    구독하기
+                    {purchasingRules.stdLabel}
                   </button>
                 ) : (
                   <div className="mt-5 rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-300/20 dark:bg-amber-500/10 dark:text-amber-300">
@@ -408,9 +487,15 @@ export default function Header() {
                 {isLoggedIn ? (
                   <button
                     onClick={() => openConfirm({ name: "Business", price: 29000 })}
-                    className="mt-5 h-10 w-full rounded-lg border border-zinc-200 bg-white text-sm font-medium text-zinc-800 transition hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-white/10"
+                    disabled={!purchasingRules.canBuyBusiness}
+                    title={!purchasingRules.canBuyBusiness ? "이미 Business 구독 중입니다." : undefined}
+                    className={`mt-5 h-10 w-full rounded-lg border text-sm font-medium transition
+                               ${purchasingRules.canBuyBusiness
+                                  ? "border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-white/10"
+                                  : "cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400 dark:border-white/10 dark:bg-white/10 dark:text-zinc-500"
+                                }`}
                   >
-                    구독하기
+                    {purchasingRules.bizLabel}
                   </button>
                 ) : (
                   <div className="mt-5 rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-300/20 dark:bg-amber-500/10 dark:text-amber-300">
@@ -435,7 +520,7 @@ export default function Header() {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <h4 className="text-base font-semibold text-zinc-900 dark:text-white">
-                    {pendingPlan.name} 구독
+                    {pendingPlan.name} {currentPlan === "standard" && pendingPlan.name === "Business" ? "업그레이드" : "구독"}
                   </h4>
 
                   <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
@@ -457,14 +542,14 @@ export default function Header() {
                     <div className="mt-2 flex items-end gap-2">
                       <div className="flex-1">
                         <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">
-                          사용할 리워드 (최대 {maxUsable.toLocaleString()} | 보유의 30%)
+                          사용할 리워드 (최대 {maxUsable.toLocaleString()} | 요금의 30%)
                         </label>
                         <input
                           type="number"
                           inputMode="numeric"
                           min={0}
                           max={maxUsable}
-                          value={useLeaders}
+                          value={clampedUse}
                           onChange={(e) => {
                             const val = Number(e.target.value);
                             if (isNaN(val)) setUseLeaders(0);
@@ -472,7 +557,7 @@ export default function Header() {
                           }}
                           onBlur={(e) => {
                             const val = Number(e.target.value);
-                            setUseLeaders(isNaN(val) ? 0 : val);
+                            setUseLeaders(isNaN(val) ? 0 : Math.max(0, Math.min(val, maxUsable)));
                           }}
                           className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none
                                      focus:border-zinc-400 dark:border-white/10 dark:bg-zinc-900 dark:text-white"
@@ -528,16 +613,43 @@ export default function Header() {
                       취소
                     </button>
                     <button
-                      onClick={() => {
-                        // TODO: 결제 API 호출
-                        setConfirmOpen(false);
-                        setShowPricing(false);
+                      onClick={async () => {
+                        if (!pendingPlan) return;
+
+                        // 구매 제한 재확인
+                        if (pendingPlan.name === "Standard" && !purchasingRules.canBuyStandard) {
+                          alert("이미 구독 중이거나 업그레이드만 가능합니다.");
+                          return;
+                        }
+                        if (pendingPlan.name === "Business" && !purchasingRules.canBuyBusiness) {
+                          alert("이미 Business 구독 중입니다.");
+                          return;
+                        }
+
+                        try {
+                          setSubscribing(true);
+                          const tier = pendingPlan.name.toLowerCase() as "standard" | "business";
+                          await subscribeMe({ tier, use_rewards: clampedUse });
+
+                          // 등급 + 보유 리워드 동시 최신화
+                          await Promise.all([fetchMe(), refreshOverview()]);
+
+                          // 다른 페이지(MyPage 등)도 즉시 반영되도록 브로드캐스트
+                          window.dispatchEvent(new CustomEvent("mps:me:overview:changed"));
+
+                          setConfirmOpen(false);
+                          setShowPricing(false);
+                        } catch (e: any) {
+                          alert(e?.message ?? "구독에 실패했습니다.");
+                        } finally {
+                          setSubscribing(false);
+                        }
                       }}
-                      disabled={clampedUse < 0 || clampedUse > maxUsable}
+                      disabled={subscribing}
                       className="h-9 rounded-lg bg-zinc-900 px-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-60
                                  dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100"
                     >
-                      리워드로 결제
+                      {subscribing ? "처리 중…" : (currentPlan === "standard" && pendingPlan.name === "Business" ? "업그레이드 결제" : "리워드로 결제")}
                     </button>
                   </div>
                 </div>

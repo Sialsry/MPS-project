@@ -92,7 +92,7 @@ export default function SubscriptionModal({
       <section
         role="dialog"
         aria-modal="true"
-        className="relative z-[1001] w-[min(860px,94vw)] rounded-2xl bg-white text-zinc-900 shadow-xl
+        className="relative z-[1001] w-[mix(860px,94vw)] rounded-2xl bg-white text-zinc-900 shadow-xl
                    dark:bg-zinc-900 dark:text-white border border-zinc-200 dark:border-white/10 p-5"
       >
         <header className="flex items-start justify-between gap-3">
@@ -103,23 +103,6 @@ export default function SubscriptionModal({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {autoRenew ? (
-              <button
-                onClick={onCancel}
-                className="rounded-md bg-zinc-900 text-white px-3 py-2 text-sm hover:bg-zinc-800
-                           dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100"
-              >
-                구독 취소(자동갱신 해제)
-              </button>
-            ) : (
-              <button
-                onClick={onResume}
-                className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50
-                           dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:hover:bg-white/10"
-              >
-                자동갱신 재개
-              </button>
-            )}
             <button
               onClick={onClose}
               className="rounded-md border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-50
@@ -144,7 +127,6 @@ export default function SubscriptionModal({
                     <th className="px-3 py-2 text-left">일시</th>
                     <th className="px-3 py-2 text-left">항목</th>
                     <th className="px-3 py-2 text-right">금액</th>
-                    <th className="px-3 py-2 text-left">결제수단</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200 dark:divide-white/10">
@@ -154,7 +136,6 @@ export default function SubscriptionModal({
                         <td className="px-3 py-2">{p.date}</td>
                         <td className="px-3 py-2">{p.item}</td>
                         <td className="px-3 py-2 text-right">{p.amount.toLocaleString()}원</td>
-                        <td className="px-3 py-2">{p.method ?? "-"}</td>
                       </tr>
                     ))
                   ) : (

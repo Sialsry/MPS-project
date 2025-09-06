@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject  } from '@nestjs/common';
 import { db } from '../../db/client';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { companies, business_numbers, company_subscriptions } from '../../db/schema'; 
 
 export type CompanyRow = typeof companies.$inferSelect;
@@ -8,6 +8,7 @@ export type CompanySubscriptionRow = typeof company_subscriptions.$inferSelect;
 
 @Injectable()
 export class CompaniesRepository {
+  constructor(@Inject('DB') private readonly db: any) {}
   // 중복 체크: eq/or 대신 sql 템플릿 사용 (심볼 충돌 회피)
   findDuplicate(email: string, name: string, bizno: string) {
     return db.query.companies.findFirst({
@@ -51,5 +52,27 @@ export class CompaniesRepository {
     return db.query.companies.findFirst({
       where: (c, { sql }) => sql`${c.email} = ${email}`,
     });
+  }
+  // api 재발급 
+  async updateApiKeyByCompanyId(
+    companyId: number | string,
+    data: {
+      api_key_hash: string;
+      api_key_id?: string | null;
+      api_key_last4?: string | null;
+      api_key_version?: number | null;
+    },
+  ) {
+    const id = typeof companyId === 'string' ? parseInt(companyId, 10) : companyId; // ← number로
+    await this.db
+      .update(companies)
+      .set({
+        api_key_hash: data.api_key_hash,
+        ...(data.api_key_id      !== undefined ? { api_key_id: data.api_key_id } : {}),
+        ...(data.api_key_last4   !== undefined ? { api_key_last4: data.api_key_last4 } : {}),
+        ...(data.api_key_version !== undefined ? { api_key_version: data.api_key_version } : {}),
+        api_key_rotated_at: sql`now()`,   
+      })
+      .where(eq(companies.id, id));      
   }
 }

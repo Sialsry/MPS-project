@@ -1,4 +1,4 @@
-// src/lib/api/core/http.ts
+
 const RAW_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '';
 if (!RAW_BASE) throw new Error('NEXT_PUBLIC_API_BASE 가 비어 있습니다 (.env.local 설정 필요).');
 const BASE = RAW_BASE.replace(/\/+$/, '');

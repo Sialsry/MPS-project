@@ -43,7 +43,7 @@ export class AuthService {
     return {
       tokenType: 'Bearer',
       accessToken,
-      expiresIn: 3600,
+      expiresIn: 100000,
       // 프론트 편의용 미니 프로필
       company: {
         id: company.id,

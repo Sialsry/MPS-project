@@ -5,7 +5,7 @@ import { OdcloudClient } from './odcloud.client';
 import { CreateCompanyDto } from './dto/create-companie.dto';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes, createHash } from 'node:crypto';
-
+import { ApiKeyUtil } from 'src/common/utils/api-key.util';
 // 🔹 레포 타입과의 의존성 최소화를 위해 로컬 최소 타입 정의
 type MinimalSubscriptionRow = {
   start_date: Date | string;
@@ -26,11 +26,12 @@ type VerifyResp = {
 @Injectable()
 export class CompaniesService {
   private readonly logger = new Logger(CompaniesService.name);
-
+  
   constructor(
     private readonly repo: CompaniesRepository,
     private readonly odcloud: OdcloudClient,
     private readonly config: ConfigService,
+    private readonly apiKeyUtil: ApiKeyUtil,
   ) {}
 
   /* -------------------- 유틸 -------------------- */
@@ -255,5 +256,19 @@ export class CompaniesService {
     }
 
     return { ok, mode, source, business_number: bizno, reason, tax_type: taxType };
+  }
+  
+  async regenerateApiKey(companyId: number | string) {
+  const id = typeof companyId === 'string' ? parseInt(companyId, 10) : companyId; // number로 통일
+  const { key, last4, kid, version, hash } = this.apiKeyUtil.generate('live');
+
+  await this.repo.updateApiKeyByCompanyId(id, {
+    api_key_hash: hash,
+    api_key_id: kid,          // 컬럼 없으면 레포에서 무시하게 작성돼 있음
+    api_key_last4: last4,
+    api_key_version: version,
+  });
+  
+  return { api_key: key, last4 }; // 평문 1회 노출
   }
 }

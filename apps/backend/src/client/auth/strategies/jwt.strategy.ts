@@ -34,7 +34,9 @@ export class JwtStrategy extends PassportStrategy(JwtStrategyBase, 'jwt') {
     });
   }
 
-  validate(payload: JwtPayload) {
-    return payload; // req.user 로 그대로 전달
+ // jwt.strategy.ts
+async validate(payload: JwtPayload) {
+  console.log('[JWT OK]', { sub: payload.sub, grade: payload.grade, exp: payload.exp });
+  return payload; // req.user
   }
 }

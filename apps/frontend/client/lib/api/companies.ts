@@ -52,3 +52,11 @@ export async function registerCompany(dto: RegisterDto, opts?: { skipNts?: boole
   }
   return api(path, { method: 'POST', body: JSON.stringify(dto) }) as Promise<RegisterResponse>;
 }
+
+export async function rotateApiKey(companyId: number) {
+  const base = process.env.NEXT_PUBLIC_API_BASE ?? '';
+  const res = await fetch(`${base}/companies/${companyId}/regenerate-api-key`, { method: 'POST', credentials: 'include' });
+  console.log("호출번호", res);
+  if (!res.ok) throw new Error('API key rotate failed');
+  return res.json() as Promise<{ api_key: string; last4: string }>;
+}
