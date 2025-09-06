@@ -21,35 +21,71 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
   const [rewardPercentage, setRewardPercentage] = useState<number | ''>('')
   const [limitPercentage, setLimitPercentage] = useState<number | ''>('')
   const [isLoading, setIsLoading] = useState(false)
+  const [missingPolicy, setMissingPolicy] = useState<'skip' | 'default'>('skip')
+  const [defaultRpp, setDefaultRpp] = useState<number | ''>('')
+  const [defaultLimit, setDefaultLimit] = useState<number | ''>('')
 
   if (!open || selectedMusics.length === 0) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    
-    // TODO: API 호출로 일괄 수정
-    console.log('일괄 리워드 수정:', { 
-      musicIds: selectedMusics.map(m => m.id),
-      rewardPercentage,
-      limitPercentage
-    })
-    
-    // 임시 딜레이
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      const tasks = selectedMusics.map(async (music) => {
+        const applyRpp = rewardPercentage !== ''
+        const applyLimit = limitPercentage !== ''
+        let baseRpp = Number(music.rewardPerPlay || 0)
+        let baseLimit = music.monthlyLimit
+
+        if (missingPolicy === 'default') {
+          if ((baseRpp === 0 || isNaN(baseRpp)) && defaultRpp !== '') baseRpp = Number(defaultRpp)
+          if ((baseLimit == null || baseLimit === 0) && defaultLimit !== '') baseLimit = Number(defaultLimit)
+        }
+
+        // 건너뛰기 정책: 필요한 기준값이 없으면 스킵
+        if (missingPolicy === 'skip') {
+          if ((applyRpp && (baseRpp === 0 || isNaN(baseRpp))) || (applyLimit && (baseLimit == null || baseLimit === 0))) {
+            return false
+          }
+        }
+
+        const newRpp = applyRpp ? Number((baseRpp * (1 + Number(rewardPercentage) / 100)).toFixed(6)) : baseRpp
+        const newLimit = applyLimit
+          ? (baseLimit != null ? Math.max(0, Math.round(baseLimit * (1 + Number(limitPercentage) / 100))) : 0)
+          : (baseLimit ?? 0)
+
+        const body = {
+          totalRewardCount: newLimit,
+          rewardPerPlay: newRpp,
+        }
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${music.id}/rewards`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return true
+      })
+      await Promise.all(tasks)
       onClose()
-    }, 1000)
+    } catch (err) {
+      console.error('일괄 수정 실패:', err)
+      alert('일괄 수정에 실패했습니다.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const calculateNewReward = (currentReward: number) => {
-    if (!rewardPercentage) return currentReward
-    return currentReward * (1 + rewardPercentage / 100)
+    const base = (currentReward && currentReward > 0) ? currentReward : (missingPolicy === 'default' && defaultRpp !== '' ? Number(defaultRpp) : currentReward)
+    if (!rewardPercentage) return base
+    return base * (1 + Number(rewardPercentage) / 100)
   }
 
   const calculateNewLimit = (currentLimit: number | null) => {
-    if (!limitPercentage || !currentLimit) return currentLimit
-    return Math.round(currentLimit * (1 + limitPercentage / 100))
+    const base = (currentLimit && currentLimit > 0) ? currentLimit : (missingPolicy === 'default' && defaultLimit !== '' ? Number(defaultLimit) : currentLimit)
+    if (!limitPercentage || !base) return base ?? null
+    return Math.round(base * (1 + Number(limitPercentage) / 100))
   }
 
   return (
@@ -82,6 +118,57 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
 
         {/* 내용 */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* 미설정 음원 처리 옵션 */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-white/80">리워드 미설정 음원 처리</h3>
+            <div className="flex flex-col md:flex-row md:items-center md:gap-4 gap-2">
+              <label className="inline-flex items-center gap-2 text-sm text-white/80">
+                <input
+                  type="radio"
+                  className="accent-teal-400"
+                  checked={missingPolicy === 'skip'}
+                  onChange={() => setMissingPolicy('skip')}
+                />
+                미설정 음원은 건너뛰기
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-white/80">
+                <input
+                  type="radio"
+                  className="accent-teal-400"
+                  checked={missingPolicy === 'default'}
+                  onChange={() => setMissingPolicy('default')}
+                />
+                기본값으로 설정 후 퍼센트 적용
+              </label>
+            </div>
+            {missingPolicy === 'default' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-white/80 mb-2">기본 호출당 리워드</label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    value={defaultRpp}
+                    onChange={(e) => setDefaultRpp(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-teal-400/50 transition-colors text-sm"
+                    placeholder="예: 0.01"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/80 mb-2">기본 월 한도</label>
+                  <input
+                    type="number"
+                    step="1"
+                    value={defaultLimit}
+                    onChange={(e) => setDefaultLimit(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-teal-400/50 transition-colors text-sm"
+                    placeholder="예: 2000"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* 선택된 음원 목록 */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-white/80">선택된 음원</h3>
@@ -97,8 +184,8 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
                     <div className="flex-1">
                       <div className="font-medium text-white">{music.title}</div>
                       <div className="text-xs text-white/60">
-                        현재: {music.rewardPerPlay.toFixed(3)} 토큰
-                        {music.monthlyLimit && ` / ${music.monthlyLimit.toLocaleString()}회`}
+                        현재: {(music.rewardPerPlay ?? 0).toFixed(3)} 토큰
+                        {music.monthlyLimit ? ` / ${music.monthlyLimit.toLocaleString()}회` : ' / 한도 없음'}
                       </div>
                     </div>
                   </div>
@@ -141,7 +228,7 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
               </div>
 
               {/* 리워드 미리보기 */}
-              {rewardPercentage && (
+              {rewardPercentage !== '' && (
                 <div className="p-4 bg-gradient-to-r from-teal-400/10 to-blue-400/10 border border-teal-400/20 rounded-lg">
                   <h4 className="text-sm font-medium text-teal-300 mb-2">리워드 변경 미리보기</h4>
                   <div className="space-y-2 text-sm">
@@ -149,7 +236,7 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
                       <div key={music.id} className="flex justify-between">
                         <span className="text-white/70 truncate">{music.title}</span>
                         <span className="text-white font-medium">
-                          {music.rewardPerPlay.toFixed(3)} → {calculateNewReward(music.rewardPerPlay).toFixed(3)}
+                          {(music.rewardPerPlay ?? 0).toFixed(3)} → {calculateNewReward(music.rewardPerPlay ?? 0).toFixed(3)}
                         </span>
                       </div>
                     ))}
@@ -188,7 +275,7 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
               </div>
 
               {/* 한도 미리보기 */}
-              {limitPercentage && (
+              {limitPercentage !== '' && (
                 <div className="p-4 bg-gradient-to-r from-teal-400/10 to-blue-400/10 border border-teal-400/20 rounded-lg">
                   <h4 className="text-sm font-medium text-teal-300 mb-2">한도 변경 미리보기</h4>
                   <div className="space-y-2 text-sm">
@@ -200,9 +287,9 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
                         </span>
                       </div>
                     ))}
-                    {selectedMusics.filter(m => m.monthlyLimit).length === 0 && (
+                    {selectedMusics.filter(m => m.monthlyLimit).length === 0 && missingPolicy === 'skip' && (
                       <div className="text-xs text-white/50 text-center">
-                        한도가 설정된 음원이 없습니다
+                        한도가 설정된 음원이 없습니다 (설정되지 않은 음원은 건너뜁니다)
                       </div>
                     )}
                   </div>
@@ -222,7 +309,7 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
             </button>
             <button
               type="submit"
-              disabled={isLoading || (!rewardPercentage && !limitPercentage)}
+              disabled={isLoading || (!rewardPercentage && !limitPercentage && missingPolicy === 'skip')}
               className="px-3 py-2 text-xs font-medium text-white bg-teal-500/90 rounded-lg hover:bg-teal-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isLoading ? (

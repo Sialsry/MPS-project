@@ -127,7 +127,17 @@ export default function RewardsMusicsPage() {
     )
   }
 
-  const selectedMusicsData = rows.filter(music => selectedMusics.includes(String(music.musicId)))
+  const selectedMusicsData = rows
+    .filter(music => selectedMusics.includes(String(music.musicId)))
+    .map(m => ({
+      id: String(m.musicId),
+      title: m.title,
+      category: (m as any).category ?? '',
+      rewardPerPlay: Number((m as any).rewardPerPlay ?? 0),
+      monthlyLimit: (m as any).monthlyLimit ?? null,
+      maxPlayCount: null,
+      status: 'active' as const,
+    }))
 
   // 드롭다운 관련 함수들
   const toggleDropdown = (dropdownName: string, e: React.MouseEvent) => {
