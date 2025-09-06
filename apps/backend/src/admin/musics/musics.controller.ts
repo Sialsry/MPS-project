@@ -15,6 +15,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { MusicRewardsTrendQueryDto } from './dto/music-rewards-trend.dto';
 import { MusicMonthlyRewardsQueryDto } from './dto/music-monthly-rewards.dto';
 import { MusicCompanyUsageQueryDto } from './dto/music-company-usage.dto';
+import { MusicTotalStatsQueryDto } from './dto/music-stats.dto';
 
 @Controller('/admin/musics')
 export class MusicsController {
@@ -57,6 +58,11 @@ export class MusicsController {
     @Query(new ValidationPipe({ transform: true })) query: MusicCompanyUsageQueryDto,
   ) {
     return this.musicsService.getCompanyUsage(+id, query);
+  }
+
+  @Get('stats/total')
+  async getTotalStats(@Query(new ValidationPipe({ transform: true })) query: MusicTotalStatsQueryDto) {
+    return this.musicsService.getTotalCount(query);
   }
 
   @Post('categories')

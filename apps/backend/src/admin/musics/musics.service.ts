@@ -22,6 +22,7 @@ import { buildFindAllQuery, buildFindOneQuery, buildUpsertNextMonthRewardsQuery,
 import { buildMusicTrendDailyQuery, buildMusicTrendMonthlyQuery } from './queries/trend.queries';
 import { buildMusicMonthlyRewardsQuery } from './queries/monthly.queries';
 import { buildMusicCompanyUsageListQuery, buildMusicCompanyUsageCountQuery } from './queries/company-usage.queries';
+import { MusicTotalStatsQueryDto, MusicTotalStatsResponseDto } from './dto/music-stats.dto';
 
 @Injectable()
 export class MusicsService implements OnModuleInit {
@@ -529,6 +530,22 @@ export class MusicsService implements OnModuleInit {
     }))
     const total = Number((countRes.rows?.[0] as any)?.total || 0)
     return { yearMonth: ym, total, page: p, limit: l, items }
+  }
+
+  async getTotalCount(query: MusicTotalStatsQueryDto): Promise<MusicTotalStatsResponseDto> {
+    const ym = query.yearMonth ?? getDefaultYearMonthKST()
+    const [y, m] = ym.split('-').map(Number)
+    const endTsSql = sql`
+      (make_timestamptz(${y}, ${m}, 1, 0, 0, 0, 'Asia/Seoul') + interval '1 month') - interval '1 second'
+    `
+    const q = sql`
+      SELECT COUNT(*)::int AS total
+      FROM ${musics} m
+      WHERE m.created_at <= ${endTsSql}
+    `
+    const res = await this.db.execute(q)
+    const total = Number((res.rows?.[0] as any)?.total ?? 0)
+    return { total, asOf: ym }
   }
 
   private sanitizeFilename(name: string): string {
