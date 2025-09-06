@@ -24,6 +24,8 @@ import { buildMusicMonthlyRewardsQuery } from './queries/monthly.queries';
 import { buildMusicCompanyUsageListQuery, buildMusicCompanyUsageCountQuery } from './queries/company-usage.queries';
 import { MusicTotalStatsQueryDto, MusicTotalStatsResponseDto } from './dto/music-stats.dto';
 import { PlaysValidStatsQueryDto, PlaysValidStatsResponseDto } from './dto/plays-valid-stats.dto';
+import { RevenueForecastQueryDto, RevenueForecastResponseDto } from './dto/revenue-forecast.dto';
+import { buildMonthRangeCTE, resolveYearMonthKST as resolveYM, isCurrentYM } from '../../common/utils/date.util';
 
 @Injectable()
 export class MusicsService implements OnModuleInit {
@@ -552,11 +554,9 @@ export class MusicsService implements OnModuleInit {
   async getValidPlaysStats(query: PlaysValidStatsQueryDto): Promise<PlaysValidStatsResponseDto> {
     const ym = query.yearMonth ?? getDefaultYearMonthKST()
     const [y, m] = ym.split('-').map(Number)
+    const cte = buildMonthRangeCTE(y, m)
     const q = sql`
-      WITH month_range AS (
-        SELECT make_timestamptz(${y}, ${m}, 1, 0, 0, 0, 'Asia/Seoul') AS month_start,
-               (make_timestamptz(${y}, ${m}, 1, 0, 0, 0, 'Asia/Seoul') + interval '1 month') - interval '1 second' AS month_end
-      )
+      ${cte}
       SELECT
         COUNT(*) FILTER (WHERE mp.is_valid_play = true)::bigint AS valid_plays,
         COUNT(*)::bigint AS total_plays
@@ -570,6 +570,40 @@ export class MusicsService implements OnModuleInit {
       totalPlays: Number(row.total_plays ?? 0),
       asOf: ym,
     }
+  }
+
+  async getRevenueForecast(query: RevenueForecastQueryDto): Promise<RevenueForecastResponseDto> {
+    const ym = query.yearMonth ?? getDefaultYearMonthKST()
+    const [y, m] = ym.split('-').map(Number)
+    const current = isCurrentYM(ym)
+    const cte = buildMonthRangeCTE(y, m)
+    const qCurrent = sql`
+      ${cte}
+      SELECT COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS mtd
+      FROM music_plays mp, month_range mr
+      WHERE mp.created_at >= mr.month_start AND mp.created_at <= NOW()
+    `
+    const qPast = sql`
+      ${cte}
+      SELECT COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS mtd
+      FROM music_plays mp, month_range mr
+      WHERE mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
+    `
+    const res = await this.db.execute(current ? qCurrent : qPast)
+    const row = (res.rows?.[0] as any) || {}
+    const mtd = Number(row.mtd ?? 0)
+
+    // days passed (KST) and total days in month
+    const now = new Date()
+    const kst = new Date(now.getTime() + 9 * 3600 * 1000)
+    const curY = kst.getUTCFullYear()
+    const curM = kst.getUTCMonth() + 1
+    const isCurrentMonth = (curY === y && curM === m)
+    const daysInMonth = new Date(y, m, 0).getDate()
+    const dayOfMonth = isCurrentMonth ? kst.getUTCDate() : daysInMonth
+    const forecast = dayOfMonth > 0 ? Math.round((mtd / dayOfMonth) * daysInMonth) : mtd
+
+    return { mtd, forecast, asOf: ym }
   }
 
   private sanitizeFilename(name: string): string {
