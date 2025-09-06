@@ -15,6 +15,10 @@ export class MusicRewardsSummaryQueryDto {
   categoryId?: number
 
   @IsOptional()
+  @IsIn(['inst','normal','all'])
+  musicType?: 'inst' | 'normal' | 'all'
+
+  @IsOptional()
   @IsIn(['0', '1', '2', 'all'])
   grade?: '0' | '1' | '2' | 'all'
 
@@ -32,8 +36,8 @@ export class MusicRewardsSummaryQueryDto {
   limit?: number
 
   @IsOptional()
-  @IsIn(['music_id', 'title', 'artist', 'category', 'grade', 'validPlays', 'earned', 'companiesUsing', 'lastUsedAt'])
-  sortBy?: 'music_id' | 'title' | 'artist' | 'category' | 'grade' | 'validPlays' | 'earned' | 'companiesUsing' | 'lastUsedAt'
+  @IsIn(['music_id', 'title', 'artist', 'category', 'grade', 'musicType', 'monthlyLimit', 'rewardPerPlay', 'usageRate', 'validPlays', 'earned', 'companiesUsing', 'lastUsedAt'])
+  sortBy?: 'music_id' | 'title' | 'artist' | 'category' | 'grade' | 'musicType' | 'monthlyLimit' | 'rewardPerPlay' | 'usageRate' | 'validPlays' | 'earned' | 'companiesUsing' | 'lastUsedAt'
 
   @IsOptional()
   @IsIn(['asc', 'desc'])

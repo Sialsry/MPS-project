@@ -170,7 +170,7 @@ export default function CompanyRewardsPage() {
           usageRate: item.usageRate ?? 0,
           activeTracks: item.activeTracks ?? 0,
           // 이하 상세 모달용 플레이스홀더(상세 API 구현 시 대체)
-          status: 'active',
+      status: 'active',
           lastActivity: '',
           joinedDate: '',
           contactEmail: '',
@@ -181,9 +181,9 @@ export default function CompanyRewardsPage() {
           monthlyRewards: [],
           topTracks: [],
           ceoName: '',
-          profileImageUrl: '',
-          homepageUrl: '',
-          smartAccountAddress: '',
+      profileImageUrl: '',
+      homepageUrl: '',
+      smartAccountAddress: '',
           apiKeyHash: '',
           createdAt: '',
           updatedAt: '',
@@ -341,11 +341,11 @@ export default function CompanyRewardsPage() {
 
       {/* 기업 목록 */}
       {!loading && !error && (
-        <div className="overflow-visible">
-          <div className="overflow-x-auto min-h-[400px]">
-            <table className="w-full text-sm">
-              <thead className="text-center">
-                <tr className="border-b border-white/10">
+      <div className="overflow-visible">
+        <div className="overflow-x-auto min-h-[400px]">
+          <table className="w-full text-sm">
+            <thead className="text-center">
+              <tr className="border-b border-white/10">
                   <th className="px-6 py-4 text-white/70 font-medium text-center">
                     <div className="relative">
                       <button 
@@ -393,354 +393,354 @@ export default function CompanyRewardsPage() {
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-white/70 font-medium text-center">기업명</th>
-                  <th className="px-6 py-4 text-white/70 font-medium text-center">
-                    <div className="relative">
-                      <button 
-                        onClick={(e) => toggleDropdown('tier', e)}
+                <th className="px-6 py-4 text-white/70 font-medium text-center">기업명</th>
+                <th className="px-6 py-4 text-white/70 font-medium text-center">
+                  <div className="relative">
+                    <button 
+                      onClick={(e) => toggleDropdown('tier', e)}
                         className={`flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors ${
                           tierFilter !== '전체' ? 'text-teal-400' : 'text-white/70'
                         }`}
-                      >
-                        <span>등급</span>
+                    >
+                      <span>등급</span>
                         <span className={`${
                           tierFilter !== '전체' ? 'text-teal-400' : 'text-white/50'
                         }`}>▼</span>
-                      </button>
-                      {openDropdown === 'tier' && (
-                        <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
-                          <div className="py-1">
-                            <button 
-                              onClick={() => { setTierFilter('전체'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                tierFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              전체
-                            </button>
-                            <button 
-                              onClick={() => { setTierFilter('Business'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                tierFilter === 'Business' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              Business
-                            </button>
-                            <button 
-                              onClick={() => { setTierFilter('Standard'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                tierFilter === 'Standard' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              Standard
-                            </button>
-                            <button 
-                              onClick={() => { setTierFilter('Free'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                tierFilter === 'Free' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              Free
-                            </button>
-                          </div>
+                    </button>
+                    {openDropdown === 'tier' && (
+                      <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
+                        <div className="py-1">
+                          <button 
+                            onClick={() => { setTierFilter('전체'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              tierFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            전체
+                          </button>
+                          <button 
+                            onClick={() => { setTierFilter('Business'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              tierFilter === 'Business' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            Business
+                          </button>
+                          <button 
+                            onClick={() => { setTierFilter('Standard'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              tierFilter === 'Standard' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            Standard
+                          </button>
+                          <button 
+                            onClick={() => { setTierFilter('Free'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              tierFilter === 'Free' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            Free
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-white/70 font-medium text-center">
-                    <div className="relative">
-                      <button 
-                        onClick={(e) => toggleDropdown('tokens', e)}
+                      </div>
+                    )}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-white/70 font-medium text-center">
+                  <div className="relative">
+                    <button 
+                      onClick={(e) => toggleDropdown('tokens', e)}
                         className={`flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors ${
                           tokensFilter !== '전체' ? 'text-teal-400' : 'text-white/70'
                         }`}
-                      >
-                        <span>보유 토큰</span>
+                    >
+                      <span>보유 토큰</span>
                         <span className={`${
                           tokensFilter !== '전체' ? 'text-teal-400' : 'text-white/50'
                         }`}>▼</span>
-                      </button>
-                      {openDropdown === 'tokens' && (
-                        <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
-                          <div className="py-1">
-                            <button 
+                    </button>
+                    {openDropdown === 'tokens' && (
+                      <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
+                        <div className="py-1">
+                          <button 
                               onClick={() => { setTokensFilter('전체'); setSortBy('company_id'); setSortOrder('asc'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                tokensFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              전체
-                            </button>
-                            <button 
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              tokensFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            전체
+                          </button>
+                          <button 
                               onClick={() => { setTokensFilter('많은순'); setSortBy('total_tokens'); setSortOrder('desc'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                tokensFilter === '많은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              많은순
-                            </button>
-                            <button 
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              tokensFilter === '많은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            많은순
+                          </button>
+                          <button 
                               onClick={() => { setTokensFilter('적은순'); setSortBy('total_tokens'); setSortOrder('asc'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                tokensFilter === '적은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              적은순
-                            </button>
-                          </div>
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              tokensFilter === '적은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            적은순
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-white/70 font-medium text-center">
-                    <div className="relative">
-                      <button 
-                        onClick={(e) => toggleDropdown('earned', e)}
+                      </div>
+                    )}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-white/70 font-medium text-center">
+                  <div className="relative">
+                    <button 
+                      onClick={(e) => toggleDropdown('earned', e)}
                         className={`flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors ${
                           earnedFilter !== '전체' ? 'text-teal-400' : 'text-white/70'
                         }`}
-                      >
-                        <span>이번 달 적립</span>
+                    >
+                      <span>이번 달 적립</span>
                         <span className={`${
                           earnedFilter !== '전체' ? 'text-teal-400' : 'text-white/50'
                         }`}>▼</span>
-                      </button>
-                      {openDropdown === 'earned' && (
-                        <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
-                          <div className="py-1">
-                            <button 
-                              onClick={() => { setEarnedFilter('전체'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                earnedFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              전체
-                            </button>
-                            <button 
+                    </button>
+                    {openDropdown === 'earned' && (
+                      <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
+                        <div className="py-1">
+                          <button 
+                            onClick={() => { setEarnedFilter('전체'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              earnedFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            전체
+                          </button>
+                          <button 
                               onClick={() => { setEarnedFilter('많은순'); setSortBy('monthly_earned'); setSortOrder('desc'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                earnedFilter === '많은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              많은순
-                            </button>
-                            <button 
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              earnedFilter === '많은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            많은순
+                          </button>
+                          <button 
                               onClick={() => { setEarnedFilter('적은순'); setSortBy('monthly_earned'); setSortOrder('asc'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                earnedFilter === '적은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              적은순
-                            </button>
-                          </div>
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              earnedFilter === '적은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            적은순
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-white/70 font-medium text-center">
-                    <div className="relative">
-                      <button 
-                        onClick={(e) => toggleDropdown('used', e)}
+                      </div>
+                    )}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-white/70 font-medium text-center">
+                  <div className="relative">
+                    <button 
+                      onClick={(e) => toggleDropdown('used', e)}
                         className={`flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors ${
                           usedFilter !== '전체' ? 'text-teal-400' : 'text-white/70'
                         }`}
-                      >
-                        <span>이번 달 사용</span>
+                    >
+                      <span>이번 달 사용</span>
                         <span className={`${
                           usedFilter !== '전체' ? 'text-teal-400' : 'text-white/50'
                         }`}>▼</span>
-                      </button>
-                      {openDropdown === 'used' && (
-                        <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
-                          <div className="py-1">
-                            <button 
+                    </button>
+                    {openDropdown === 'used' && (
+                      <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
+                        <div className="py-1">
+                          <button 
                               onClick={() => { setUsedFilter('전체'); setSortBy('company_id'); setSortOrder('asc'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                usedFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              전체
-                            </button>
-                            <button 
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              usedFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            전체
+                          </button>
+                          <button 
                               onClick={() => { setUsedFilter('많은순'); setSortBy('monthly_used'); setSortOrder('desc'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                usedFilter === '많은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              많은순
-                            </button>
-                            <button 
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              usedFilter === '많은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            많은순
+                          </button>
+                          <button 
                               onClick={() => { setUsedFilter('적은순'); setSortBy('monthly_used'); setSortOrder('asc'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                usedFilter === '적은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              적은순
-                            </button>
-                          </div>
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              usedFilter === '적은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            적은순
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-white/70 font-medium text-center">
-                    <div className="relative">
-                      <button 
-                        onClick={(e) => toggleDropdown('usageRate', e)}
+                      </div>
+                    )}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-white/70 font-medium text-center">
+                  <div className="relative">
+                    <button 
+                      onClick={(e) => toggleDropdown('usageRate', e)}
                         className={`flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors ${
                           usageRateFilter !== '전체' ? 'text-teal-400' : 'text-white/70'
                         }`}
-                      >
-                        <span>사용률</span>
+                    >
+                      <span>사용률</span>
                         <span className={`${
                           usageRateFilter !== '전체' ? 'text-teal-400' : 'text-white/50'
                         }`}>▼</span>
-                      </button>
-                      {openDropdown === 'usageRate' && (
-                        <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
-                          <div className="py-1">
-                            <button 
+                    </button>
+                    {openDropdown === 'usageRate' && (
+                      <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
+                        <div className="py-1">
+                          <button 
                               onClick={() => { setUsageRateFilter('전체'); setSortBy('company_id'); setSortOrder('asc'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                usageRateFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              전체
-                            </button>
-                            <button 
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              usageRateFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            전체
+                          </button>
+                          <button 
                               onClick={() => { setUsageRateFilter('높은순'); setSortBy('usage_rate'); setSortOrder('desc'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                usageRateFilter === '높은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              높은순
-                            </button>
-                            <button 
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              usageRateFilter === '높은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            높은순
+                          </button>
+                          <button 
                               onClick={() => { setUsageRateFilter('낮은순'); setSortBy('usage_rate'); setSortOrder('asc'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                usageRateFilter === '낮은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              낮은순
-                            </button>
-                          </div>
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              usageRateFilter === '낮은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            낮은순
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-white/70 font-medium text-center">
-                    <div className="relative">
-                      <button 
-                        onClick={(e) => toggleDropdown('activeTracks', e)}
+                      </div>
+                    )}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-white/70 font-medium text-center">
+                  <div className="relative">
+                    <button 
+                      onClick={(e) => toggleDropdown('activeTracks', e)}
                         className={`flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors ${
                           activeTracksFilter !== '전체' ? 'text-teal-400' : 'text-white/70'
                         }`}
-                      >
-                        <span>사용중 음원</span>
+                    >
+                      <span>사용중 음원</span>
                         <span className={`${
                           activeTracksFilter !== '전체' ? 'text-teal-400' : 'text-white/50'
                         }`}>▼</span>
-                      </button>
-                      {openDropdown === 'activeTracks' && (
-                        <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
-                          <div className="py-1">
-                            <button 
+                    </button>
+                    {openDropdown === 'activeTracks' && (
+                      <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
+                        <div className="py-1">
+                          <button 
                               onClick={() => { setActiveTracksFilter('전체'); setSortBy('company_id'); setSortOrder('asc'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                activeTracksFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              전체
-                            </button>
-                            <button 
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              activeTracksFilter === '전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            전체
+                          </button>
+                          <button 
                               onClick={() => { setActiveTracksFilter('많은순'); setSortBy('active_tracks'); setSortOrder('desc'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                activeTracksFilter === '많은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              많은순
-                            </button>
-                            <button 
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              activeTracksFilter === '많은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            많은순
+                          </button>
+                          <button 
                               onClick={() => { setActiveTracksFilter('적은순'); setSortBy('active_tracks'); setSortOrder('asc'); closeDropdown(); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                                activeTracksFilter === '적은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                              }`}
-                            >
-                              적은순
-                            </button>
-                          </div>
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              activeTracksFilter === '적은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'
+                            }`}
+                          >
+                            적은순
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-white/70 font-medium text-center">액션</th>
-                </tr>
-              </thead>
-              <tbody>
+                      </div>
+                    )}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-white/70 font-medium text-center">액션</th>
+              </tr>
+            </thead>
+            <tbody>
                 {filteredCompanies.map((company, index) => (
-                  <tr 
-                    key={company.id} 
-                    className={`border-b border-white/5 transition-all duration-200 cursor-pointer ${
-                    index % 2 === 0 ? 'bg-white/2' : 'bg-white/1'
-                    } hover:bg-white/8`}
-                    onClick={() => {
-                      setSelectedCompany(company)
+                <tr 
+                  key={company.id} 
+                  className={`border-b border-white/5 transition-all duration-200 cursor-pointer ${
+                  index % 2 === 0 ? 'bg-white/2' : 'bg-white/1'
+                  } hover:bg-white/8`}
+                  onClick={() => {
+                    setSelectedCompany(company)
                       fetchCompanyDetail(company.id)
-                      setModalOpen(true)
-                    }}
-                  >
-                    <td className="px-6 py-4 text-center">
+                    setModalOpen(true)
+                  }}
+                >
+                  <td className="px-6 py-4 text-center">
                       <div className="font-mono text-sm text-white/90 font-medium truncate max-w-[160px] mx-auto" title={company.id}>{company.id}</div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
+                  </td>
+                  <td className="px-6 py-4 text-center">
                       <div className="text-white/90 font-medium">{company.name}</div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
+                  </td>
+                  <td className="px-6 py-4 text-center">
                       <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${getTierColor(company.tier)}`}>
-                        {company.tier}
-                      </span>
-                    </td>
-                    <td className="px-8 py-5 text-white/90 font-medium text-center">
-                      {company.totalTokens.toLocaleString()}
-                    </td>
+                      {company.tier}
+                    </span>
+                  </td>
+                  <td className="px-8 py-5 text-white/90 font-medium text-center">
+                    {company.totalTokens.toLocaleString()}
+                  </td>
                     <td className="px-8 py-5 text-white/90 font-medium text-center">
                       {company.monthlyEarned.toLocaleString()}
-                    </td>
+                  </td>
                     <td className="px-8 py-5 text-white/90 font-medium text-center">
-                      {company.monthlyUsed.toLocaleString()}
-                    </td>
-                    <td className="px-8 py-5 text-center">
-                      <div className="flex items-center justify-center gap-3">
-                        <div className="w-20 bg-white/10 rounded-full h-1.5">
-                          <div 
-                            className="bg-gradient-to-r from-teal-400 to-blue-400 h-1.5 rounded-full transition-all duration-300"
-                            style={{ width: `${company.usageRate}%` }}
-                          />
-                        </div>
-                        <span className="text-white/90 font-medium text-sm">{company.usageRate}%</span>
+                    {company.monthlyUsed.toLocaleString()}
+                  </td>
+                  <td className="px-8 py-5 text-center">
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="w-20 bg-white/10 rounded-full h-1.5">
+                        <div 
+                          className="bg-gradient-to-r from-teal-400 to-blue-400 h-1.5 rounded-full transition-all duration-300"
+                          style={{ width: `${company.usageRate}%` }}
+                        />
                       </div>
-                    </td>
+                        <span className="text-white/90 font-medium text-sm">{company.usageRate}%</span>
+                    </div>
+                  </td>
                     <td className="px-8 py-5 text-white/90 font-medium text-center">
-                      {company.activeTracks}개
-                    </td>
-                    <td className="px-8 py-5 text-center">
-                      <button 
-                        className="rounded-md bg-teal-500/90 px-2.5 py-1.5 text-xs text-white font-medium hover:bg-teal-400 transition-all duration-200"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedCompany(company)
+                    {company.activeTracks}개
+                  </td>
+                  <td className="px-8 py-5 text-center">
+                    <button 
+                      className="rounded-md bg-teal-500/90 px-2.5 py-1.5 text-xs text-white font-medium hover:bg-teal-400 transition-all duration-200"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedCompany(company)
                           fetchCompanyDetail(company.id)
-                          setModalOpen(true)
-                        }}
-                      >
-                        상세
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        setModalOpen(true)
+                      }}
+                    >
+                      상세
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+      </div>
       )}
 
       {/* 페이지네이션 */}

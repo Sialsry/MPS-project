@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import SimpleLineChart from '@/components/charts/SimpleLineChart'
 
 type Music = {
@@ -34,27 +34,18 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
   const [activeTab, setActiveTab] = useState<'usage' | 'rewards'>('usage')
   const [musicGranularity, setMusicGranularity] = useState<'monthly' | 'daily'>('monthly')
   const [lyricsGranularity, setLyricsGranularity] = useState<'monthly' | 'daily'>('monthly')
+  const [musicTrend, setMusicTrend] = useState<{ labels: string[]; series: Array<{ label: string; data: number[] }> } | null>(null)
+  const [lyricsTrend, setLyricsTrend] = useState<{ labels: string[]; series: Array<{ label: string; data: number[] }> } | null>(null)
+  const [musicLoading, setMusicLoading] = useState(false)
+  const [lyricsLoading, setLyricsLoading] = useState(false)
+  const [musicError, setMusicError] = useState<string | null>(null)
+  const [lyricsError, setLyricsError] = useState<string | null>(null)
 
   if (!open || !music) return null
 
   const months = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월']
 
-  const usageData = {
-    labels: months,
-    series: [
-      { label: '현재 음원', data: music.monthlyUsage },
-      { label: '업계 평균', data: [800, 950, 1100, 1200, 1350, 1500, 1600, 1550, 1700, 1650, 1800, 2000] }
-    ]
-  }
-
-  // 임시 분리 데이터 (프론트 미리보기용): 음악 호출 60%, 가사 호출 40%
-  const industryAvg = [800, 950, 1100, 1200, 1350, 1500, 1600, 1550, 1700, 1650, 1800, 2000]
-  const musicCalls = (music.monthlyUsage || []).map(v => Math.round(v * 0.6))
-  const lyricsCalls = (music.monthlyUsage || []).map((v, i) => Math.max(0, v - (musicCalls[i] || 0)))
-  const industryMusicCalls = industryAvg.map(v => Math.round(v * 0.6))
-  const industryLyricsCalls = industryAvg.map((v, i) => Math.max(0, v - industryMusicCalls[i]))
-
-  // 이번 달(KST) 기준 일수와 인덱스 계산
+  // 이번 달(KST) 기준 일수와 인덱스 계산 (일별 조회 기본값)
   const now = new Date()
   const kst = new Date(now.getTime() + 9 * 3600 * 1000)
   const currentMonthIndex = kst.getUTCMonth() // 0-11
@@ -62,59 +53,44 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
   const month = currentMonthIndex + 1
   const daysInMonth = new Date(year, month, 0).getDate()
   const dailyLabels = Array.from({ length: daysInMonth }, (_, i) => `${i + 1}일`)
+  const defaultYearMonth = `${year}-${String(month).padStart(2, '0')}`
 
-  // 월 값을 일별로 균등 분배(미리보기)
-  const distributeMonthlyToDaily = (total: number, days: number) => {
-    if (!total || total <= 0 || !days) return Array.from({ length: days }, () => 0)
-    const base = Math.floor(total / days)
-    let rem = total - base * days
-    return Array.from({ length: days }, (_, i) => {
-      if (rem > 0) { rem -= 1; return base + 1 }
-      return base
-    })
-  }
-
-  const monthMusicTotal = Number(musicCalls[currentMonthIndex] || 0)
-  const monthLyricsTotal = Number(lyricsCalls[currentMonthIndex] || 0)
-  const monthIndustryMusicTotal = Number(industryMusicCalls[currentMonthIndex] || 0)
-  const monthIndustryLyricsTotal = Number(industryLyricsCalls[currentMonthIndex] || 0)
-
-  const musicCallsDaily = distributeMonthlyToDaily(monthMusicTotal, daysInMonth)
-  const lyricsCallsDaily = distributeMonthlyToDaily(monthLyricsTotal, daysInMonth)
-  const industryMusicCallsDaily = distributeMonthlyToDaily(monthIndustryMusicTotal, daysInMonth)
-  const industryLyricsCallsDaily = distributeMonthlyToDaily(monthIndustryLyricsTotal, daysInMonth)
-
-  const musicCallsData = {
-    labels: months,
-    series: [
-      { label: '현재 음원', data: musicCalls },
-      { label: '업계 평균', data: industryMusicCalls }
-    ]
-  }
-
-  const lyricsCallsData = {
-    labels: months,
-    series: [
-      { label: '현재 음원', data: lyricsCalls },
-      { label: '업계 평균', data: industryLyricsCalls }
-    ]
-  }
-
-  const musicCallsDataDaily = {
-    labels: dailyLabels,
-    series: [
-      { label: '현재 음원', data: musicCallsDaily },
-      { label: '업계 평균', data: industryMusicCallsDaily }
-    ]
-  }
-
-  const lyricsCallsDataDaily = {
-    labels: dailyLabels,
-    series: [
-      { label: '현재 음원', data: lyricsCallsDaily },
-      { label: '업계 평균', data: industryLyricsCallsDaily }
-    ]
-  }
+  // 트렌드 API 페칭 함수
+  useEffect(() => {
+    if (!open || !music) return
+    let aborted = false
+    const fetchTrend = async (kind: 'music' | 'lyrics', granularity: 'daily' | 'monthly') => {
+      const setLoading = kind === 'music' ? setMusicLoading : setLyricsLoading
+      const setErr = kind === 'music' ? setMusicError : setLyricsError
+      const setData = kind === 'music' ? setMusicTrend : setLyricsTrend
+      try {
+        setLoading(true)
+        setErr(null)
+        const params = new URLSearchParams()
+        params.set('granularity', granularity)
+        params.set('type', kind)
+        params.set('segment', 'all')
+        if (granularity === 'daily') params.set('yearMonth', defaultYearMonth)
+        else params.set('months', '12')
+        const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${music.id}/rewards/trend?` + params.toString()
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        if (aborted) return
+        setData({ labels: data.labels || [], series: data.series || [] })
+      } catch (e: any) {
+        if (aborted) return
+        setErr(e.message || '조회 실패')
+        setData({ labels: [], series: [] })
+      } finally {
+        if (!aborted) setLoading(false)
+      }
+    }
+    // 병렬 호출
+    fetchTrend('music', musicGranularity)
+    fetchTrend('lyrics', lyricsGranularity)
+    return () => { aborted = true }
+  }, [open, music?.id, musicGranularity, lyricsGranularity])
 
   const rewardsData = {
     labels: months,
@@ -203,10 +179,10 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
 
           {/* 탭 네비게이션 */}
           <div className="flex border-b border-white/10 flex-shrink-0">
-            {[
-              { id: 'usage', label: '리워드 발생 현황' },
-              { id: 'rewards', label: '사용 기업 현황' }
-            ].map((tab) => (
+                          {[
+                { id: 'usage', label: '리워드 발생 현황' },
+                { id: 'rewards', label: '사용 기업 현황' }
+              ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
@@ -260,19 +236,32 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                       </div>
                     </div>
                     <div className="h-64">
-                      <SimpleLineChart 
-                        labels={musicGranularity === 'daily' ? musicCallsDataDaily.labels : musicCallsData.labels}
-                        series={musicGranularity === 'daily' ? musicCallsDataDaily.series : musicCallsData.series}
-                        colors={['#14b8a6', '#9ca3af']}
-                      />
+                      {musicLoading ? (
+                        <div className="h-full flex items-center justify-center text-white/60">로딩중...</div>
+                      ) : musicTrend && musicTrend.labels.length > 0 ? (
+                        <SimpleLineChart 
+                          labels={musicTrend.labels.map(l => {
+                            if (musicGranularity === 'daily') {
+                              const d = new Date(l)
+                              return `${d.getMonth()+1}/${d.getDate()}`
+                            }
+                            const [y, mm] = l.split('-')
+                            return `${y}/${Number(mm)}`
+                          })}
+                          series={musicTrend.series}
+                          colors={['#14b8a6', '#9ca3af']}
+                        />
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-white/60">데이터가 없습니다</div>
+                      )}
                     </div>
                   </div>
-                  <div className="rounded-xl border border-white/10 p-6">
+                <div className="rounded-xl border border-white/10 p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-white flex items-center gap-3">
-                        <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
+                    <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
                         가사 호출 추이
-                      </h3>
+                  </h3>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => setLyricsGranularity('daily')}
@@ -296,12 +285,25 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                         </button>
                       </div>
                     </div>
-                    <div className="h-64">
-                      <SimpleLineChart 
-                        labels={lyricsGranularity === 'daily' ? lyricsCallsDataDaily.labels : lyricsCallsData.labels}
-                        series={lyricsGranularity === 'daily' ? lyricsCallsDataDaily.series : lyricsCallsData.series}
-                        colors={['#14b8a6', '#9ca3af']}
-                      />
+                  <div className="h-64">
+                      {lyricsLoading ? (
+                        <div className="h-full flex items-center justify-center text-white/60">로딩중...</div>
+                      ) : lyricsTrend && lyricsTrend.labels.length > 0 ? (
+                    <SimpleLineChart 
+                          labels={lyricsTrend.labels.map(l => {
+                            if (lyricsGranularity === 'daily') {
+                              const d = new Date(l)
+                              return `${d.getMonth()+1}/${d.getDate()}`
+                            }
+                            const [y, mm] = l.split('-')
+                            return `${y}/${Number(mm)}`
+                          })}
+                          series={lyricsTrend.series}
+                      colors={['#14b8a6', '#9ca3af']}
+                    />
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-white/60">데이터가 없습니다</div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -408,7 +410,7 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                           const prevMonthReward = Math.floor(company.usage * music.rewardPerPlay * 0.8 * 1000) / 1000
                           const rewardChange = monthlyReward - prevMonthReward
                           const rewardChangePercent = Math.round((rewardChange / (prevMonthReward || 1)) * 100)
-                          const totalMonthlyReward = music.topCompanies.reduce((sum, c) =>
+                          const totalMonthlyReward = music.topCompanies.reduce((sum, c) => 
                             sum + Math.floor(c.usage * music.rewardPerPlay * 1000) / 1000, 0
                           )
                           const rewardShare = totalMonthlyReward > 0 ? Math.round((monthlyReward / totalMonthlyReward) * 100) : 0

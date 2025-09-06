@@ -15,7 +15,10 @@ import { getDefaultYearMonthKST } from '../../common/utils/date.util';
 import { resolveYearMonthKST } from '../../common/utils/date.util';
 import { normalizeSort } from '../../common/utils/sort.util';
 import { MusicRewardsSummaryQueryDto, MusicRewardsSummaryResponseDto } from './dto/music-rewards-summary.dto';
+import { MusicRewardsTrendQueryDto, MusicRewardsTrendResponseDto } from './dto/music-rewards-trend.dto';
 import { buildMusicRewardsSummaryQuery, buildMusicRewardsSummaryCountQuery } from './queries/rewards.queries';
+import { buildFindAllQuery, buildFindOneQuery, buildUpsertNextMonthRewardsQuery, buildCleanupOrphanCategoriesQuery } from './queries/musics.queries';
+import { buildMusicTrendDailyQuery, buildMusicTrendMonthlyQuery } from './queries/trend.queries';
 
 @Injectable()
 export class MusicsService implements OnModuleInit {
@@ -79,74 +82,17 @@ export class MusicsService implements OnModuleInit {
 
     const { page: p, limit: l, offset } = normalizePagination(page, limit, 100);
     const currentMonth = getDefaultYearMonthKST();
-
-    const conditions: SQL<unknown>[] = [];
-
-    if (search) {
-      conditions.push(sql`(musics.title ILIKE ${`%${search}%`} OR musics.artist ILIKE ${`%${search}%`} OR music_tags.text ILIKE ${`%${search}%`})`);
-    }
-
-    if (category && category !== '전체') {
-      conditions.push(sql`music_categories.name = ${category}`);
-    }
-
-    if (musicType && musicType !== '전체') {
-      if (musicType === 'Inst') {
-        conditions.push(sql`musics.inst = true`);
-      } else if (musicType === '일반') {
-        conditions.push(sql`musics.inst = false`);
-      }
-    }
-
-
-    const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
-
-    // 드롭다운 정렬을 위한 조건
-    let orderByClause = sql``;
-    
-    // 음원번호 정렬
-    if (idSortFilter === '오름차순') {
-      orderByClause = sql`ORDER BY musics.id ASC`;
-    } else if (idSortFilter === '내림차순') {
-      orderByClause = sql`ORDER BY musics.id DESC`;
-    }
-    // 발매일 정렬
-    else if (releaseDateSortFilter === '오름차순') {
-      orderByClause = sql`ORDER BY musics.release_date ASC`;
-    } else if (releaseDateSortFilter === '내림차순') {
-      orderByClause = sql`ORDER BY musics.release_date DESC`;
-    }
-    // 리워드 한도 정렬
-    else if (rewardLimitFilter === '오름차순') {
-      orderByClause = sql`ORDER BY maxRewardLimit ASC`;
-    } else if (rewardLimitFilter === '내림차순') {
-      orderByClause = sql`ORDER BY maxRewardLimit DESC`;
-    }
-    // 기본 정렬
-    else {
-      orderByClause = sql`ORDER BY musics.created_at DESC`;
-    }
-
-    const rawQuery = sql`
-      SELECT
-        musics.id,
-        musics.title,
-        musics.artist,
-        musics.inst AS musicType,
-        music_categories.name AS category,
-        STRING_AGG(DISTINCT music_tags.text, ', ') AS tags,
-        musics.release_date AS releaseDate,
-        COALESCE(${monthly_music_rewards.total_reward_count} * ${monthly_music_rewards.reward_per_play}, 0) AS maxRewardLimit,
-        musics.created_at AS createdAt
-      FROM musics
-      LEFT JOIN music_categories ON musics.category_id = music_categories.id
-      LEFT JOIN music_tags ON musics.id = music_tags.music_id
-      LEFT JOIN monthly_music_rewards ON musics.id = monthly_music_rewards.music_id AND monthly_music_rewards.year_month = ${currentMonth}
-      ${whereClause}
-      GROUP BY musics.id, musics.title, musics.artist, musics.inst, music_categories.name, musics.release_date, musics.created_at, monthly_music_rewards.total_reward_count, monthly_music_rewards.reward_per_play
-      ${orderByClause}
-      LIMIT ${l} OFFSET ${offset}
-    `;
+    const rawQuery = buildFindAllQuery({
+      search,
+      categoryLabel: category ?? null,
+      musicType: (musicType as any) ?? '',
+      idSortFilter: (idSortFilter as any) ?? '',
+      releaseDateSortFilter: (releaseDateSortFilter as any) ?? '',
+      rewardLimitFilter: (rewardLimitFilter as any) ?? '',
+      currentMonth,
+      limit: l,
+      offset,
+    });
 
     const results = await this.db.execute(rawQuery);
 
@@ -163,7 +109,7 @@ export class MusicsService implements OnModuleInit {
     const { page = 1, limit = 20 } = query
     const { offset, page: p, limit: l } = normalizePagination(page, limit, 100)
 
-    const sortAllow = ['music_id','title','artist','category','grade','validPlays','earned','companiesUsing','lastUsedAt']
+    const sortAllow = ['music_id','title','artist','category','grade','musicType','monthlyLimit','rewardPerPlay','usageRate','validPlays','earned','companiesUsing','lastUsedAt']
     const { sortBy, order } = normalizeSort(query.sortBy, query.order, sortAllow)
 
     // order by SQL 안전 매핑
@@ -175,6 +121,21 @@ export class MusicsService implements OnModuleInit {
         case 'artist': return sql`m.artist ${dir}`
         case 'category': return sql`mc.name ${dir}`
         case 'grade': return sql`m.grade_required ${dir}`
+        case 'musicType': return sql`m.inst ${dir}`
+        case 'monthlyLimit': return sql`mmr.total_reward_count ${dir} NULLS LAST`
+        case 'rewardPerPlay': return sql`mmr.reward_per_play ${dir} NULLS LAST`
+        case 'usageRate':
+          return sql`
+            CASE 
+              WHEN mmr.total_reward_count IS NULL OR mmr.total_reward_count <= 0 THEN NULL
+              WHEN mmr.remaining_reward_count IS NOT NULL AND (mmr.total_reward_count - mmr.remaining_reward_count) > 0 THEN 
+                ((mmr.total_reward_count - mmr.remaining_reward_count)::numeric / NULLIF(mmr.total_reward_count, 0)::numeric) * 100
+              WHEN mmr.reward_per_play IS NOT NULL AND mmr.reward_per_play > 0 AND COALESCE(earned,0) > 0 THEN
+                (FLOOR(COALESCE(earned, 0) / NULLIF(mmr.reward_per_play, 0))::numeric / NULLIF(mmr.total_reward_count, 0)::numeric) * 100
+              ELSE 
+                (LEAST(COALESCE(valid_plays, 0), mmr.total_reward_count)::numeric / NULLIF(mmr.total_reward_count, 0)::numeric) * 100
+            END ${dir} NULLS LAST
+          `
         case 'validPlays': return sql`valid_plays ${dir}`
         case 'earned': return sql`earned ${dir}`
         case 'companiesUsing': return sql`companies_using ${dir}`
@@ -182,6 +143,8 @@ export class MusicsService implements OnModuleInit {
         default: return sql`earned DESC, valid_plays DESC`
       }
     })()
+
+    const musicTypeBool = query.musicType === 'inst' ? true : query.musicType === 'normal' ? false : undefined
 
     const gradeNum = query.grade && query.grade !== 'all' ? Number(query.grade) : undefined
 
@@ -191,6 +154,7 @@ export class MusicsService implements OnModuleInit {
       search: query.search,
       categoryId: query.categoryId,
       grade: gradeNum,
+      musicType: musicTypeBool,
       offset,
       limit: l,
       orderBySql: orderSql,
@@ -202,6 +166,7 @@ export class MusicsService implements OnModuleInit {
       search: query.search,
       categoryId: query.categoryId,
       grade: gradeNum,
+      musicType: musicTypeBool,
     })
 
     const [rowsRes, countRes] = await Promise.all([
@@ -214,22 +179,40 @@ export class MusicsService implements OnModuleInit {
       title: r.title,
       artist: r.artist,
       category: r.category ?? null,
+      musicType: (() => {
+        const v = r.music_type
+        const b = v === true || v === 't' || v === 'true' || v === 1 || v === '1'
+        return b ? 'Inst' : '일반'
+      })(),
       grade: Number(r.grade) as 0|1|2,
       validPlays: Number(r.valid_plays || 0),
       earned: Number(r.earned || 0),
       companiesUsing: Number(r.companies_using || 0),
       lastUsedAt: r.last_used_at ?? null,
       monthlyLimit: r.monthly_limit !== null && r.monthly_limit !== undefined ? Number(r.monthly_limit) : null,
-      usageRate: r.usage_rate !== null && r.usage_rate !== undefined
-        ? Number(r.usage_rate)
-        : (() => {
-            const total = r.monthly_limit !== null && r.monthly_limit !== undefined ? Number(r.monthly_limit) : null
-            const remaining = r.monthly_remaining !== null && r.monthly_remaining !== undefined ? Number(r.monthly_remaining) : null
-            if (total === null || total <= 0) return null
-            if (remaining === null || remaining < 0) return null
-            const used = Math.max(total - remaining, 0)
+      usageRate: (() => {
+        const total = r.monthly_limit !== null && r.monthly_limit !== undefined ? Number(r.monthly_limit) : null
+        if (total === null || total <= 0) return null
+        const remaining = r.monthly_remaining !== null && r.monthly_remaining !== undefined ? Number(r.monthly_remaining) : null
+        if (remaining !== null && remaining >= 0) {
+          const used = Math.max(total - remaining, 0)
+          if (used > 0) {
             return Math.min(100, Math.round((used / total) * 100))
-          })(),
+          }
+        }
+        const rewardPerPlay = r.reward_per_play !== null && r.reward_per_play !== undefined ? Number(r.reward_per_play) : null
+        const earned = r.earned !== null && r.earned !== undefined ? Number(r.earned) : 0
+        if (rewardPerPlay !== null && rewardPerPlay > 0 && earned > 0) {
+          const usedEst = Math.floor(earned / rewardPerPlay)
+          return Math.min(100, Math.round((usedEst / total) * 100))
+        }
+        const validPlays = r.valid_plays !== null && r.valid_plays !== undefined ? Number(r.valid_plays) : 0
+        if (validPlays > 0) {
+          const usedEst = Math.min(validPlays, total)
+          return Math.min(100, Math.round((usedEst / total) * 100))
+        }
+        return 0
+      })(),
       rewardPerPlay: r.reward_per_play !== null && r.reward_per_play !== undefined ? Number(r.reward_per_play) : null,
     }))
 
@@ -355,41 +338,7 @@ export class MusicsService implements OnModuleInit {
   async findOne(id: number) {
     try {
       const currentMonth = new Date().toISOString().slice(0, 7);
-      const query = sql`
-        SELECT
-          m.id,
-          m.title,
-          m.artist,
-          m.inst AS "inst",
-          mc.name AS "category",
-          COALESCE(STRING_AGG(DISTINCT mt.text, ', '), '') AS "tags",
-          COALESCE(STRING_AGG(DISTINCT rt.name, ', '), '') AS "normalizedTags",
-          m.release_date AS "releaseDate",
-          m.duration_sec AS "durationSec",
-          m.isrc AS "isrc",
-          m.lyricist AS "lyricist",
-          m.composer AS "composer",
-          m.music_arranger AS "arranger",
-          m.lyrics_text AS "lyricsText",
-          m.lyrics_file_path AS "lyricsFilePath",
-          m.file_path AS "audioFilePath",
-          m.cover_image_url AS "coverImageUrl",
-          m.price_per_play AS "priceMusicOnly",
-          m.lyrics_price AS "priceLyricsOnly",
-          m.created_at AS "createdAt",
-          m.grade_required AS "grade",
-          COALESCE(mmr.total_reward_count * mmr.reward_per_play, 0) AS "maxRewardLimit",
-          mmr.reward_per_play AS "rewardPerPlay",
-          mmr.total_reward_count AS "maxPlayCount"
-        FROM musics m
-        LEFT JOIN music_categories mc ON m.category_id = mc.id
-        LEFT JOIN music_tags mt ON m.id = mt.music_id
-        LEFT JOIN raw_tags rt ON LOWER(rt.name) = LOWER(mt.text)
-        LEFT JOIN monthly_music_rewards mmr ON m.id = mmr.music_id AND mmr.year_month = ${currentMonth}
-        WHERE m.id = ${id}
-        GROUP BY m.id, m.title, m.artist, m.inst, mc.name, m.release_date, m.duration_sec, m.isrc, m.lyricist, m.composer, m.music_arranger, m.lyrics_text, m.lyrics_file_path, m.file_path, m.cover_image_url, m.price_per_play, m.lyrics_price, m.created_at, m.grade_required, mmr.total_reward_count, mmr.reward_per_play
-        LIMIT 1
-      `;
+      const query = buildFindOneQuery(id, currentMonth);
 
       const result = await this.db.execute(query);
       if (!result.rows || result.rows.length === 0) {
@@ -463,6 +412,69 @@ export class MusicsService implements OnModuleInit {
     }
     const filename = path.basename(relativePath) || 'lyrics.txt';
     return { hasText: false, hasFile: true, absPath, filename };
+  }
+
+  async getRewardsTrend(musicId: number, query: MusicRewardsTrendQueryDto): Promise<MusicRewardsTrendResponseDto> {
+    const segment = (query.segment ?? 'category') as 'category' | 'all'
+    if (query.granularity === 'daily') {
+      const ym = resolveYearMonthKST(query.yearMonth)
+      const [y, m] = ym.split('-').map(Number)
+      const sqlQ = buildMusicTrendDailyQuery({
+        musicId,
+        year: y,
+        month: m,
+        type: query.type,
+        segment,
+      })
+      const res = await this.db.execute(sqlQ)
+      const labels: string[] = []
+      const current: number[] = []
+      const industry: number[] = []
+      for (const row of res.rows as any[]) {
+        labels.push(String(row.label))
+        current.push(Number(row.current_cnt || 0))
+        industry.push(Number(row.industry_avg || 0))
+      }
+      return {
+        labels,
+        series: [
+          { label: '현재 음원', data: current },
+          { label: '업계 평균', data: industry },
+        ],
+        meta: { granularity: 'daily', type: query.type, segment, yearMonth: ym },
+      }
+    } else {
+      const now = new Date()
+      const kst = new Date(now.getTime() + 9 * 3600 * 1000)
+      const endYear = kst.getUTCFullYear()
+      const endMonth = kst.getUTCMonth() + 1
+      const months = query.months && query.months > 0 ? query.months : 12
+      const sqlQ = buildMusicTrendMonthlyQuery({
+        musicId,
+        endYear,
+        endMonth,
+        months,
+        type: query.type,
+        segment,
+      })
+      const res = await this.db.execute(sqlQ)
+      const labels: string[] = []
+      const current: number[] = []
+      const industry: number[] = []
+      for (const row of res.rows as any[]) {
+        labels.push(String(row.label))
+        current.push(Number(row.current_cnt || 0))
+        industry.push(Number(row.industry_avg || 0))
+      }
+      return {
+        labels,
+        series: [
+          { label: '현재 음원', data: current },
+          { label: '업계 평균', data: industry },
+        ],
+        meta: { granularity: 'monthly', type: query.type, segment, months },
+      }
+    }
   }
 
   private sanitizeFilename(name: string): string {
@@ -656,12 +668,7 @@ export class MusicsService implements OnModuleInit {
   }
 
   private async cleanupOrphanCategories() {
-    await this.db.execute(sql`
-      delete from ${music_categories} c
-      where not exists (
-        select 1 from ${musics} m where m.category_id = c.id
-      )
-    `);
+    await this.db.execute(buildCleanupOrphanCategoriesQuery());
   }
 
   async delete(ids: number[]) {
@@ -704,15 +711,12 @@ export class MusicsService implements OnModuleInit {
     const m = now.getUTCMonth(); 
     const next = new Date(Date.UTC(y, m + 1, 1));
     const ym = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`;
-
-    // upsert: (music_id, year_month) 기준
-    const upsertQuery = sql`
-      insert into ${monthly_music_rewards} (music_id, year_month, total_reward_count, remaining_reward_count, reward_per_play)
-      values (${musicId}, ${ym}, ${dto.totalRewardCount}, ${dto.totalRewardCount}, ${dto.rewardPerPlay})
-      on conflict (music_id, year_month)
-      do update set total_reward_count = ${dto.totalRewardCount}, remaining_reward_count = ${dto.totalRewardCount}, reward_per_play = ${dto.rewardPerPlay}
-      returning music_id, year_month
-    `;
+    const upsertQuery = buildUpsertNextMonthRewardsQuery({
+      musicId,
+      yearMonth: ym,
+      totalRewardCount: dto.totalRewardCount,
+      rewardPerPlay: dto.rewardPerPlay,
+    });
 
     const result = await this.db.execute(upsertQuery);
     return { message: '다음 달 리워드가 업데이트되었습니다.', musicId, yearMonth: ym };

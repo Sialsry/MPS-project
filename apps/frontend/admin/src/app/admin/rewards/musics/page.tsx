@@ -49,10 +49,12 @@ export default function RewardsMusicsPage() {
   const [yearMonth, setYearMonth] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
-  const [limitFilter, setLimitFilter] = useState('')
-  const [usageFilter, setUsageFilter] = useState('')
-  const [companyFilter, setCompanyFilter] = useState('')
-  const [rewardFilter, setRewardFilter] = useState('')
+  const [limitFilter, setLimitFilter] = useState('전체')
+  const [musicTypeFilter, setMusicTypeFilter] = useState<'all'|'inst'|'normal'>('all')
+  const [usageFilter, setUsageFilter] = useState('전체')
+  const [companyFilter, setCompanyFilter] = useState('전체')
+  const [rewardFilter, setRewardFilter] = useState('전체')
+  const [idFilter, setIdFilter] = useState('전체')
   const [sortBy, setSortBy] = useState<'music_id'|'title'|'artist'|'category'|'grade'|'validPlays'|'earned'|'companiesUsing'|'lastUsedAt'>('earned')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [modalOpen, setModalOpen] = useState(false)
@@ -79,6 +81,7 @@ export default function RewardsMusicsPage() {
       if (yearMonth) params.set('yearMonth', yearMonth)
       if (searchTerm) params.set('search', searchTerm)
       if (categoryFilter && /^\d+$/.test(categoryFilter)) params.set('categoryId', categoryFilter)
+      if (musicTypeFilter && musicTypeFilter !== 'all') params.set('musicType', musicTypeFilter)
       // grade 필터는 현재 UI에 없으므로 제외
       params.set('page', String(currentPage))
       params.set('limit', String(itemsPerPage))
@@ -102,7 +105,7 @@ export default function RewardsMusicsPage() {
   useEffect(() => {
     fetchRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, sortBy, sortOrder])
+  }, [currentPage, sortBy, sortOrder, musicTypeFilter])
 
   const handleSearch = () => {
     setCurrentPage(1)
@@ -236,85 +239,184 @@ export default function RewardsMusicsPage() {
                     className="accent-teal-400 rounded" 
                   />
                 </th>
-                <th className="px-6 py-4 text-white/70 font-medium text-center">음원명</th>
                 <th className="px-6 py-4 text-white/70 font-medium text-center">
                   <div className="relative">
                     <button 
-                      onClick={(e) => toggleDropdown('category', e)}
-                      className="flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors"
+                      onClick={(e) => toggleDropdown('musicId', e)}
+                      className={`flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors ${
+                        idFilter !== '전체' ? 'text-teal-400' : 'text-white/70'
+                      }`}
                     >
-                      <span>카테고리</span>
-                      <span className="text-white/50">▼</span>
+                      <span>음원 ID</span>
+                      <span className={`${
+                        idFilter !== '전체' ? 'text-teal-400' : 'text-white/50'
+                      }`}>▼</span>
                     </button>
-                    
-                    {/* 카테고리 드롭다운 메뉴 */}
-                    {openDropdown === 'category' && (
+                    {openDropdown === 'musicId' && (
                       <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
                         <div className="py-1">
                           <button 
-                            onClick={() => { setCategoryFilter(''); closeDropdown(); }}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              categoryFilter === '' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                            }`}
-                          >
-                            전체
-                          </button>
+                            onClick={() => { setIdFilter('전체'); setSortBy('music_id'); setSortOrder('asc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${idFilter==='전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >전체</button>
                           <button 
-                            onClick={() => { setCategoryFilter('Pop'); closeDropdown(); }}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              categoryFilter === 'Pop' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                            }`}
-                          >
-                            Pop
-                          </button>
+                            onClick={() => { setIdFilter('오름차순'); setSortBy('music_id'); setSortOrder('asc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${idFilter==='오름차순' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >오름차순</button>
                           <button 
-                            onClick={() => { setCategoryFilter('Rock'); closeDropdown(); }}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              categoryFilter === 'Rock' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                            }`}
-                          >
-                            Rock
-                          </button>
-                          <button 
-                            onClick={() => { setCategoryFilter('Jazz'); closeDropdown(); }}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              categoryFilter === 'Jazz' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                            }`}
-                          >
-                            Jazz
-                          </button>
-                          <button 
-                            onClick={() => { setCategoryFilter('Classical'); closeDropdown(); }}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              categoryFilter === 'Classical' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                            }`}
-                          >
-                            Classical
-                          </button>
-                          <button 
-                            onClick={() => { setCategoryFilter('Electronic'); closeDropdown(); }}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              categoryFilter === 'Electronic' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                            }`}
-                          >
-                            Electronic
-                          </button>
+                            onClick={() => { setIdFilter('내림차순'); setSortBy('music_id'); setSortOrder('desc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${idFilter==='내림차순' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >내림차순</button>
                         </div>
                       </div>
                     )}
                   </div>
                 </th>
-                <th className="px-6 py-4 text-white/70 font-medium text-center">리워드 월 한도</th>
-                <th className="px-6 py-4 text-white/70 font-medium text-center">호출당 리워드</th>
-                <th className="px-6 py-4 text-white/70 font-medium text-center">리워드 사용률</th>
+                <th className="px-6 py-4 text-white/70 font-medium text-center">음원명</th>
+                <th className="px-6 py-4 text-white/70 font-medium text-center">
+                  <div className="relative">
+                    <button 
+                      onClick={(e) => toggleDropdown('musicType', e)}
+                      className={`flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors ${
+                        musicTypeFilter !== 'all' ? 'text-teal-400' : 'text-white/70'
+                      }`}
+                    >
+                      <span>음원 유형</span>
+                      <span className={`${
+                        musicTypeFilter !== 'all' ? 'text-teal-400' : 'text-white/50'
+                      }`}>▼</span>
+                    </button>
+                    {openDropdown === 'musicType' && (
+                      <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[140px]">
+                        <div className="py-1">
+                          <button
+                            onClick={() => { setMusicTypeFilter('all'); closeDropdown(); setCurrentPage(1); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${musicTypeFilter==='all' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >전체</button>
+                          <button
+                            onClick={() => { setMusicTypeFilter('inst'); closeDropdown(); setCurrentPage(1); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${musicTypeFilter==='inst' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >Inst</button>
+                          <button
+                            onClick={() => { setMusicTypeFilter('normal'); closeDropdown(); setCurrentPage(1); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${musicTypeFilter==='normal' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >일반</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-white/70 font-medium text-center">
+                  <div className="relative">
+                    <button 
+                      onClick={(e) => toggleDropdown('monthlyLimit', e)}
+                      className={`flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors ${
+                        limitFilter !== '전체' ? 'text-teal-400' : 'text-white/70'
+                      }`}
+                    >
+                      <span>리워드 월 한도</span>
+                      <span className={`${
+                        limitFilter !== '전체' ? 'text-teal-400' : 'text-white/50'
+                      }`}>▼</span>
+                    </button>
+                    {openDropdown === 'monthlyLimit' && (
+                      <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
+                        <div className="py-1">
+                          <button 
+                            onClick={() => { setLimitFilter('전체'); setSortBy('music_id'); setSortOrder('asc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${limitFilter==='전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >전체</button>
+                          <button 
+                            onClick={() => { setLimitFilter('많은순'); setSortBy('monthlyLimit'); setSortOrder('desc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${limitFilter==='많은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >많은순</button>
+                          <button 
+                            onClick={() => { setLimitFilter('적은순'); setSortBy('monthlyLimit'); setSortOrder('asc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${limitFilter==='적은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >적은순</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-white/70 font-medium text-center">
+                  <div className="relative">
+                    <button 
+                      onClick={(e) => toggleDropdown('rewardPerPlay', e)}
+                      className={`flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors ${
+                        rewardFilter !== '전체' ? 'text-teal-400' : 'text-white/70'
+                      }`}
+                    >
+                      <span>호출당 리워드</span>
+                      <span className={`${
+                        rewardFilter !== '전체' ? 'text-teal-400' : 'text-white/50'
+                      }`}>▼</span>
+                    </button>
+                    {openDropdown === 'rewardPerPlay' && (
+                      <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
+                        <div className="py-1">
+                          <button 
+                            onClick={() => { setRewardFilter('전체'); setSortBy('music_id'); setSortOrder('asc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${rewardFilter==='전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >전체</button>
+                          <button 
+                            onClick={() => { setRewardFilter('많은순'); setSortBy('rewardPerPlay'); setSortOrder('desc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${rewardFilter==='많은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >많은순</button>
+                          <button 
+                            onClick={() => { setRewardFilter('적은순'); setSortBy('rewardPerPlay'); setSortOrder('asc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${rewardFilter==='적은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >적은순</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-white/70 font-medium text-center">
+                  <div className="relative">
+                    <button 
+                      onClick={(e) => toggleDropdown('usageRate', e)}
+                      className={`flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors ${
+                        usageFilter !== '전체' ? 'text-teal-400' : 'text-white/70'
+                      }`}
+                    >
+                      <span>리워드 사용률</span>
+                      <span className={`${
+                        usageFilter !== '전체' ? 'text-teal-400' : 'text-white/50'
+                      }`}>▼</span>
+                    </button>
+                    {openDropdown === 'usageRate' && (
+                      <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
+                        <div className="py-1">
+                          <button 
+                            onClick={() => { setUsageFilter('전체'); setSortBy('music_id'); setSortOrder('asc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${usageFilter==='전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >전체</button>
+                          <button 
+                            onClick={() => { setUsageFilter('많은순'); setSortBy('usageRate'); setSortOrder('desc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${usageFilter==='많은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >많은순</button>
+                          <button 
+                            onClick={() => { setUsageFilter('적은순'); setSortBy('usageRate'); setSortOrder('asc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${usageFilter==='적은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >적은순</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </th>
                 <th className="px-6 py-4 text-white/70 font-medium text-center">
                   <div className="relative">
                     <button 
                       onClick={(e) => toggleDropdown('company', e)}
-                      className="flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors"
+                      className={`flex items-center justify-center gap-1 w-full text-center hover:text-white/90 transition-colors ${
+                        companyFilter !== '전체' ? 'text-teal-400' : 'text-white/70'
+                      }`}
                     >
                       <span>사용중 기업</span>
-                      <span className="text-white/50">▼</span>
+                      <span className={`${
+                        companyFilter !== '전체' ? 'text-teal-400' : 'text-white/50'
+                      }`}>▼</span>
                     </button>
                     
                     {/* 사용 기업 드롭다운 메뉴 */}
@@ -322,37 +424,17 @@ export default function RewardsMusicsPage() {
                       <div className="absolute top-full left-0 mt-1 bg-black/90 border border-white/20 rounded-lg shadow-xl z-[9999] min-w-[120px]">
                         <div className="py-1">
                           <button 
-                            onClick={() => { setCompanyFilter(''); closeDropdown(); }}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              companyFilter === '' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                            }`}
-                          >
-                            전체
-                          </button>
+                            onClick={() => { setCompanyFilter('전체'); setSortBy('music_id'); setSortOrder('asc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${companyFilter==='전체' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >전체</button>
                           <button 
-                            onClick={() => { setCompanyFilter('many'); closeDropdown(); }}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              companyFilter === 'many' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                            }`}
-                          >
-                            많음 (5개+)
-                          </button>
+                            onClick={() => { setCompanyFilter('많은순'); setSortBy('companiesUsing'); setSortOrder('desc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${companyFilter==='많은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >많은순</button>
                           <button 
-                            onClick={() => { setCompanyFilter('medium'); closeDropdown(); }}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              companyFilter === 'medium' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                            }`}
-                          >
-                            보통 (2-4개)
-                          </button>
-                          <button 
-                            onClick={() => { setCompanyFilter('few'); closeDropdown(); }}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
-                              companyFilter === 'few' ? 'text-teal-300 bg-white/5' : 'text-white/80'
-                            }`}
-                          >
-                            적음 (1개)
-                          </button>
+                            onClick={() => { setCompanyFilter('적은순'); setSortBy('companiesUsing'); setSortOrder('asc'); closeDropdown(); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${companyFilter==='적은순' ? 'text-teal-300 bg-white/5' : 'text-white/80'}`}
+                          >적은순</button>
                         </div>
                       </div>
                     )}
@@ -364,7 +446,6 @@ export default function RewardsMusicsPage() {
             <tbody>
               {currentMusics.map((music, index) => {
                 const usageRate = music.usageRate
-                const categoryColor = getCategoryColor(music.category || '')
                 
                 // 유효재생률 계산 (예시 데이터)
                 const totalPlays = Math.floor(music.validPlays * (1 + Math.random() * 0.3 + 0.1)) // 10-40% 추가
@@ -387,21 +468,12 @@ export default function RewardsMusicsPage() {
                         className="accent-teal-400 rounded" 
                       />
                     </td>
+                    <td className="px-8 py-5 text-white/80 text-center">{music.musicId}</td>
                     <td className="px-8 py-5 text-center">
                       <div className="font-semibold text-white">{music.title}</div>
                       <div className="text-xs text-white/60">{music.artist}</div>
                     </td>
-                    <td className="px-8 py-5 text-white/80 text-center">
-                      {music.category ? (
-                        (() => { const categoryColor = getCategoryColor(music.category!); return (
-                          <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gradient-to-r ${categoryColor.bg} ${categoryColor.text} border ${categoryColor.border}`}>
-                            {music.category}
-                          </span>
-                        )})()
-                      ) : (
-                        <span className="text-white/50 text-xs">-</span>
-                      )}
-                    </td>
+                    <td className="px-8 py-5 text-white/80 text-center">{(music as any).musicType || '-'}</td>
                     <td className="px-8 py-5 text-white/80 text-center">{music.monthlyLimit !== null ? music.monthlyLimit.toLocaleString() : '-'}</td>
                     <td className="px-8 py-5 text-white/80 text-center">{music.rewardPerPlay != null ? Number(music.rewardPerPlay).toLocaleString() : '-'}</td>
                     <td className="px-8 py-5 text-center">

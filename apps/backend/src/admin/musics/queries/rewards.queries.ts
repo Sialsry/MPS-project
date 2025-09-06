@@ -8,11 +8,12 @@ export function buildMusicRewardsSummaryQuery(params: {
   search?: string
   categoryId?: number
   grade?: number
+  musicType?: boolean // true: Inst, false: 일반
   offset: number
   limit: number
   orderBySql: SQL
 }) {
-  const { year, month, search, categoryId, grade, offset, limit, orderBySql } = params
+  const { year, month, search, categoryId, grade, musicType, offset, limit, orderBySql } = params
 
   const ym = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}`
 
@@ -39,21 +40,14 @@ SELECT
   m.artist,
   mc.name AS category,
   m.grade_required AS grade,
+  m.inst AS music_type,
   COALESCE(p.valid_plays, 0) AS valid_plays,
   COALESCE(p.earned, 0) AS earned,
   COALESCE(p.companies_using, 0) AS companies_using,
   to_char(p.last_used_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD') AS last_used_at,
   mmr.total_reward_count AS monthly_limit,
   mmr.remaining_reward_count AS monthly_remaining,
-  mmr.reward_per_play AS reward_per_play,
-  CASE
-    WHEN mmr.total_reward_count IS NULL OR mmr.total_reward_count <= 0 THEN NULL
-    ELSE LEAST(COALESCE(p.valid_plays, 0), mmr.total_reward_count)
-  END AS used_count,
-  CASE
-    WHEN mmr.total_reward_count IS NULL OR mmr.total_reward_count <= 0 THEN NULL
-    ELSE ROUND((LEAST(COALESCE(p.valid_plays, 0), mmr.total_reward_count))::numeric / NULLIF(mmr.total_reward_count, 0)::numeric * 100)
-  END AS usage_rate
+  mmr.reward_per_play AS reward_per_play
 FROM musics m
 LEFT JOIN plays p ON p.music_id = m.id
 LEFT JOIN music_categories mc ON mc.id = m.category_id
@@ -62,6 +56,7 @@ WHERE 1=1
 ${search ? sql` AND (m.title ILIKE '%' || ${search} || '%' OR m.artist ILIKE '%' || ${search} || '%')` : sql``}
 ${typeof categoryId === 'number' && Number.isFinite(categoryId) ? sql` AND m.category_id = ${categoryId}` : sql``}
 ${typeof grade === 'number' ? sql` AND m.grade_required = ${grade}` : sql``}
+${typeof musicType === 'boolean' ? (musicType ? sql` AND m.inst = true` : sql` AND m.inst = false`) : sql``}
 ORDER BY ${orderBySql}
 OFFSET ${offset} LIMIT ${limit}
   `
@@ -75,8 +70,9 @@ export function buildMusicRewardsSummaryCountQuery(params: {
   search?: string
   categoryId?: number
   grade?: number
+  musicType?: boolean
 }) {
-  const { year, month, search, categoryId, grade } = params
+  const { year, month, search, categoryId, grade, musicType } = params
   const q = sql`
 WITH month_range AS (
   SELECT
@@ -90,6 +86,7 @@ WHERE 1=1
 ${search ? sql` AND (m.title ILIKE '%' || ${search} || '%' OR m.artist ILIKE '%' || ${search} || '%')` : sql``}
 ${typeof categoryId === 'number' && Number.isFinite(categoryId) ? sql` AND m.category_id = ${categoryId}` : sql``}
 ${typeof grade === 'number' ? sql` AND m.grade_required = ${grade}` : sql``}
+${typeof musicType === 'boolean' ? (musicType ? sql` AND m.inst = true` : sql` AND m.inst = false`) : sql``}
   `
   return q
 } 

@@ -637,8 +637,8 @@ export default function MusicsPage() {
                   >
                   <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
                     <div onClick={(e) => e.stopPropagation()}>
-                      <input 
-                        type="checkbox" 
+                    <input 
+                      type="checkbox" 
                           checked={selectedItems.has(typeof item.id === 'string' ? parseInt(item.id) : item.id)}
                                                   onChange={(e) => {
                           e.stopPropagation()
@@ -647,8 +647,8 @@ export default function MusicsPage() {
                         onClick={(e) => {
                           e.stopPropagation()
                         }}
-                        className="accent-teal-400 rounded" 
-                      />
+                      className="accent-teal-400 rounded" 
+                    />
                     </div>
                   </td>
 

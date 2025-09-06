@@ -8,7 +8,7 @@ import { CompanyModule } from './admin/company/company.module';
 
 @Module({
   imports: [DbModule, AuthModule, MusicsModule, CompanyModule],
-  controllers: [AppController],  
-  providers: [AppService],    
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

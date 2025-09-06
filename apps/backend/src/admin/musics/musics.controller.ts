@@ -12,6 +12,7 @@ import { UpdateRewardDto } from './dto/update-reward.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { MusicRewardsSummaryQueryDto } from './dto/music-rewards-summary.dto';
 import { ValidationPipe } from '@nestjs/common';
+import { MusicRewardsTrendQueryDto } from './dto/music-rewards-trend.dto';
 
 @Controller('/admin/musics')
 export class MusicsController {
@@ -30,6 +31,14 @@ export class MusicsController {
   @Get('rewards/summary')
   async getRewardsSummary(@Query(new ValidationPipe({ transform: true })) query: MusicRewardsSummaryQueryDto) {
     return this.musicsService.getRewardsSummary(query);
+  }
+
+  @Get(':id/rewards/trend')
+  async getRewardsTrend(
+    @Param('id') id: string,
+    @Query(new ValidationPipe({ transform: true })) query: MusicRewardsTrendQueryDto,
+  ) {
+    return this.musicsService.getRewardsTrend(+id, query);
   }
 
   @Post('categories')
