@@ -4,6 +4,7 @@ import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { RewardsSummaryQueryDto } from './dto/rewards-summary.query.dto';
 import { RewardsDetailQueryDto } from './dto/rewards-detail.query.dto';
+import { CompanyTotalStatsQueryDto } from './dto/company-stats.dto';
 
 @Controller('/admin/companies')
 export class CompanyController {
@@ -47,5 +48,10 @@ export class CompanyController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.companyService.remove(+id);
+  }
+
+  @Get('stats/total')
+  async getCompanyTotal(@Query(new ValidationPipe({ transform: true })) query: CompanyTotalStatsQueryDto) {
+    return this.companyService.getTotalCount(query)
   }
 }

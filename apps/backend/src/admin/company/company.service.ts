@@ -8,6 +8,7 @@ import { getDefaultYearMonthKST, isValidYearMonth, resolveYearMonthKST } from '.
 import { normalizePagination } from '../../common/utils/pagination.util';
 import { normalizeSort } from '../../common/utils/sort.util';
 import { buildSummaryQuery, buildDailyQuery, buildByMusicQuery, buildSummaryListBaseQuery, buildDailyIndustryAvgQuery, buildMonthlyCompanyQuery, buildMonthlyIndustryAvgQuery } from './queries/rewards.queries';
+import { CompanyTotalStatsQueryDto, CompanyTotalStatsResponseDto } from './dto/company-stats.dto';
 
 @Injectable()
 export class CompanyService {
@@ -135,5 +136,17 @@ export class CompanyService {
 
   remove(id: number) {
     return `This action removes a #${id} company`;
+  }
+
+  async getTotalCount(query: CompanyTotalStatsQueryDto): Promise<CompanyTotalStatsResponseDto> {
+    const ym = query.yearMonth ?? getDefaultYearMonthKST()
+    const [y, m] = ym.split('-').map(Number)
+    const endTsSql = sql`
+      (make_timestamptz(${y}, ${m}, 1, 0, 0, 0, 'Asia/Seoul') + interval '1 month') - interval '1 second'
+    `
+    const q = sql`SELECT COUNT(*)::int AS total FROM companies c WHERE c.created_at <= ${endTsSql}`
+    const res = await this.db.execute(q as any)
+    const total = Number((res as any).rows?.[0]?.total ?? 0)
+    return { total, asOf: ym }
   }
 }
