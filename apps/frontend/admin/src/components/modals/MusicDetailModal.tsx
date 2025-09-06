@@ -40,6 +40,19 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
   const [lyricsLoading, setLyricsLoading] = useState(false)
   const [musicError, setMusicError] = useState<string | null>(null)
   const [lyricsError, setLyricsError] = useState<string | null>(null)
+  const [companyLoading, setCompanyLoading] = useState(false)
+  const [companyError, setCompanyError] = useState<string | null>(null)
+  const [companyItems, setCompanyItems] = useState<Array<{
+    rank: number
+    companyId: number
+    companyName: string
+    tier: 'Free' | 'Standard' | 'Business'
+    monthlyEarned: number
+    monthlyPlays: number
+  }> | null>(null)
+  const [companyTotal, setCompanyTotal] = useState(0)
+  const [companyPage] = useState(1)
+  const [companyLimit] = useState(1000)
   const [monthlyLoading, setMonthlyLoading] = useState(false)
   const [monthlyError, setMonthlyError] = useState<string | null>(null)
   const [monthlyItems, setMonthlyItems] = useState<Array<{
@@ -140,6 +153,46 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
     fetchTrend('lyrics', lyricsGranularity)
     return () => { aborted = true }
   }, [open, music?.id, musicGranularity, lyricsGranularity])
+
+  // 사용 기업 현황 API 페칭
+  useEffect(() => {
+    if (!open || !music || activeTab !== 'rewards') return
+    let aborted = false
+    const fetchCompanies = async () => {
+      try {
+        setCompanyLoading(true)
+        setCompanyError(null)
+        const params = new URLSearchParams()
+        params.set('yearMonth', defaultYearMonth)
+        params.set('page', '1')
+        params.set('limit', '1000')
+        const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${music.id}/rewards/companies?` + params.toString()
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        if (aborted) return
+        const items = Array.isArray(data.items) ? data.items.map((it: any) => ({
+          rank: Number(it.rank ?? 0),
+          companyId: Number(it.companyId ?? it.company_id ?? 0),
+          companyName: String(it.companyName ?? it.company_name ?? ''),
+          tier: (it.tier ?? 'Free') as any,
+          monthlyEarned: Number(it.monthlyEarned ?? it.monthly_earned ?? 0),
+          monthlyPlays: Number(it.monthlyPlays ?? it.monthly_plays ?? 0),
+        })) : []
+        setCompanyItems(items)
+        setCompanyTotal(Number(data.total ?? 0))
+      } catch (e: any) {
+        if (aborted) return
+        setCompanyError(e.message || '조회 실패')
+        setCompanyItems([])
+        setCompanyTotal(0)
+      } finally {
+        if (!aborted) setCompanyLoading(false)
+      }
+    }
+    fetchCompanies()
+    return () => { aborted = true }
+  }, [open, music?.id, activeTab, defaultYearMonth])
 
   const rewardsData = {
     labels: months,
@@ -430,80 +483,55 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                       <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
                       월별 사용 기업 현황
                     </h3>
-                    <select 
-                      className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-teal-400/50 transition-colors"
-                      onChange={(e) => {
-                        // 월별 필터링 로직 (필요시 구현)
-                      }}
-                    >
-                      <option value="all">전체 기간</option>
-                      {months.map((month, index) => (
-                        <option key={month} value={index}>{month}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white/60 text-sm">{defaultYearMonth}</span>
+                    </div>
                   </div>
                   
                   {/* 선택된 월의 모든 사용 기업 테이블 */}
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="text-center">
-                        <tr className="border-b border-white/10">
-                          <th className="px-4 py-3 text-white/80 font-medium text-center">순위</th>
-                          <th className="px-4 py-3 text-white/80 font-medium text-center">기업명</th>
-                          <th className="px-4 py-3 text-white/80 font-medium text-center">등급</th>
-                          <th className="px-4 py-3 text-white/80 font-medium text-center">월 리워드 적립</th>
-                          <th className="px-4 py-3 text-white/80 font-medium text-center">전월 대비</th>
-                          <th className="px-4 py-3 text-white/80 font-medium text-center">전체 리워드 대비</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {music.topCompanies.map((company, index) => {
-                          const monthlyReward = Math.floor(company.usage * music.rewardPerPlay * 1000) / 1000
-                          const prevMonthReward = Math.floor(company.usage * music.rewardPerPlay * 0.8 * 1000) / 1000
-                          const rewardChange = monthlyReward - prevMonthReward
-                          const rewardChangePercent = Math.round((rewardChange / (prevMonthReward || 1)) * 100)
-                          const totalMonthlyReward = music.topCompanies.reduce((sum, c) => 
-                            sum + Math.floor(c.usage * music.rewardPerPlay * 1000) / 1000, 0
-                          )
-                          const rewardShare = totalMonthlyReward > 0 ? Math.round((monthlyReward / totalMonthlyReward) * 100) : 0
-                          return (
-                            <tr key={company.name} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    {companyLoading ? (
+                      <div className="py-10 text-center text-white/60">로딩중...</div>
+                    ) : companyError ? (
+                      <div className="py-10 text-center text-red-400">{companyError}</div>
+                    ) : companyItems && companyItems.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <thead className="text-center">
+                          <tr className="border-b border-white/10">
+                            <th className="px-4 py-3 text-white/80 font-medium text-center">순위</th>
+                            <th className="px-4 py-3 text-white/80 font-medium text-center">기업명</th>
+                            <th className="px-4 py-3 text-white/80 font-medium text-center">등급</th>
+                            <th className="px-4 py-3 text-white/80 font-medium text-center">월 리워드 적립</th>
+                            <th className="px-4 py-3 text-white/80 font-medium text-center">유효 재생수</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {companyItems.map((item) => (
+                            <tr key={`${item.companyId}`} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                               <td className="px-4 py-3 text-center">
-                                <span className={`text-sm font-bold ${index < 3 ? 'text-teal-400' : 'text-white'}`}>{index + 1}</span>
+                                <span className={`text-sm font-bold ${item.rank <= 3 ? 'text-teal-400' : 'text-white'}`}>{item.rank}</span>
                               </td>
-                              <td className="px-4 py-3 font-medium text-white text-center">{company.name}</td>
+                              <td className="px-4 py-3 font-medium text-white text-center">{item.companyName}</td>
                               <td className="px-4 py-3 text-center">
                                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                  company.tier === 'Business' ? 'bg-gradient-to-r from-purple-400/15 to-purple-500/15 text-purple-300 border border-purple-400/25' :
-                                  company.tier === 'Standard' ? 'bg-gradient-to-r from-blue-400/15 to-blue-500/15 text-blue-300 border border-blue-400/25' :
+                                  item.tier === 'Business' ? 'bg-gradient-to-r from-purple-400/15 to-purple-500/15 text-purple-300 border border-purple-400/25' :
+                                  item.tier === 'Standard' ? 'bg-gradient-to-r from-blue-400/15 to-blue-500/15 text-blue-300 border border-blue-400/25' :
                                   'bg-gradient-to-r from-gray-400/15 to-gray-500/15 text-gray-300 border border-gray-400/25'
                                 }`}>
-                                  {company.tier}
+                                  {item.tier}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-teal-400 font-medium text-center">{monthlyReward.toFixed(3)} 토큰</td>
-                              <td className="px-4 py-3 text-center">
-                                <span className="text-xs font-medium text-teal-400">
-                                  {rewardChange > 0 ? '+' : ''}{rewardChange.toFixed(3)} ({rewardChangePercent > 0 ? '+' : ''}{rewardChangePercent}%)
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                <div className="flex items-center justify-center gap-2">
-                                  <div className="w-16 bg-white/10 rounded-full h-1.5">
-                                    <div 
-                                      className="bg-gradient-to-r from-teal-400 to-blue-400 h-1.5 rounded-full transition-all duration-300"
-                                      style={{ width: `${Math.min(rewardShare, 100)}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-white/70 text-xs">{rewardShare}%</span>
-                                </div>
-                              </td>
+                              <td className="px-4 py-3 text-teal-400 font-medium text-center">{item.monthlyEarned.toLocaleString()} 토큰</td>
+                              <td className="px-4 py-3 text-white/80 font-medium text-center">{item.monthlyPlays.toLocaleString()}</td>
                             </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="py-10 text-center text-white/60">데이터가 없습니다</div>
+                    )}
                   </div>
+                  {/* 스크롤 처리로 페이징 제거 */}
                 </div>
               </div>
             )}

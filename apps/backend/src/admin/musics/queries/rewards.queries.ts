@@ -2,6 +2,37 @@ import { SQL, sql } from 'drizzle-orm'
 
 export type MusicRewardsSortKey = 'music_id' | 'title' | 'artist' | 'category' | 'grade' | 'validPlays' | 'earned' | 'companiesUsing' | 'lastUsedAt'
 
+export function buildMusicRewardsOrderSql(sortBy: string, order: 'asc' | 'desc'): SQL {
+  const dir = order === 'desc' ? sql`DESC` : sql`ASC`
+  switch (sortBy) {
+    case 'music_id': return sql`m.id ${dir}`
+    case 'title': return sql`m.title ${dir}`
+    case 'artist': return sql`m.artist ${dir}`
+    case 'category': return sql`mc.name ${dir}`
+    case 'grade': return sql`m.grade_required ${dir}`
+    case 'musicType': return sql`m.inst ${dir}`
+    case 'monthlyLimit': return sql`mmr.total_reward_count ${dir} NULLS LAST`
+    case 'rewardPerPlay': return sql`mmr.reward_per_play ${dir} NULLS LAST`
+    case 'usageRate':
+      return sql`
+        CASE 
+          WHEN mmr.total_reward_count IS NULL OR mmr.total_reward_count <= 0 THEN NULL
+          WHEN mmr.remaining_reward_count IS NOT NULL AND (mmr.total_reward_count - mmr.remaining_reward_count) > 0 THEN 
+            ((mmr.total_reward_count - mmr.remaining_reward_count)::numeric / NULLIF(mmr.total_reward_count, 0)::numeric) * 100
+          WHEN mmr.reward_per_play IS NOT NULL AND mmr.reward_per_play > 0 AND COALESCE(p.earned,0) > 0 THEN
+            (FLOOR(COALESCE(p.earned, 0) / NULLIF(mmr.reward_per_play, 0))::numeric / NULLIF(mmr.total_reward_count, 0)::numeric) * 100
+          ELSE 
+            (LEAST(COALESCE(p.valid_plays, 0), mmr.total_reward_count)::numeric / NULLIF(mmr.total_reward_count, 0)::numeric) * 100
+        END ${dir} NULLS LAST
+      `
+    case 'validPlays': return sql`p.valid_plays ${dir}`
+    case 'earned': return sql`p.earned ${dir}`
+    case 'companiesUsing': return sql`p.companies_using ${dir}`
+    case 'lastUsedAt': return sql`p.last_used_at ${dir} NULLS LAST`
+    default: return sql`p.earned DESC, p.valid_plays DESC`
+  }
+}
+
 export function buildMusicRewardsSummaryQuery(params: {
   year: number
   month: number

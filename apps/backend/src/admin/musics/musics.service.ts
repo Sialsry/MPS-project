@@ -17,10 +17,11 @@ import { normalizeSort } from '../../common/utils/sort.util';
 import { MusicRewardsSummaryQueryDto, MusicRewardsSummaryResponseDto } from './dto/music-rewards-summary.dto';
 import { MusicRewardsTrendQueryDto, MusicRewardsTrendResponseDto } from './dto/music-rewards-trend.dto';
 import { MusicMonthlyRewardsQueryDto, MusicMonthlyRewardsResponseDto } from './dto/music-monthly-rewards.dto';
-import { buildMusicRewardsSummaryQuery, buildMusicRewardsSummaryCountQuery } from './queries/rewards.queries';
+import { buildMusicRewardsSummaryQuery, buildMusicRewardsSummaryCountQuery, buildMusicRewardsOrderSql } from './queries/rewards.queries';
 import { buildFindAllQuery, buildFindOneQuery, buildUpsertNextMonthRewardsQuery, buildCleanupOrphanCategoriesQuery } from './queries/musics.queries';
 import { buildMusicTrendDailyQuery, buildMusicTrendMonthlyQuery } from './queries/trend.queries';
 import { buildMusicMonthlyRewardsQuery } from './queries/monthly.queries';
+import { buildMusicCompanyUsageListQuery, buildMusicCompanyUsageCountQuery } from './queries/company-usage.queries';
 
 @Injectable()
 export class MusicsService implements OnModuleInit {
@@ -114,37 +115,7 @@ export class MusicsService implements OnModuleInit {
     const sortAllow = ['music_id','title','artist','category','grade','musicType','monthlyLimit','rewardPerPlay','usageRate','validPlays','earned','companiesUsing','lastUsedAt']
     const { sortBy, order } = normalizeSort(query.sortBy, query.order, sortAllow)
 
-    // order by SQL 안전 매핑
-    const orderSql: SQL = (() => {
-      const dir = order === 'desc' ? sql`DESC` : sql`ASC`
-      switch (sortBy) {
-        case 'music_id': return sql`m.id ${dir}`
-        case 'title': return sql`m.title ${dir}`
-        case 'artist': return sql`m.artist ${dir}`
-        case 'category': return sql`mc.name ${dir}`
-        case 'grade': return sql`m.grade_required ${dir}`
-        case 'musicType': return sql`m.inst ${dir}`
-        case 'monthlyLimit': return sql`mmr.total_reward_count ${dir} NULLS LAST`
-        case 'rewardPerPlay': return sql`mmr.reward_per_play ${dir} NULLS LAST`
-        case 'usageRate':
-          return sql`
-            CASE 
-              WHEN mmr.total_reward_count IS NULL OR mmr.total_reward_count <= 0 THEN NULL
-              WHEN mmr.remaining_reward_count IS NOT NULL AND (mmr.total_reward_count - mmr.remaining_reward_count) > 0 THEN 
-                ((mmr.total_reward_count - mmr.remaining_reward_count)::numeric / NULLIF(mmr.total_reward_count, 0)::numeric) * 100
-              WHEN mmr.reward_per_play IS NOT NULL AND mmr.reward_per_play > 0 AND COALESCE(earned,0) > 0 THEN
-                (FLOOR(COALESCE(earned, 0) / NULLIF(mmr.reward_per_play, 0))::numeric / NULLIF(mmr.total_reward_count, 0)::numeric) * 100
-              ELSE 
-                (LEAST(COALESCE(valid_plays, 0), mmr.total_reward_count)::numeric / NULLIF(mmr.total_reward_count, 0)::numeric) * 100
-            END ${dir} NULLS LAST
-          `
-        case 'validPlays': return sql`valid_plays ${dir}`
-        case 'earned': return sql`earned ${dir}`
-        case 'companiesUsing': return sql`companies_using ${dir}`
-        case 'lastUsedAt': return sql`last_used_at ${dir} NULLS LAST`
-        default: return sql`earned DESC, valid_plays DESC`
-      }
-    })()
+    const orderSql: SQL = buildMusicRewardsOrderSql(sortBy, order)
 
     const musicTypeBool = query.musicType === 'inst' ? true : query.musicType === 'normal' ? false : undefined
 
@@ -537,6 +508,27 @@ export class MusicsService implements OnModuleInit {
         meta: { granularity: 'monthly', type: query.type, segment, months },
       }
     }
+  }
+
+  async getCompanyUsage(musicId: number, query: any) {
+    const ym = resolveYearMonthKST(query.yearMonth)
+    const [y, m] = ym.split('-').map(Number)
+    const { page = 1, limit = 20, search } = query
+    const { offset, page: p, limit: l } = normalizePagination(page, limit, 100)
+
+    const listSql = buildMusicCompanyUsageListQuery({ musicId, year: y, month: m, search, limit: l, offset })
+    const countSql = buildMusicCompanyUsageCountQuery({ musicId, year: y, month: m, search })
+    const [listRes, countRes] = await Promise.all([this.db.execute(listSql), this.db.execute(countSql)])
+    const items = (listRes.rows || []).map((r: any, idx: number) => ({
+      rank: offset + idx + 1,
+      companyId: Number(r.company_id),
+      companyName: r.company_name,
+      tier: (String(r.grade || '')[0].toUpperCase() + String(r.grade || '').slice(1)) as 'Free' | 'Standard' | 'Business',
+      monthlyEarned: Number(r.monthly_earned || 0),
+      monthlyPlays: Number(r.monthly_plays || 0),
+    }))
+    const total = Number((countRes.rows?.[0] as any)?.total || 0)
+    return { yearMonth: ym, total, page: p, limit: l, items }
   }
 
   private sanitizeFilename(name: string): string {

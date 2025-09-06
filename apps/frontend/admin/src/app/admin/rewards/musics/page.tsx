@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react'
 import MusicDetailModal from '@/components/modals/MusicDetailModal'
-import RewardEditModal from '@/components/modals/RewardEditModal'
 import BulkRewardEditModal from '@/components/modals/BulkRewardEditModal'
 
 type MusicRow = {
@@ -59,8 +58,7 @@ export default function RewardsMusicsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedMusic, setSelectedMusic] = useState<MusicRow | null>(null)
-  const [rewardEditModalOpen, setRewardEditModalOpen] = useState(false)
-  const [selectedMusicForEdit, setSelectedMusicForEdit] = useState<any | null>(null)
+  
   const [selectedMusics, setSelectedMusics] = useState<string[]>([])
   const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
@@ -500,16 +498,7 @@ export default function RewardsMusicsPage() {
                         >
                           상세
                         </button>
-                        <button 
-                          className="rounded-md bg-white/10 px-2.5 py-1.5 text-xs text-white font-medium hover:bg-white/20 transition-all duration-200"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedMusicForEdit(music)
-                            setRewardEditModalOpen(true)
-                          }}
-                        >
-                          리워드 수정
-                        </button>
+                        
                       </div>
                     </td>
                   </tr>
@@ -596,18 +585,7 @@ export default function RewardsMusicsPage() {
         />
       )}
 
-      {/* 리워드 수정 모달 */}
-      {selectedMusicForEdit && (
-        <RewardEditModal
-          open={rewardEditModalOpen}
-          onClose={() => {
-            setRewardEditModalOpen(false)
-            setSelectedMusicForEdit(null)
-          }}
-          music={selectedMusicForEdit}
-        />
-      )}
-
+      
       {/* 일괄 수정 모달 */}
       <BulkRewardEditModal
         open={bulkEditModalOpen}
