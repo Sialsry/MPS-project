@@ -5,6 +5,7 @@ import { UpdateCompanyDto } from './dto/update-company.dto';
 import { RewardsSummaryQueryDto } from './dto/rewards-summary.query.dto';
 import { RewardsDetailQueryDto } from './dto/rewards-detail.query.dto';
 import { CompanyTotalStatsQueryDto } from './dto/company-stats.dto';
+import { RenewalStatsQueryDto } from './dto/renewal-stats.dto';
 
 @Controller('/admin/companies')
 export class CompanyController {
@@ -25,6 +26,16 @@ export class CompanyController {
     @Query(new ValidationPipe({ transform: true, whitelist: true })) query: RewardsSummaryQueryDto,
   ) {
     return this.companyService.getRewardsSummary(query);
+  }
+
+  @Get('stats/total')
+  async getCompanyTotal(@Query(new ValidationPipe({ transform: true })) query: CompanyTotalStatsQueryDto) {
+    return this.companyService.getTotalCount(query)
+  }
+
+  @Get('stats/renewal')
+  async getRenewalStats(@Query(new ValidationPipe({ transform: true })) query: RenewalStatsQueryDto) {
+    return this.companyService.getRenewalStats(query)
   }
 
   @Get(':id/rewards/detail')
@@ -50,8 +61,4 @@ export class CompanyController {
     return this.companyService.remove(+id);
   }
 
-  @Get('stats/total')
-  async getCompanyTotal(@Query(new ValidationPipe({ transform: true })) query: CompanyTotalStatsQueryDto) {
-    return this.companyService.getTotalCount(query)
-  }
 }

@@ -17,6 +17,9 @@ import PieTierDistribution from '@/components/charts/PieTierDistribution'
 export default function DashboardPage() {
   const [hourlyData, setHourlyData] = useState<any[]>([])
   const [lastUpdated, setLastUpdated] = useState<string>('')
+  const [topTracks, setTopTracks] = useState<Array<{ rank: number; validPlays: number; totalPlays: number }>>(
+    Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, validPlays: 0, totalPlays: 0 }))
+  )
 
   useEffect(() => {
     // 시간별 사용량 데이터 (유효재생/총재생 구분)
@@ -81,6 +84,17 @@ export default function DashboardPage() {
 
     generateHourlyData()
     updateTime()
+
+    // 인기 음원 TOP10 데이터는 클라이언트에서만 랜덤 생성하여 SSR/CSR 불일치 방지
+    const generateTopTracks = () => {
+      const data = Array.from({ length: 10 }, (_, idx) => {
+        const validPlays = Math.floor(Math.random() * 2000 + 800)
+        const totalPlays = Math.floor(validPlays * (1 + Math.random() * 0.3 + 0.1))
+        return { rank: idx + 1, validPlays, totalPlays }
+      })
+      setTopTracks(data)
+    }
+    generateTopTracks()
 
     const interval = setInterval(() => {
       generateHourlyData()
@@ -231,29 +245,21 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="text-sm">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rank) => {
-                    const validPlays = Math.floor(Math.random() * 2000 + 800)
-                    const totalPlays = Math.floor(validPlays * (1 + Math.random() * 0.3 + 0.1)) // 10-40% 추가
-                    const validRate = Math.round((validPlays / totalPlays) * 100)
-                    
+                  {topTracks.map(({ rank, validPlays, totalPlays }) => {
+                    const denom = totalPlays > 0 ? totalPlays : 1
+                    const validRate = Math.round((validPlays / denom) * 100)
                     return (
-                    <tr key={rank} className="border-b border-white/5">
-                      <td className={`py-2 px-3 font-medium ${
-                        rank <= 3 ? 'text-teal-300' : 'text-white/60'
-                      }`}>{rank}</td>
-                      <td className="py-2 px-3 text-white/80">Track Title {rank}</td>
-                      <td className="py-2 px-3 text-white/60">
+                      <tr key={rank} className="border-b border-white/5">
+                        <td className={`py-2 px-3 font-medium ${rank <= 3 ? 'text-teal-300' : 'text-white/60'}`}>{rank}</td>
+                        <td className="py-2 px-3 text-white/80">Track Title {rank}</td>
+                        <td className="py-2 px-3 text-white/60">
                           <div className="flex items-center gap-2">
                             <span>{validPlays.toLocaleString()}회</span>
-                            <span className="text-xs text-white/50">
-                              ({validRate}%)
-                            </span>
+                            <span className="text-xs text-white/50">({validRate}%)</span>
                           </div>
-                          <div className="text-xs text-white/40">
-                            총 {totalPlays.toLocaleString()}회
-                          </div>
-                      </td>
-                    </tr>
+                          <div className="text-xs text-white/40">총 {totalPlays.toLocaleString()}회</div>
+                        </td>
+                      </tr>
                     )
                   })}
                 </tbody>

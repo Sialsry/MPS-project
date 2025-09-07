@@ -9,6 +9,7 @@ import { normalizePagination } from '../../common/utils/pagination.util';
 import { normalizeSort } from '../../common/utils/sort.util';
 import { buildSummaryQuery, buildDailyQuery, buildByMusicQuery, buildSummaryListBaseQuery, buildDailyIndustryAvgQuery, buildMonthlyCompanyQuery, buildMonthlyIndustryAvgQuery } from './queries/rewards.queries';
 import { CompanyTotalStatsQueryDto, CompanyTotalStatsResponseDto } from './dto/company-stats.dto';
+import { RenewalStatsQueryDto, RenewalStatsResponseDto } from './dto/renewal-stats.dto';
 
 @Injectable()
 export class CompanyService {
@@ -148,5 +149,45 @@ export class CompanyService {
     const res = await this.db.execute(q as any)
     const total = Number((res as any).rows?.[0]?.total ?? 0)
     return { total, asOf: ym }
+  }
+
+  async getRenewalStats(query: RenewalStatsQueryDto): Promise<RenewalStatsResponseDto> {
+    const tz = 'Asia/Seoul'
+    const ym = resolveYearMonthKST(query.yearMonth)
+    const [y, m] = ym.split('-').map(Number)
+    const prevY = m === 1 ? y - 1 : y
+    const prevM = m === 1 ? 12 : (m - 1)
+
+    const q = sql`
+      WITH cur AS (
+        SELECT cs.company_id
+        FROM company_subscriptions cs
+        WHERE cs.start_date < (make_timestamptz(${y}, ${m}, 1, 0, 0, 0, ${tz}) + interval '1 month')
+          AND cs.end_date >= make_timestamptz(${y}, ${m}, 1, 0, 0, 0, ${tz})
+        GROUP BY cs.company_id
+      ),
+      prev AS (
+        SELECT cs.company_id
+        FROM company_subscriptions cs
+        WHERE cs.start_date < (make_timestamptz(${prevY}, ${prevM}, 1, 0, 0, 0, ${tz}) + interval '1 month')
+          AND cs.end_date >= make_timestamptz(${prevY}, ${prevM}, 1, 0, 0, 0, ${tz})
+        GROUP BY cs.company_id
+      )
+      SELECT 
+        (SELECT COUNT(*) FROM prev) AS prev_active,
+        (SELECT COUNT(*) FROM cur) AS curr_active,
+        (SELECT COUNT(*) FROM prev p INNER JOIN cur c ON c.company_id = p.company_id) AS retained,
+        (SELECT COUNT(*) FROM prev p LEFT JOIN cur c ON c.company_id = p.company_id WHERE c.company_id IS NULL) AS churned,
+        (SELECT COUNT(*) FROM cur c LEFT JOIN prev p ON p.company_id = c.company_id WHERE p.company_id IS NULL) AS reactivated
+    `
+    const res = await this.db.execute(q as any)
+    const row = (res as any).rows?.[0] || {}
+    const prevActive = Number(row.prev_active || 0)
+    const currActive = Number(row.curr_active || 0)
+    const retained = Number(row.retained || 0)
+    const churned = Number(row.churned || 0)
+    const reactivated = Number(row.reactivated || 0)
+    const rate = prevActive > 0 ? Math.round((retained / prevActive) * 100) : null
+    return { asOf: ym, prevActive, currActive, retained, churned, reactivated, rate }
   }
 }
