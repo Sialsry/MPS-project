@@ -14,9 +14,11 @@ export const music_plays = pgTable('music_plays', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   transaction_hash: text('transaction_hash'),
+  // api_latency: integer('api_latency'),
   reward_code: rewardCodeEnum('reward_code').notNull(),
   use_case: useCaseEnum('use_case').notNull(),
   use_price: numeric('use_price').default('0'), // 실제 청구 비용
+  // played_at: timestamp('played_at', { withTimezone: true }).defaultNow(),
   is_valid_play: boolean('is_valid_play').default(false), // 60초 이상 = true
   play_duration_sec: integer('play_duration_sec'), // 실제 재생 시간
 })

@@ -16,7 +16,7 @@ export const musics = pgTable('musics', {
   music_arranger: text('music_arranger'),
   lyricist: text('lyricist'),
   lyrics_text: text('lyrics_text'),
-  lyrics_file_path: text('lyrics_file_path'),
+  lyrics_file_path: text('lyrics_file_path'), // 가사 파일 경로 (기존 lyrics_file에서 변경)
   inst: boolean('inst').notNull().default(false), // true: instrumental, false: with vocal. 가사가 없으면 true
   isrc: text('isrc'),
   duration_sec: integer('duration_sec'),
@@ -28,10 +28,10 @@ export const musics = pgTable('musics', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   category_id: integer('category_id'),
-  grade: integer('grade_required').notNull().default(0), // 0: 무료 음원, 1: 유료 음원이면서 리워드가 있는 음원, 2: 유료 음원이면서 리워드가 없는 음원
+  grade: integer('grade_required').notNull().default(0), // 0: free, standard, business | 1: standard, business (리워드 있음) | 2: standard, business (리워드 없음)
   total_valid_play_count: bigint('valid_play_count', { mode: 'number' }).default(0),
   total_play_count: bigint('total_play_count', { mode: 'number' }).default(0),
-  total_rewarded_amount: numeric('total_rewarded_amount').default('0'),
+  total_rewarded_amount: numeric('total_rewarded_amount').default('0'), // 누적 지급된 리워드 금액
   total_revenue: numeric('total_revenue').default('0'),
   file_size_bytes: bigint('file_size_bytes', { mode: 'number' }),
   last_played_at: timestamp('last_played_at', { withTimezone: true }),

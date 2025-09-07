@@ -3,9 +3,11 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DbModule } from './db/db.module';
 import { MusicModule } from './music/music.module';
+import { RecordModule } from './record/record.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
 
 @Module({
-  imports: [DbModule, MusicModule],
+  imports: [DbModule, MusicModule, RecordModule, SchedulerModule],
   controllers: [AppController],
   providers: [AppService],
 })
