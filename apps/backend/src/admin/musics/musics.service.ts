@@ -28,7 +28,8 @@ import { RevenueForecastQueryDto, RevenueForecastResponseDto } from './dto/reven
 import { buildMonthRangeCTE, resolveYearMonthKST as resolveYM, isCurrentYM } from '../../common/utils/date.util';
 import { RewardsFilledStatsQueryDto, RewardsFilledStatsResponseDto } from './dto/rewards-filled-stats.dto';
 import { CategoryTop5QueryDto, CategoryTop5ResponseDto, CategoryTop5ItemDto } from './dto/category-top5.dto';
-import { buildCategoryTop5Query } from './queries/stats.queries';
+import { RealtimeApiStatusQueryDto, RealtimeApiStatusResponseDto, RealtimeApiStatusItemDto, RealtimeTopTracksQueryDto, RealtimeTopTracksResponseDto, RealtimeTopTracksItemDto, RealtimeTransactionsQueryDto, RealtimeTransactionsResponseDto, RealtimeTransactionsItemDto } from './dto/realtime.dto';
+import { buildCategoryTop5Query, buildRealtimeApiStatusQuery, buildRealtimeTopTracksQuery, buildRealtimeTransactionsQuery } from './queries/stats.queries';
 
 @Injectable()
 export class MusicsService implements OnModuleInit {
@@ -668,6 +669,56 @@ export class MusicsService implements OnModuleInit {
     }))
 
     return { yearMonth: ym, items }
+  }
+
+  async getRealtimeApiStatus(query: RealtimeApiStatusQueryDto): Promise<RealtimeApiStatusResponseDto> {
+    const limit = Math.min(Math.max(query.limit ?? 5, 1), 20)
+    const q = buildRealtimeApiStatusQuery(limit)
+    const res = await this.db.execute(q)
+    const rows = (res.rows || []) as any[]
+    
+    const items: RealtimeApiStatusItemDto[] = rows.map((r: any) => ({
+      status: r.status === 'success' ? 'success' : 'error',
+      endpoint: r.endpoint || '/api/unknown',
+      company: r.company || 'Unknown',
+      timestamp: r.timestamp || '00:00:00',
+    }))
+
+    return { items }
+  }
+
+  async getRealtimeTopTracks(query: RealtimeTopTracksQueryDto): Promise<RealtimeTopTracksResponseDto> {
+    const limit = Math.min(Math.max(query.limit ?? 10, 1), 50)
+    const q = buildRealtimeTopTracksQuery(limit)
+    const res = await this.db.execute(q)
+    const rows = (res.rows || []) as any[]
+    
+    const items: RealtimeTopTracksItemDto[] = rows.map((r: any) => ({
+      rank: Number(r.rank || 0),
+      title: r.title || 'Unknown Track',
+      validPlays: Number(r.valid_plays || 0),
+      totalPlays: Number(r.total_plays || 0),
+      validRate: Number(r.valid_rate || 0),
+    }))
+
+    return { items }
+  }
+
+  async getRealtimeTransactions(query: RealtimeTransactionsQueryDto): Promise<RealtimeTransactionsResponseDto> {
+    const limit = Math.min(Math.max(query.limit ?? 3, 1), 10)
+    const q = buildRealtimeTransactionsQuery(limit)
+    const res = await this.db.execute(q)
+    const rows = (res.rows || []) as any[]
+    
+    const items: RealtimeTransactionsItemDto[] = rows.map((r: any) => ({
+      timestamp: r.timestamp || '00:00:00',
+      status: r.status === 'success' ? 'success' : r.status === 'pending' ? 'pending' : 'failed',
+      processedCount: r.processed_count || '0/0',
+      gasFee: r.gas_fee || '0.000 ETH',
+      hash: r.hash || '0x0000...0000',
+    }))
+
+    return { items }
   }
 
   private sanitizeFilename(name: string): string {

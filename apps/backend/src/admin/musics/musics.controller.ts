@@ -20,6 +20,7 @@ import { PlaysValidStatsQueryDto } from './dto/plays-valid-stats.dto';
 import { RevenueForecastQueryDto } from './dto/revenue-forecast.dto';
 import { RewardsFilledStatsQueryDto } from './dto/rewards-filled-stats.dto';
 import { CategoryTop5QueryDto } from './dto/category-top5.dto';
+import { RealtimeApiStatusQueryDto, RealtimeTopTracksQueryDto, RealtimeTransactionsQueryDto } from './dto/realtime.dto';
 
 @Controller('/admin/musics')
 export class MusicsController {
@@ -87,6 +88,21 @@ export class MusicsController {
   @Get('stats/category-top5')
   async getCategoryTop5(@Query(new ValidationPipe({ transform: true })) query: CategoryTop5QueryDto) {
     return this.musicsService.getCategoryTop5(query);
+  }
+
+  @Get('realtime/api-status')
+  async getRealtimeApiStatus(@Query(new ValidationPipe({ transform: true })) query: RealtimeApiStatusQueryDto) {
+    return this.musicsService.getRealtimeApiStatus(query);
+  }
+
+  @Get('realtime/top-tracks')
+  async getRealtimeTopTracks(@Query(new ValidationPipe({ transform: true })) query: RealtimeTopTracksQueryDto) {
+    return this.musicsService.getRealtimeTopTracks(query);
+  }
+
+  @Get('realtime/transactions')
+  async getRealtimeTransactions(@Query(new ValidationPipe({ transform: true })) query: RealtimeTransactionsQueryDto) {
+    return this.musicsService.getRealtimeTransactions(query);
   }
 
   @Post('categories')

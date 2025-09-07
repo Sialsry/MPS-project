@@ -31,3 +31,81 @@ export const buildCategoryTop5Query = (ymYear: number, ymMonth: number, tz: stri
   WHERE rank <= ${limit}
   ORDER BY rank ASC
 `
+
+export const buildRealtimeApiStatusQuery = (limit: number = 5) => sql`
+  WITH recent_plays AS (
+    SELECT 
+      mp.created_at,
+      CASE WHEN mp.is_valid_play THEN 'success' ELSE 'error' END AS status,
+      CASE 
+        WHEN mp.use_case = '0' THEN '/api/music/play'
+        WHEN mp.use_case = '1' THEN '/api/music/play'
+        WHEN mp.use_case = '2' THEN '/api/lyrics/get'
+        ELSE '/api/unknown'
+      END AS endpoint,
+      c.name AS company
+    FROM music_plays mp
+    JOIN companies c ON c.id = mp.using_company_id
+    ORDER BY mp.created_at DESC
+    LIMIT ${limit * 3}
+  )
+  SELECT 
+    status,
+    endpoint,
+    company,
+    to_char(created_at AT TIME ZONE 'Asia/Seoul', 'HH24:MI:SS') AS timestamp
+  FROM recent_plays
+  ORDER BY created_at DESC
+  LIMIT ${limit}
+`
+
+export const buildRealtimeTopTracksQuery = (limit: number = 10) => sql`
+  WITH recent_plays AS (
+    SELECT 
+      m.id,
+      m.title,
+      COUNT(*) FILTER (WHERE mp.is_valid_play = true) AS valid_plays,
+      COUNT(*) AS total_plays
+    FROM music_plays mp
+    JOIN musics m ON m.id = mp.music_id
+    WHERE mp.created_at >= NOW() - interval '24 hours'
+    GROUP BY m.id, m.title
+    ORDER BY valid_plays DESC
+    LIMIT ${limit}
+  )
+  SELECT 
+    ROW_NUMBER() OVER (ORDER BY valid_plays DESC) AS rank,
+    title,
+    valid_plays,
+    total_plays,
+    CASE 
+      WHEN total_plays > 0 THEN ROUND((valid_plays::numeric / total_plays::numeric) * 100)
+      ELSE 0
+    END AS valid_rate
+  FROM recent_plays
+  ORDER BY valid_plays DESC
+`
+
+export const buildRealtimeTransactionsQuery = (limit: number = 3) => sql`
+  WITH mock_tx AS (
+    SELECT 
+      NOW() - (random() * interval '1 hour') AS timestamp,
+      CASE 
+        WHEN random() < 0.8 THEN 'success'
+        WHEN random() < 0.9 THEN 'pending'
+        ELSE 'failed'
+      END AS status,
+      (20 + floor(random() * 15))::text || '/' || (25 + floor(random() * 10))::text AS processed_count,
+      '0.00' || (3 + floor(random() * 3))::text || ' ETH' AS gas_fee,
+      '0x' || substr(md5(random()::text), 1, 8) || '...' || substr(md5(random()::text), 1, 4) AS hash
+    FROM generate_series(1, ${limit})
+  )
+  SELECT 
+    to_char(timestamp AT TIME ZONE 'Asia/Seoul', 'HH24:MI:SS') AS timestamp,
+    status,
+    processed_count,
+    gas_fee,
+    hash
+  FROM mock_tx
+  ORDER BY timestamp DESC
+`

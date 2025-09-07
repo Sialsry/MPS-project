@@ -22,6 +22,9 @@ export default function DashboardPage() {
   const [topTracks, setTopTracks] = useState<Array<{ rank: number; validPlays: number; totalPlays: number }>>(
     Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, validPlays: 0, totalPlays: 0 }))
   )
+  const [realtimeApiStatus, setRealtimeApiStatus] = useState<Array<{ status: string; endpoint: string; company: string; timestamp: string }>>([])
+  const [realtimeTopTracks, setRealtimeTopTracks] = useState<Array<{ rank: number; title: string; validPlays: number; totalPlays: number; validRate: number }>>([])
+  const [realtimeTransactions, setRealtimeTransactions] = useState<Array<{ timestamp: string; status: string; processedCount: string; gasFee: string; hash: string }>>([])
 
   useEffect(() => {
     // 마지막 업데이트 시간
@@ -59,22 +62,59 @@ export default function DashboardPage() {
       }
     }
 
-    fetchHourly()
-    updateTime()
-
-    // 인기 음원 TOP10 데이터는 클라이언트에서만 랜덤 생성하여 SSR/CSR 불일치 방지
-    const generateTopTracks = () => {
-      const data = Array.from({ length: 10 }, (_, idx) => {
-        const validPlays = Math.floor(Math.random() * 2000 + 800)
-        const totalPlays = Math.floor(validPlays * (1 + Math.random() * 0.3 + 0.1))
-        return { rank: idx + 1, validPlays, totalPlays }
-      })
-      setTopTracks(data)
+    const fetchRealtimeData = async () => {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+        console.log('Base URL:', baseUrl)
+        
+        console.log('Fetching realtime data...')
+        const [apiRes, tracksRes, txRes] = await Promise.all([
+          fetch(`${baseUrl}/admin/musics/realtime/api-status`),
+          fetch(`${baseUrl}/admin/musics/realtime/top-tracks`),
+          fetch(`${baseUrl}/admin/musics/realtime/transactions`)
+        ])
+        
+        console.log('API responses:', {
+          apiStatus: apiRes.status,
+          topTracks: tracksRes.status,
+          transactions: txRes.status
+        })
+        
+        if (apiRes.ok) {
+          const apiData = await apiRes.json()
+          console.log('API Status Data:', apiData)
+          setRealtimeApiStatus(apiData.items || [])
+        } else {
+          console.error('API Status failed:', apiRes.status)
+        }
+        
+        if (tracksRes.ok) {
+          const tracksData = await tracksRes.json()
+          console.log('Top Tracks Data:', tracksData)
+          setRealtimeTopTracks(tracksData.items || [])
+        } else {
+          console.error('Top Tracks failed:', tracksRes.status)
+        }
+        
+        if (txRes.ok) {
+          const txData = await txRes.json()
+          console.log('Transactions Data:', txData)
+          setRealtimeTransactions(txData.items || [])
+        } else {
+          console.error('Transactions failed:', txRes.status)
+        }
+      } catch (e) {
+        console.error('실시간 데이터 조회 실패:', e)
+      }
     }
-    generateTopTracks()
+
+    fetchHourly()
+    fetchRealtimeData()
+    updateTime()
 
     const interval = setInterval(() => {
       fetchHourly()
+      fetchRealtimeData()
       updateTime()
     }, 1000)
 
@@ -149,46 +189,22 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="text-sm">
-                  <tr className="border-b border-white/5">
-                    <td className="py-2 px-3">
-                      <div className="h-2 w-2 rounded-full bg-green-400" />
-                    </td>
-                    <td className="py-2 px-3 text-white/80">/api/rewards/claim</td>
-                    <td className="py-2 px-3 text-white/60">MelOn</td>
-                    <td className="py-2 px-3 text-white/40">오전 10:38:13</td>
-                  </tr>
-                  <tr className="border-b border-white/5">
-                    <td className="py-2 px-3">
-                      <div className="h-2 w-2 rounded-full bg-red-400" />
-                    </td>
-                    <td className="py-2 px-3 text-white/80">/api/music/play</td>
-                    <td className="py-2 px-3 text-white/60">Kakao</td>
-                    <td className="py-2 px-3 text-white/40">오전 10:38:11</td>
-                  </tr>
-                  <tr className="border-b border-white/5">
-                    <td className="py-2 px-3">
-                      <div className="h-2 w-2 rounded-full bg-green-400" />
-                    </td>
-                    <td className="py-2 px-3 text-white/80">/api/rewards/claim</td>
-                    <td className="py-2 px-3 text-white/60">MelOn</td>
-                    <td className="py-2 px-3 text-white/40">오전 10:38:09</td>
-                  </tr>
-                  <tr className="border-b border-white/5">
-                    <td className="py-2 px-3">
-                      <div className="h-2 w-2 rounded-full bg-green-400" />
-                    </td>
-                    <td className="py-2 px-3 text-white/80">/api/auth/verify</td>
-                    <td className="py-2 px-3 text-white/60">Kakao</td>
-                    <td className="py-2 px-3 text-white/40">오전 10:38:07</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-3">
-                      <div className="h-2 w-2 rounded-full bg-green-400" />
-                    </td>
-                    <td className="py-2 px-3 text-white/80">/api/music/play</td>
-                    <td className="py-2 px-3 text-white/60">MelOn</td>
-                    <td className="py-2 px-3 text-white/40">오전 10:38:05</td>
-                  </tr>
+                  {realtimeApiStatus.length > 0 ? (
+                    realtimeApiStatus.map((item, idx) => (
+                      <tr key={idx} className="border-b border-white/5">
+                        <td className="py-2 px-3">
+                          <div className={`h-2 w-2 rounded-full ${item.status === 'success' ? 'bg-green-400' : 'bg-red-400'}`} />
+                        </td>
+                        <td className="py-2 px-3 text-white/80">{item.endpoint}</td>
+                        <td className="py-2 px-3 text-white/60">{item.company}</td>
+                        <td className="py-2 px-3 text-white/40">{item.timestamp}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="py-4 px-3 text-center text-white/40">데이터를 불러오는 중...</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -207,13 +223,11 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="text-sm">
-                  {topTracks.map(({ rank, validPlays, totalPlays }) => {
-                    const denom = totalPlays > 0 ? totalPlays : 1
-                    const validRate = Math.round((validPlays / denom) * 100)
-                    return (
+                  {realtimeTopTracks.length > 0 ? (
+                    realtimeTopTracks.map(({ rank, title, validPlays, totalPlays, validRate }) => (
                       <tr key={rank} className="border-b border-white/5">
                         <td className={`py-2 px-3 font-medium ${rank <= 3 ? 'text-teal-300' : 'text-white/60'}`}>{rank}</td>
-                        <td className="py-2 px-3 text-white/80">Track Title {rank}</td>
+                        <td className="py-2 px-3 text-white/80">{title}</td>
                         <td className="py-2 px-3 text-white/60">
                           <div className="flex items-center gap-2">
                             <span>{validPlays.toLocaleString()}회</span>
@@ -222,8 +236,12 @@ export default function DashboardPage() {
                           <div className="text-xs text-white/40">총 {totalPlays.toLocaleString()}회</div>
                         </td>
                       </tr>
-                    )
-                  })}
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={3} className="py-4 px-3 text-center text-white/40">데이터를 불러오는 중...</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -244,33 +262,26 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="text-sm">
-                  <tr className="border-b border-white/5">
-                    <td className="py-2 px-3 text-white/40">오전 10:38:11</td>
-                    <td className="py-2 px-3">
-                      <div className="h-2 w-2 rounded-full bg-green-400" />
-                    </td>
-                    <td className="py-2 px-3 text-white/80">20/22건</td>
-                    <td className="py-2 px-3 text-white/60">0.005 ETH</td>
-                    <td className="py-2 px-3 text-white/40">0x86d70c...b07e</td>
-                  </tr>
-                  <tr className="border-b border-white/5">
-                    <td className="py-2 px-3 text-white/40">오전 10:38:01</td>
-                    <td className="py-2 px-3">
-                      <div className="h-2 w-2 rounded-full bg-green-400" />
-                    </td>
-                    <td className="py-2 px-3 text-white/80">24/33건</td>
-                    <td className="py-2 px-3 text-white/60">0.005 ETH</td>
-                    <td className="py-2 px-3 text-white/40">0x4d253c...5313</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-3 text-white/40">오전 10:37:51</td>
-                    <td className="py-2 px-3">
-                      <div className="h-2 w-2 rounded-full bg-green-400" />
-                    </td>
-                    <td className="py-2 px-3 text-white/80">19/26건</td>
-                    <td className="py-2 px-3 text-white/60">0.003 ETH</td>
-                    <td className="py-2 px-3 text-white/40">0x50fde9...20a7</td>
-                  </tr>
+                  {realtimeTransactions.length > 0 ? (
+                    realtimeTransactions.map((item, idx) => (
+                      <tr key={idx} className="border-b border-white/5">
+                        <td className="py-2 px-3 text-white/40">{item.timestamp}</td>
+                        <td className="py-2 px-3">
+                          <div className={`h-2 w-2 rounded-full ${
+                            item.status === 'success' ? 'bg-green-400' : 
+                            item.status === 'pending' ? 'bg-yellow-400' : 'bg-red-400'
+                          }`} />
+                        </td>
+                        <td className="py-2 px-3 text-white/80">{item.processedCount}건</td>
+                        <td className="py-2 px-3 text-white/60">{item.gasFee}</td>
+                        <td className="py-2 px-3 text-white/40">{item.hash}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="py-4 px-3 text-center text-white/40">데이터를 불러오는 중...</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
