@@ -16,59 +16,14 @@ import PieTierDistribution from '@/components/charts/PieTierDistribution'
 
 export default function DashboardPage() {
   const [hourlyData, setHourlyData] = useState<any[]>([])
+  const [hourlyLoading, setHourlyLoading] = useState(false)
+  const [hourlyError, setHourlyError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<string>('')
   const [topTracks, setTopTracks] = useState<Array<{ rank: number; validPlays: number; totalPlays: number }>>(
     Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, validPlays: 0, totalPlays: 0 }))
   )
 
   useEffect(() => {
-    // 시간별 사용량 데이터 (유효재생/총재생 구분)
-    const generateHourlyData = () => {
-      const now = new Date()
-      const currentHour = now.getHours()
-      const data = Array.from({ length: 24 }, (_, i) => {
-        if (i > currentHour) {
-          return {
-            hour: `${i}시`,
-            free: null,
-            standard: null,
-            business: null
-          }
-        }
-        // 실제 시간대별 패턴 (새벽 낮음, 오후 높음)
-        const baseHour = i
-        const isPeak = baseHour >= 9 && baseHour <= 18
-        const isNight = baseHour >= 22 || baseHour <= 6
-        
-        // 유효재생 데이터 (60초 이상)
-        const freeValid = [150, 200, 180, 160, 140, 120, 100, 80, 120, 180, 220, 280, 320, 380, 420, 400, 380, 360, 340, 320, 300, 280, 260, 240][i] || 200
-        const standardValid = [200, 250, 230, 210, 190, 170, 150, 130, 170, 230, 270, 330, 370, 430, 470, 450, 430, 410, 390, 370, 350, 330, 310, 290][i] || 250
-        const businessValid = [300, 350, 330, 310, 290, 270, 250, 230, 270, 330, 370, 430, 470, 530, 570, 550, 530, 510, 490, 470, 450, 430, 410, 390][i] || 350
-        
-        // 총재생 데이터 (유효재생 + 60초 미만)
-        const freeTotal = Math.floor(freeValid * 1.15) // 15% 추가
-        const standardTotal = Math.floor(standardValid * 1.12) // 12% 추가
-        const businessTotal = Math.floor(businessValid * 1.08) // 8% 추가
-        
-        return {
-          hour: `${i}시`,
-          free: {
-            valid: freeValid,
-            total: freeTotal
-          },
-          standard: {
-            valid: standardValid,
-            total: standardTotal
-          },
-          business: {
-            valid: businessValid,
-            total: businessTotal
-          }
-        }
-      })
-      setHourlyData(data)
-    }
-
     // 마지막 업데이트 시간
     const updateTime = () => {
       const now = new Date()
@@ -81,8 +36,30 @@ export default function DashboardPage() {
       })
       setLastUpdated(s)
     }
+    const fetchHourly = async () => {
+      try {
+        setHourlyLoading(true)
+        setHourlyError(null)
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/companies/stats/hourly-plays`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const j = await res.json()
+        const data = (j.labels || []).map((label: string, i: number) => ({
+          hour: label,
+          free: { valid: j.free?.[i] ?? 0, total: j.free?.[i] ?? 0 },
+          standard: { valid: j.standard?.[i] ?? 0, total: j.standard?.[i] ?? 0 },
+          business: { valid: j.business?.[i] ?? 0, total: j.business?.[i] ?? 0 },
+          prevAvg: j.prevAvg?.[i] ?? 0,
+        }))
+        setHourlyData(data)
+      } catch (e: any) {
+        setHourlyError(e.message || '조회 실패')
+        setHourlyData([])
+      } finally {
+        setHourlyLoading(false)
+      }
+    }
 
-    generateHourlyData()
+    fetchHourly()
     updateTime()
 
     // 인기 음원 TOP10 데이터는 클라이언트에서만 랜덤 생성하여 SSR/CSR 불일치 방지
@@ -97,7 +74,7 @@ export default function DashboardPage() {
     generateTopTracks()
 
     const interval = setInterval(() => {
-      generateHourlyData()
+      fetchHourly()
       updateTime()
     }, 1000)
 
@@ -132,25 +109,10 @@ export default function DashboardPage() {
               <SimpleLineChart 
                 labels={hourlyData.map(d => d.hour)}
                 series={[
-                  {
-                    label: 'Free (유효재생)',
-                    data: hourlyData.map(d => d.free?.valid || 0)
-                  },
-                  {
-                    label: 'Standard (유효재생)',
-                    data: hourlyData.map(d => d.standard?.valid || 0)
-                  },
-                  {
-                    label: 'Business (유효재생)',
-                    data: hourlyData.map(d => d.business?.valid || 0)
-                  },
-                  {
-                    label: '전일 평균 (유효재생)',
-                    data: hourlyData.map(d => {
-                      if (!d.free || !d.standard || !d.business) return 0
-                      return Math.floor((d.free.valid + d.standard.valid + d.business.valid) / 3)
-                    })
-                  }
+                  { label: 'Free (유효재생)', data: hourlyData.map(d => d.free?.valid || 0) },
+                  { label: 'Standard (유효재생)', data: hourlyData.map(d => d.standard?.valid || 0) },
+                  { label: 'Business (유효재생)', data: hourlyData.map(d => d.business?.valid || 0) },
+                  { label: '전일 평균 (유효재생)', data: hourlyData.map(d => d.prevAvg ?? 0) }
                 ]}
               />
             </div>

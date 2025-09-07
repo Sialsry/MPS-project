@@ -8,8 +8,12 @@ import { getDefaultYearMonthKST, isValidYearMonth, resolveYearMonthKST } from '.
 import { normalizePagination } from '../../common/utils/pagination.util';
 import { normalizeSort } from '../../common/utils/sort.util';
 import { buildSummaryQuery, buildDailyQuery, buildByMusicQuery, buildSummaryListBaseQuery, buildDailyIndustryAvgQuery, buildMonthlyCompanyQuery, buildMonthlyIndustryAvgQuery } from './queries/rewards.queries';
+import { buildRenewalStatsQuery, buildHourlyValidPlaysQuery, buildTierDistributionQuery } from './queries/stats.queries';
 import { CompanyTotalStatsQueryDto, CompanyTotalStatsResponseDto } from './dto/company-stats.dto';
 import { RenewalStatsQueryDto, RenewalStatsResponseDto } from './dto/renewal-stats.dto';
+import { HourlyPlaysQueryDto, HourlyPlaysResponseDto } from './dto/hourly-plays.dto';
+import { TierDistributionQueryDto, TierDistributionResponseDto } from './dto/tier-distribution.dto';
+import { buildDayRangeCTE } from '../../common/utils/date.util';
 
 @Injectable()
 export class CompanyService {
@@ -158,28 +162,7 @@ export class CompanyService {
     const prevY = m === 1 ? y - 1 : y
     const prevM = m === 1 ? 12 : (m - 1)
 
-    const q = sql`
-      WITH cur AS (
-        SELECT cs.company_id
-        FROM company_subscriptions cs
-        WHERE cs.start_date < (make_timestamptz(${y}, ${m}, 1, 0, 0, 0, ${tz}) + interval '1 month')
-          AND cs.end_date >= make_timestamptz(${y}, ${m}, 1, 0, 0, 0, ${tz})
-        GROUP BY cs.company_id
-      ),
-      prev AS (
-        SELECT cs.company_id
-        FROM company_subscriptions cs
-        WHERE cs.start_date < (make_timestamptz(${prevY}, ${prevM}, 1, 0, 0, 0, ${tz}) + interval '1 month')
-          AND cs.end_date >= make_timestamptz(${prevY}, ${prevM}, 1, 0, 0, 0, ${tz})
-        GROUP BY cs.company_id
-      )
-      SELECT 
-        (SELECT COUNT(*) FROM prev) AS prev_active,
-        (SELECT COUNT(*) FROM cur) AS curr_active,
-        (SELECT COUNT(*) FROM prev p INNER JOIN cur c ON c.company_id = p.company_id) AS retained,
-        (SELECT COUNT(*) FROM prev p LEFT JOIN cur c ON c.company_id = p.company_id WHERE c.company_id IS NULL) AS churned,
-        (SELECT COUNT(*) FROM cur c LEFT JOIN prev p ON p.company_id = c.company_id WHERE p.company_id IS NULL) AS reactivated
-    `
+    const q = buildRenewalStatsQuery(y, m, tz)
     const res = await this.db.execute(q as any)
     const row = (res as any).rows?.[0] || {}
     const prevActive = Number(row.prev_active || 0)
@@ -189,5 +172,45 @@ export class CompanyService {
     const reactivated = Number(row.reactivated || 0)
     const rate = prevActive > 0 ? Math.round((retained / prevActive) * 100) : null
     return { asOf: ym, prevActive, currActive, retained, churned, reactivated, rate }
+  }
+
+  async getHourlyValidPlays(query: HourlyPlaysQueryDto): Promise<HourlyPlaysResponseDto> {
+    const tz = 'Asia/Seoul'
+    const toDate = (s?: string) => {
+      if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+      const now = new Date()
+      const kst = new Date(now.getTime() + 9 * 3600 * 1000)
+      const y = kst.getUTCFullYear()
+      const m = String(kst.getUTCMonth() + 1).padStart(2, '0')
+      const d = String(kst.getUTCDate()).padStart(2, '0')
+      return `${y}-${m}-${d}`
+    }
+    const date = toDate(query.date)
+    const [y, m, d] = date.split('-').map(Number)
+
+    const q = buildHourlyValidPlaysQuery(y, m, d, tz)
+    const res = await this.db.execute(q as any)
+    const rows = (res as any).rows || []
+    const labels = rows.map((r: any) => `${Number(r.h)}시`)
+    const free = rows.map((r: any) => Number(r.free || 0))
+    const standard = rows.map((r: any) => Number(r.standard || 0))
+    const business = rows.map((r: any) => Number(r.business || 0))
+    const prevAvg = rows.map((r: any) => Number(r.prev_avg || 0))
+    return { date, labels, free, standard, business, prevAvg }
+  }
+
+  async getTierDistribution(query: TierDistributionQueryDto): Promise<TierDistributionResponseDto> {
+    const tz = 'Asia/Seoul'
+    const ym = resolveYearMonthKST(query.yearMonth)
+    const [y, m] = ym.split('-').map(Number)
+
+    const q = buildTierDistributionQuery(y, m, tz)
+    const res = await this.db.execute(q as any)
+    const row = (res as any).rows?.[0] || {}
+    const free = Number(row.free || 0)
+    const standard = Number(row.standard || 0)
+    const business = Number(row.business || 0)
+    const total = Number(row.total || 0)
+    return { yearMonth: ym, free, standard, business, total }
   }
 }

@@ -19,6 +19,7 @@ import { MusicTotalStatsQueryDto } from './dto/music-stats.dto';
 import { PlaysValidStatsQueryDto } from './dto/plays-valid-stats.dto';
 import { RevenueForecastQueryDto } from './dto/revenue-forecast.dto';
 import { RewardsFilledStatsQueryDto } from './dto/rewards-filled-stats.dto';
+import { CategoryTop5QueryDto } from './dto/category-top5.dto';
 
 @Controller('/admin/musics')
 export class MusicsController {
@@ -81,6 +82,11 @@ export class MusicsController {
   @Get('stats/rewards/filled')
   async getRewardsFilled(@Query(new ValidationPipe({ transform: true })) query: RewardsFilledStatsQueryDto) {
     return this.musicsService.getRewardsFilledStats(query);
+  }
+
+  @Get('stats/category-top5')
+  async getCategoryTop5(@Query(new ValidationPipe({ transform: true })) query: CategoryTop5QueryDto) {
+    return this.musicsService.getCategoryTop5(query);
   }
 
   @Post('categories')

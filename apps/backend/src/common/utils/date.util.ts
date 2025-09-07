@@ -59,3 +59,19 @@ export const buildMonthRangeCTE = (y: number, m: number) => {
     )
   `
 }
+
+export const getDayRangeSqlKST = (y: number, m: number, d: number) => {
+  return {
+    start: sql`make_timestamptz(${y}, ${m}, ${d}, 0, 0, 0, 'Asia/Seoul')`,
+    end: sql`(make_timestamptz(${y}, ${m}, ${d}, 0, 0, 0, 'Asia/Seoul') + interval '1 day')`,
+  }
+}
+
+export const buildDayRangeCTE = (y: number, m: number, d: number) => {
+  const { start, end } = getDayRangeSqlKST(y, m, d)
+  return sql`
+    WITH day_range AS (
+      SELECT ${start} AS day_start, ${end} AS day_end
+    )
+  `
+}

@@ -6,6 +6,8 @@ import { RewardsSummaryQueryDto } from './dto/rewards-summary.query.dto';
 import { RewardsDetailQueryDto } from './dto/rewards-detail.query.dto';
 import { CompanyTotalStatsQueryDto } from './dto/company-stats.dto';
 import { RenewalStatsQueryDto } from './dto/renewal-stats.dto';
+import { HourlyPlaysQueryDto } from './dto/hourly-plays.dto';
+import { TierDistributionQueryDto } from './dto/tier-distribution.dto';
 
 @Controller('/admin/companies')
 export class CompanyController {
@@ -36,6 +38,16 @@ export class CompanyController {
   @Get('stats/renewal')
   async getRenewalStats(@Query(new ValidationPipe({ transform: true })) query: RenewalStatsQueryDto) {
     return this.companyService.getRenewalStats(query)
+  }
+
+  @Get('stats/hourly-plays')
+  async getHourlyPlays(@Query(new ValidationPipe({ transform: true })) query: HourlyPlaysQueryDto) {
+    return this.companyService.getHourlyValidPlays(query)
+  }
+
+  @Get('stats/tier-distribution')
+  async getTierDistribution(@Query(new ValidationPipe({ transform: true })) query: TierDistributionQueryDto) {
+    return this.companyService.getTierDistribution(query)
   }
 
   @Get(':id/rewards/detail')

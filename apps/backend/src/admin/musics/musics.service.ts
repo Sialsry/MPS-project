@@ -27,6 +27,8 @@ import { PlaysValidStatsQueryDto, PlaysValidStatsResponseDto } from './dto/plays
 import { RevenueForecastQueryDto, RevenueForecastResponseDto } from './dto/revenue-forecast.dto';
 import { buildMonthRangeCTE, resolveYearMonthKST as resolveYM, isCurrentYM } from '../../common/utils/date.util';
 import { RewardsFilledStatsQueryDto, RewardsFilledStatsResponseDto } from './dto/rewards-filled-stats.dto';
+import { CategoryTop5QueryDto, CategoryTop5ResponseDto, CategoryTop5ItemDto } from './dto/category-top5.dto';
+import { buildCategoryTop5Query } from './queries/stats.queries';
 
 @Injectable()
 export class MusicsService implements OnModuleInit {
@@ -647,6 +649,25 @@ export class MusicsService implements OnModuleInit {
     const filled = Number(row.filled ?? 0)
     const ratio = eligible > 0 ? Math.round((filled / eligible) * 100) : null
     return { eligible, filled, ratio, asOf: ym }
+  }
+
+  async getCategoryTop5(query: CategoryTop5QueryDto): Promise<CategoryTop5ResponseDto> {
+    const ym = resolveYM(query.yearMonth)
+    const [y, m] = ym.split('-').map(Number)
+    const limit = Math.min(Math.max(query.limit ?? 5, 1), 20)
+    const tz = 'Asia/Seoul'
+
+    const q = buildCategoryTop5Query(y, m, tz, limit)
+    const res = await this.db.execute(q)
+    const rows = (res.rows || []) as any[]
+    
+    const items: CategoryTop5ItemDto[] = rows.map((r: any) => ({
+      category: r.category || '미분류',
+      validPlays: Number(r.valid_plays || 0),
+      rank: Number(r.rank || 0),
+    }))
+
+    return { yearMonth: ym, items }
   }
 
   private sanitizeFilename(name: string): string {
