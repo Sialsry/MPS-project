@@ -1,7 +1,4 @@
 {
-  "AAModule#EntryPoint": "0xF094662e0E1a9c6c612b97F49ACd29f07C9f7908",
-  "AAModule#Paymaster": "0xdF42aD42341288799F335894415E1384F2A195C4",
-  "AAModule#SmartAccountFactory": "0x8F083F4E0a04C578e31D5e02707cc1bf31b0a0a3",
-  "RewardsModule#RewardToken": "0xdc1917A12266f98A0a9E9892cd12221b52356b86",
-  "RewardsModule#RecordUsage": "0x5808b4f0B03f1F1E147B975D35Aa2bd5419f4431"
+  "RewardsModule#RewardToken": "0xfD32603F29b516fdE6C952d5494d4056be0ade84",
+  "RewardsModule#RecordUsage": "0xd81103bd6F36bD5E0A85e07Ce28F63D7FEb41462"
 }

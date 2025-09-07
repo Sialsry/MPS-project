@@ -1,0 +1,2 @@
+-- Schema already applied via drizzle-kit push
+-- This migration file is intentionally empty as the schema was already pushed to the database

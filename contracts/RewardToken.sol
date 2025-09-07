@@ -3,40 +3,58 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract RewardToken is ERC20, Ownable {
-    address public recordUsageContract;
+contract RewardToken is ERC20, Ownable, Pausable, ReentrancyGuard {
+    mapping(address => bool) public authorizedMinter;
+
+    event MinterAuthorized(address indexed minter, bool authorized);
+
+    error UnauthorizedMinter();
+    error InvalidRecipient();
+    error NoRewardsToDistribute();
+
+    constructor(
+        string memory name,
+        string memory symbol,
+        address initialOwner
+    ) ERC20(name, symbol) Ownable(initialOwner) {}
+
+    function setMinterAuthorization(address minter, bool authorized) external onlyOwner {
+        require(minter != address(0), "Invalid minter address");
+        authorizedMinter[minter] = authorized;
+        emit MinterAuthorized(minter, authorized);
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
     
-    constructor(address admin) ERC20("MPS Mileage", "MPSM") Ownable(admin) {}
-
-    function setRecordUsageContract(address _recordUsage) external onlyOwner {
-        recordUsageContract = _recordUsage;
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
-    function mint(address to, uint256 amount) external onlyOwner {
-        _mint(to, amount);
-    }
+    function processDailyRewardsBatch(
+        address[] calldata recipients,
+        uint256[] calldata amounts
+    ) external nonReentrant whenNotPaused {
+        if (!authorizedMinter[msg.sender]) revert UnauthorizedMinter();
+        require(recipients.length == amounts.length, "Array length mismatch");
+        require(recipients.length > 0, "Empty arrays");
 
-    function burnFrom(address from, uint256 amount) external onlyOwner {
-        _burn(from, amount);
-    }
-
-    // RecordUsage 컨트랙트에서의 전송만 허용
-    function transfer(address to, uint256 amount) public override returns (bool) {
-        require(msg.sender == recordUsageContract, "Only RecordUsage contract");
-        return super.transfer(to, amount);
-    }
-
-    // 양도 불가 (RecordUsage 컨트랙트 제외)
-    function _update(
-        address from,
-        address to,
-        uint256 value
-    ) internal override {
-        // 민팅(0→to) / 소각(from→0) / RecordUsage 컨트랙트에서의 전송만 허용
-        if (from != address(0) && to != address(0) && msg.sender != recordUsageContract) {
-            revert("NonTransferable");
+        uint256 totalMintAmount = 0;
+        for (uint256 i = 0; i < amounts.length; i++) {
+            totalMintAmount += amounts[i];
         }
-        super._update(from, to, value);
+
+        if (totalMintAmount == 0) revert NoRewardsToDistribute();
+        _mint(address(this), totalMintAmount);
+
+        for (uint256 i = 0; i < recipients.length; i++) {
+            if (recipients[i] != address(0) && amounts[i] > 0) {
+                _transfer(address(this), recipients[i], amounts[i]);
+            }
+        }
     }
 }

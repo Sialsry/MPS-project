@@ -8,13 +8,17 @@ module.exports = buildModule("RewardsModule", (m) => {
   const admin = m.getParameter("admin", m.getAccount(0));
 
   // 먼저 RewardToken을 배포합니다
-  const rewardToken = m.contract("RewardToken", [admin]);
+  const rewardToken = m.contract("RewardToken", [
+    "Music Reward Token",  // name
+    "MRT",                 // symbol
+    admin                  // initialOwner
+  ]);
 
   // RewardToken 주소를 사용하여 RecordUsage 컨트랙트를 배포합니다
   const recordUsage = m.contract("RecordUsage", [admin, rewardToken]);
 
-  // RewardToken에 RecordUsage 컨트랙트 주소를 설정합니다
-  m.call(rewardToken, "setRecordUsageContract", [recordUsage]);
+  // RecordUsage 컨트랙트를 RewardToken의 authorized minter로 설정합니다
+  m.call(rewardToken, "setMinterAuthorization", [recordUsage, true]);
 
   return { rewardToken, recordUsage };
 });
