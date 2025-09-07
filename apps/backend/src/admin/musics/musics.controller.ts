@@ -18,6 +18,7 @@ import { MusicCompanyUsageQueryDto } from './dto/music-company-usage.dto';
 import { MusicTotalStatsQueryDto } from './dto/music-stats.dto';
 import { PlaysValidStatsQueryDto } from './dto/plays-valid-stats.dto';
 import { RevenueForecastQueryDto } from './dto/revenue-forecast.dto';
+import { RewardsFilledStatsQueryDto } from './dto/rewards-filled-stats.dto';
 
 @Controller('/admin/musics')
 export class MusicsController {
@@ -75,6 +76,11 @@ export class MusicsController {
   @Get('stats/revenue/forecast')
   async getRevenueForecast(@Query(new ValidationPipe({ transform: true })) query: RevenueForecastQueryDto) {
     return this.musicsService.getRevenueForecast(query);
+  }
+
+  @Get('stats/rewards/filled')
+  async getRewardsFilled(@Query(new ValidationPipe({ transform: true })) query: RewardsFilledStatsQueryDto) {
+    return this.musicsService.getRewardsFilledStats(query);
   }
 
   @Post('categories')

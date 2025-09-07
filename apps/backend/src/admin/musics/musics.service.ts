@@ -26,6 +26,7 @@ import { MusicTotalStatsQueryDto, MusicTotalStatsResponseDto } from './dto/music
 import { PlaysValidStatsQueryDto, PlaysValidStatsResponseDto } from './dto/plays-valid-stats.dto';
 import { RevenueForecastQueryDto, RevenueForecastResponseDto } from './dto/revenue-forecast.dto';
 import { buildMonthRangeCTE, resolveYearMonthKST as resolveYM, isCurrentYM } from '../../common/utils/date.util';
+import { RewardsFilledStatsQueryDto, RewardsFilledStatsResponseDto } from './dto/rewards-filled-stats.dto';
 
 @Injectable()
 export class MusicsService implements OnModuleInit {
@@ -604,6 +605,48 @@ export class MusicsService implements OnModuleInit {
     const forecast = dayOfMonth > 0 ? Math.round((mtd / dayOfMonth) * daysInMonth) : mtd
 
     return { mtd, forecast, asOf: ym }
+  }
+
+  async getRewardsFilledStats(query: RewardsFilledStatsQueryDto): Promise<RewardsFilledStatsResponseDto> {
+    const ym = resolveYM(query.yearMonth)
+    const [y, m] = ym.split('-').map(Number)
+    const cte = buildMonthRangeCTE(y, m)
+    const q = sql`
+      ${cte}
+      , plays AS (
+        SELECT 
+          mp.music_id,
+          COUNT(*) FILTER (WHERE mp.is_valid_play = true) AS valid_plays,
+          COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned
+        FROM music_plays mp, month_range mr
+        WHERE mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
+        GROUP BY mp.music_id
+      )
+      SELECT
+        COUNT(*) FILTER (WHERE mmr.total_reward_count > 0)::bigint AS eligible,
+        COUNT(*) FILTER (
+          WHERE mmr.total_reward_count > 0 AND (
+            mmr.remaining_reward_count <= 0 OR (
+              COALESCE(
+                CASE 
+                  WHEN mmr.reward_per_play IS NOT NULL AND mmr.reward_per_play > 0 THEN 
+                    FLOOR(COALESCE(p.earned, 0) / NULLIF(mmr.reward_per_play, 0))
+                  ELSE COALESCE(p.valid_plays, 0)
+                END, 0
+              ) >= mmr.total_reward_count
+            )
+          )
+        )::bigint AS filled
+      FROM monthly_music_rewards mmr
+      LEFT JOIN plays p ON p.music_id = mmr.music_id
+      WHERE mmr.year_month = ${ym}
+    `
+    const res = await this.db.execute(q)
+    const row = (res.rows?.[0] as any) || {}
+    const eligible = Number(row.eligible ?? 0)
+    const filled = Number(row.filled ?? 0)
+    const ratio = eligible > 0 ? Math.round((filled / eligible) * 100) : null
+    return { eligible, filled, ratio, asOf: ym }
   }
 
   private sanitizeFilename(name: string): string {
