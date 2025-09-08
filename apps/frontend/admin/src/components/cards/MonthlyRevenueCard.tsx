@@ -47,26 +47,25 @@ export default function MonthlyRevenueCard() {
     return () => { aborted = true }
   }, [prevYM])
 
-  const forecast = cur?.forecast ?? 0
   const mtd = cur?.mtd ?? 0
-  const prevForecast = prev?.forecast ?? 0
-  const pct = prevForecast > 0 ? Math.round(((forecast - prevForecast) / prevForecast) * 100) : null
-  const sign = (forecast - prevForecast) > 0 ? '+' : (forecast - prevForecast) < 0 ? '' : ''
+  const prevMtd = prev?.mtd ?? 0
+  const pct = prevMtd > 0 ? Math.round(((mtd - prevMtd) / prevMtd) * 100) : null
+  const sign = (mtd - prevMtd) > 0 ? '+' : (mtd - prevMtd) < 0 ? '' : ''
 
   const fmt = (n: number) => `₩${n.toLocaleString()}`
 
   return (
     <Card>
       <div className="space-y-1">
-        <Title variant="card">이번 달 예상 매출</Title>
-        <div className="text-3xl font-bold text-white">{loading ? '...' : (error ? '-' : fmt(forecast))}</div>
+        <Title variant="card">이번 달 누적 매출</Title>
+        <div className="text-3xl font-bold text-white">{loading ? '...' : (error ? '-' : fmt(mtd))}</div>
         <div className="space-y-0.5">
           <div className="text-sm text-teal-300">
             {loading ? '' : pct === null ? '(전월 대비 -)' : `(전월 대비 ${sign}${pct}%)`}
           </div>
           <div className="mt-2 space-y-0.5">
-            <div className="text-xs text-white/60">전월: {loading || error ? '-' : fmt(prevForecast)}</div>
-            <div className="text-xs text-white/60">이번 달 누적(MTD): {loading || error ? '-' : fmt(mtd)}</div>
+            <div className="text-xs text-white/60">전월 누적: {loading || error ? '-' : fmt(prevMtd)}</div>
+            <div className="text-xs text-white/60">기준일: {loading || error ? '-' : cur?.asOf || '-'}</div>
           </div>
         </div>
       </div>

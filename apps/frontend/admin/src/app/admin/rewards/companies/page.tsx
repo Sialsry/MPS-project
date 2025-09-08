@@ -713,10 +713,12 @@ export default function CompanyRewardsPage() {
                       <div className="w-20 bg-white/10 rounded-full h-1.5">
                         <div 
                           className="bg-gradient-to-r from-teal-400 to-blue-400 h-1.5 rounded-full transition-all duration-300"
-                          style={{ width: `${company.usageRate}%` }}
+                          style={{ width: `${Math.min(company.usageRate, 100)}%` }}
                         />
                       </div>
-                        <span className="text-white/90 font-medium text-sm">{company.usageRate}%</span>
+                        <span className={`font-medium text-sm ${company.usageRate > 100 ? 'text-teal-300' : 'text-white/90'}`}>
+                          {company.usageRate > 100 ? '100%' : `${company.usageRate}%`}
+                        </span>
                     </div>
                   </td>
                     <td className="px-8 py-5 text-white/90 font-medium text-center">

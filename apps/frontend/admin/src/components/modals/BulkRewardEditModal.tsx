@@ -6,8 +6,7 @@ type Music = {
   title: string
   category: string
   rewardPerPlay: number
-  monthlyLimit: number | null
-  maxPlayCount: number | null
+  totalRewardCount: number | null
   status: 'active' | 'inactive'
 }
 
@@ -15,9 +14,10 @@ interface BulkRewardEditModalProps {
   open: boolean
   onClose: () => void
   selectedMusics: Music[]
+  onSuccess?: () => void
 }
 
-export default function BulkRewardEditModal({ open, onClose, selectedMusics }: BulkRewardEditModalProps) {
+export default function BulkRewardEditModal({ open, onClose, selectedMusics, onSuccess }: BulkRewardEditModalProps) {
   const [rewardPercentage, setRewardPercentage] = useState<number | ''>('')
   const [limitPercentage, setLimitPercentage] = useState<number | ''>('')
   const [isLoading, setIsLoading] = useState(false)
@@ -35,7 +35,7 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
         const applyRpp = rewardPercentage !== ''
         const applyLimit = limitPercentage !== ''
         let baseRpp = Number(music.rewardPerPlay || 0)
-        let baseLimit = music.monthlyLimit
+        let baseLimit = music.totalRewardCount
 
         if (missingPolicy === 'default') {
           if ((baseRpp === 0 || isNaN(baseRpp)) && defaultRpp !== '') baseRpp = Number(defaultRpp)
@@ -67,6 +67,12 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
         return true
       })
       await Promise.all(tasks)
+      
+      // 성공 시 콜백 실행 (페이지 새로고침)
+      if (onSuccess) {
+        onSuccess()
+      }
+      
       onClose()
     } catch (err) {
       console.error('일괄 수정 실패:', err)
@@ -83,9 +89,19 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
   }
 
   const calculateNewLimit = (currentLimit: number | null) => {
-    const base = (currentLimit && currentLimit > 0) ? currentLimit : (missingPolicy === 'default' && defaultLimit !== '' ? Number(defaultLimit) : currentLimit)
-    if (!limitPercentage || !base) return base ?? null
-    return Math.round(base * (1 + Number(limitPercentage) / 100))
+    // 미설정 음원 처리
+    if (!currentLimit || currentLimit === 0) {
+      if (missingPolicy === 'default' && defaultLimit !== '') {
+        const base = Number(defaultLimit);
+        if (!limitPercentage) return base;
+        return Math.round(base * (1 + Number(limitPercentage) / 100));
+      }
+      return null; // 미설정 상태 유지
+    }
+    
+    // 기존 한도가 있는 경우
+    if (!limitPercentage) return currentLimit;
+    return Math.round(currentLimit * (1 + Number(limitPercentage) / 100));
   }
 
   return (
@@ -108,9 +124,9 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
           </div>
           <button
             onClick={onClose}
-            className="text-white/60 hover:text-white transition-colors"
+            className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -176,16 +192,13 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
               {selectedMusics.length > 0 ? (
                 selectedMusics.map((music) => (
                   <div key={music.id} className="flex items-center gap-3 p-3 bg-white/5 rounded-lg border border-white/10">
-                    <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-blue-500 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                      </svg>
-                    </div>
                     <div className="flex-1">
-                      <div className="font-medium text-white">{music.title}</div>
-                      <div className="text-xs text-white/60">
+                      <div className="font-medium text-white">
+                        {music.title} · <span className="text-white/60">{music.category}</span>
+                      </div>
+                      <div className="text-xs text-teal-300">
                         현재: {(music.rewardPerPlay ?? 0).toFixed(3)} 토큰
-                        {music.monthlyLimit ? ` / ${music.monthlyLimit.toLocaleString()}회` : ' / 한도 없음'}
+                        {music.totalRewardCount ? ` / ${music.totalRewardCount.toLocaleString()}회` : ' / 한도 없음'}
                       </div>
                     </div>
                   </div>
@@ -229,7 +242,7 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
 
               {/* 리워드 미리보기 */}
               {rewardPercentage !== '' && (
-                <div className="p-4 bg-gradient-to-r from-teal-400/10 to-blue-400/10 border border-teal-400/20 rounded-lg">
+                <div className="p-4 bg-teal-500/10 border border-teal-400/20 rounded-lg">
                   <h4 className="text-sm font-medium text-teal-300 mb-2">리워드 변경 미리보기</h4>
                   <div className="space-y-2 text-sm">
                     {selectedMusics.slice(0, 3).map((music) => (
@@ -276,18 +289,28 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics }: B
 
               {/* 한도 미리보기 */}
               {limitPercentage !== '' && (
-                <div className="p-4 bg-gradient-to-r from-teal-400/10 to-blue-400/10 border border-teal-400/20 rounded-lg">
+                <div className="p-4 bg-teal-500/10 border border-teal-400/20 rounded-lg">
                   <h4 className="text-sm font-medium text-teal-300 mb-2">한도 변경 미리보기</h4>
                   <div className="space-y-2 text-sm">
-                    {selectedMusics.filter(m => m.monthlyLimit).slice(0, 3).map((music) => (
-                      <div key={music.id} className="flex justify-between">
-                        <span className="text-white/70 truncate">{music.title}</span>
-                        <span className="text-white font-medium">
-                          {music.monthlyLimit?.toLocaleString()} → {calculateNewLimit(music.monthlyLimit)?.toLocaleString()}
-                        </span>
+                    {selectedMusics.slice(0, 3).map((music) => {
+                      const currentLimit = music.totalRewardCount || 0;
+                      const newLimit = calculateNewLimit(music.totalRewardCount);
+                      
+                      return (
+                        <div key={music.id} className="flex justify-between">
+                          <span className="text-white/70 truncate">{music.title}</span>
+                          <span className="text-white font-medium">
+                            {currentLimit > 0 ? currentLimit.toLocaleString() : '미설정'} → {newLimit ? newLimit.toLocaleString() : '미설정'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {selectedMusics.length > 3 && (
+                      <div className="text-xs text-white/50 text-center">
+                        ... 외 {selectedMusics.length - 3}개 음원
                       </div>
-                    ))}
-                    {selectedMusics.filter(m => m.monthlyLimit).length === 0 && missingPolicy === 'skip' && (
+                    )}
+                    {selectedMusics.filter(m => m.totalRewardCount).length === 0 && missingPolicy === 'skip' && (
                       <div className="text-xs text-white/50 text-center">
                         한도가 설정된 음원이 없습니다 (설정되지 않은 음원은 건너뜁니다)
                       </div>

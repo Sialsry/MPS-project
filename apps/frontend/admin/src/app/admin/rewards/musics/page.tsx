@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import MusicDetailModal from '@/components/modals/MusicDetailModal'
 import BulkRewardEditModal from '@/components/modals/BulkRewardEditModal'
+import RewardEditModal from '@/components/modals/RewardEditModal'
 
 type MusicRow = {
   musicId: number
@@ -61,6 +62,8 @@ export default function RewardsMusicsPage() {
   
   const [selectedMusics, setSelectedMusics] = useState<string[]>([])
   const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
+  const [rewardEditModalOpen, setRewardEditModalOpen] = useState(false)
+  const [selectedMusicForReward, setSelectedMusicForReward] = useState<MusicRow | null>(null)
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -132,10 +135,9 @@ export default function RewardsMusicsPage() {
     .map(m => ({
       id: String(m.musicId),
       title: m.title,
-      category: (m as any).category ?? '',
+      category: (m as any).artist ?? '', // artist 필드 사용
       rewardPerPlay: Number((m as any).rewardPerPlay ?? 0),
-      monthlyLimit: (m as any).monthlyLimit ?? null,
-      maxPlayCount: null,
+      totalRewardCount: (m as any).monthlyLimit ?? null,
       status: 'active' as const,
     }))
 
@@ -490,10 +492,12 @@ export default function RewardsMusicsPage() {
                           <div className="w-20 bg-white/10 rounded-full h-1.5">
                             <div
                               className="bg-gradient-to-r from-teal-400 to-blue-400 h-1.5 rounded-full transition-all duration-300"
-                              style={{ width: `${usageRate}%` }}
+                              style={{ width: `${Math.min(usageRate, 100)}%` }}
                             />
                           </div>
-                          <span className="text-white/70 text-xs font-medium">{usageRate}%</span>
+                          <span className={`text-xs font-medium ${usageRate > 100 ? 'text-teal-300' : 'text-white/70'}`}>
+                            {usageRate > 100 ? '100%' : `${usageRate}%`}
+                          </span>
                         </div>
                       ) : (
                         <span className="text-white/50 text-xs">-</span>
@@ -508,7 +512,12 @@ export default function RewardsMusicsPage() {
                         >
                           상세
                         </button>
-                        
+                        <button 
+                          className="rounded-md bg-gray-500/90 px-2.5 py-1.5 text-xs text-white font-medium hover:bg-gray-400 transition-all duration-200"
+                          onClick={(e) => { e.stopPropagation(); setSelectedMusicForReward(music); setRewardEditModalOpen(true) }}
+                        >
+                          리워드 수정
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -603,8 +612,35 @@ export default function RewardsMusicsPage() {
           setBulkEditModalOpen(false)
           setSelectedMusics([])
         }}
+        onSuccess={() => {
+          // 일괄 수정 성공 시 페이지 새로고침
+          fetchRows()
+        }}
         selectedMusics={selectedMusicsData}
       />
+
+      {/* 개별 리워드 수정 모달 */}
+      {selectedMusicForReward && (
+        <RewardEditModal
+          open={rewardEditModalOpen}
+          onClose={() => {
+            setRewardEditModalOpen(false)
+            setSelectedMusicForReward(null)
+          }}
+          onSuccess={() => {
+            // 리워드 수정 성공 시 페이지 새로고침
+            fetchRows()
+          }}
+          music={{
+            id: String(selectedMusicForReward.musicId),
+            title: selectedMusicForReward.title,
+            category: selectedMusicForReward.artist || '-',
+            rewardPerPlay: Number((selectedMusicForReward as any).rewardPerPlay ?? 0),
+            totalRewardCount: (selectedMusicForReward as any).monthlyLimit ?? null,
+            status: 'active' as const,
+          }}
+        />
+      )}
     </div>
   )
 } 

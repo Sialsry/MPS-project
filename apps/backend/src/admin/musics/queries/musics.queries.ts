@@ -115,22 +115,33 @@ export function buildUpsertNextMonthRewardsQuery(params: {
   yearMonth: string
   totalRewardCount: number
   rewardPerPlay: number
+  remainingRewardCount: number
 }) {
-  const { musicId, yearMonth, totalRewardCount, rewardPerPlay } = params
+  const { musicId, yearMonth, totalRewardCount, rewardPerPlay, remainingRewardCount } = params
   return sql`
-    with updated as (
-      update ${monthly_music_rewards}
-      set total_reward_count = ${totalRewardCount},
-          remaining_reward_count = ${totalRewardCount},
-          reward_per_play = ${rewardPerPlay},
-          updated_at = now()
-      where music_id = ${musicId} and year_month = ${yearMonth}
-      returning music_id, year_month
+    WITH existing_record AS (
+      SELECT id FROM ${monthly_music_rewards} 
+      WHERE music_id = ${musicId} AND year_month = ${yearMonth}
+    ),
+    updated AS (
+      UPDATE ${monthly_music_rewards} 
+      SET 
+        total_reward_count = ${totalRewardCount},
+        remaining_reward_count = ${remainingRewardCount},
+        reward_per_play = ${rewardPerPlay},
+        updated_at = now()
+      WHERE music_id = ${musicId} AND year_month = ${yearMonth}
+      RETURNING music_id, year_month
+    ),
+    inserted AS (
+      INSERT INTO ${monthly_music_rewards} (music_id, year_month, total_reward_count, remaining_reward_count, reward_per_play)
+      SELECT ${musicId}, ${yearMonth}, ${totalRewardCount}, ${remainingRewardCount}, ${rewardPerPlay}
+      WHERE NOT EXISTS (SELECT 1 FROM existing_record)
+      RETURNING music_id, year_month
     )
-    insert into ${monthly_music_rewards} (music_id, year_month, total_reward_count, remaining_reward_count, reward_per_play)
-    select ${musicId}, ${yearMonth}, ${totalRewardCount}, ${totalRewardCount}, ${rewardPerPlay}
-    where not exists (select 1 from updated)
-    returning ${monthly_music_rewards.music_id}, ${monthly_music_rewards.year_month}
+    SELECT music_id, year_month FROM updated
+    UNION ALL
+    SELECT music_id, year_month FROM inserted
   `
 }
 

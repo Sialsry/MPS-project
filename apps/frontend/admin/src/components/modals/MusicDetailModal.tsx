@@ -450,10 +450,12 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                                       <div className="w-20 bg-white/10 rounded-full h-1.5">
                                         <div
                                           className="bg-gradient-to-r from-teal-400 to-blue-400 h-1.5 rounded-full transition-all duration-300"
-                                          style={{ width: `${usageRate}%` }}
+                                          style={{ width: `${Math.min(usageRate, 100)}%` }}
                                         />
                                       </div>
-                                      <span className="text-white/70 text-xs font-medium">{Math.round(usageRate)}%</span>
+                                      <span className={`text-xs font-medium ${usageRate > 100 ? 'text-teal-300' : 'text-white/70'}`}>
+                                        {usageRate > 100 ? '100%' : `${Math.round(usageRate)}%`}
+                                      </span>
                                     </div>
                                   ) : (
                                     <span className="text-white/40 text-xs">-</span>

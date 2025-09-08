@@ -1,12 +1,12 @@
 'use client'
-import { useState } from 'react'
+import React, { useState } from 'react'
 
 type Music = {
   id: string
   title: string
   category: string
   rewardPerPlay: number
-  maxPlayCount: number | null
+  totalRewardCount: number | null
   status: 'active' | 'inactive'
 }
 
@@ -14,12 +14,26 @@ interface RewardEditModalProps {
   open: boolean
   onClose: () => void
   music: Music | null
+  onSuccess?: () => void
 }
 
-export default function RewardEditModal({ open, onClose, music }: RewardEditModalProps) {
+export default function RewardEditModal({ open, onClose, music, onSuccess }: RewardEditModalProps) {
   const [rewardPerPlay, setRewardPerPlay] = useState(music?.rewardPerPlay || 0)
-  const [maxPlayCount, setMaxPlayCount] = useState<number | ''>(music?.maxPlayCount || '')
+  const [totalRewardCount, setTotalRewardCount] = useState<number | ''>(music?.totalRewardCount || '')
   const [isLoading, setIsLoading] = useState(false)
+
+  // 모달이 열릴 때 초기값 설정
+  React.useEffect(() => {
+    if (open && music) {
+      setRewardPerPlay(music.rewardPerPlay || 0)
+      setTotalRewardCount(music.totalRewardCount || '')
+      console.log('모달 초기값 설정:', {
+        rewardPerPlay: music.rewardPerPlay,
+        totalRewardCount: music.totalRewardCount,
+        music: music
+      })
+    }
+  }, [open, music])
 
   if (!open || !music) return null
 
@@ -27,18 +41,43 @@ export default function RewardEditModal({ open, onClose, music }: RewardEditModa
     e.preventDefault()
     setIsLoading(true)
     
-    // TODO: API 호출로 리워드 수정
-    console.log('리워드 수정:', { 
-      musicId: music.id, 
-      newReward: rewardPerPlay,
-      newMaxPlayCount: maxPlayCount
-    })
+    const requestData = {
+      totalRewardCount: totalRewardCount || 0,
+      rewardPerPlay: rewardPerPlay,
+    }
     
-    // 임시 딜레이
-    setTimeout(() => {
-      setIsLoading(false)
+    console.log('리워드 수정 요청 데이터:', requestData)
+    console.log('API URL:', `${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${music.id}/rewards`)
+    
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${music.id}/rewards`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const result = await response.json()
+      console.log('리워드 수정 성공:', result)
+      
+      // 성공 시 콜백 실행 (페이지 새로고침)
+      if (onSuccess) {
+        onSuccess()
+      }
+      
+      // 모달 닫기
       onClose()
-    }, 1000)
+    } catch (error) {
+      console.error('리워드 수정 실패:', error)
+      alert('리워드 수정에 실패했습니다. 다시 시도해주세요.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -56,9 +95,9 @@ export default function RewardEditModal({ open, onClose, music }: RewardEditModa
           <h2 className="text-lg font-semibold text-white">리워드 수정</h2>
           <button
             onClick={onClose}
-            className="text-white/60 hover:text-white transition-colors"
+            className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -68,16 +107,9 @@ export default function RewardEditModal({ open, onClose, music }: RewardEditModa
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* 음원 정보 */}
           <div className="space-y-3">
-            <div className="flex items-center gap-3 p-4 bg-white/5 rounded-lg border border-white/10">
-              <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-blue-500 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-white">{music.title}</h3>
-                <p className="text-sm text-white/60">{music.category}</p>
-              </div>
+            <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+              <h3 className="font-semibold text-white text-lg">{music.title}</h3>
+              <p className="text-sm text-white/60 mt-1">{music.category}</p>
             </div>
           </div>
 
@@ -109,25 +141,25 @@ export default function RewardEditModal({ open, onClose, music }: RewardEditModa
               
               <div>
                 <label className="block text-sm font-medium text-white/80 mb-2">
-                  최대 재생 횟수 <span className="text-red-400">*</span>
+                  총 리워드 수량 <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="number"
                   min="0"
-                  value={maxPlayCount}
-                  onChange={(e) => setMaxPlayCount(e.target.value ? Number(e.target.value) : '')}
+                  value={totalRewardCount}
+                  onChange={(e) => setTotalRewardCount(e.target.value ? Number(e.target.value) : '')}
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-teal-400/50 transition-colors text-sm"
                   placeholder="1000"
                 />
                 <p className="text-xs text-white/50 mt-1">
-                  현재: {music.maxPlayCount ? music.maxPlayCount.toLocaleString() : '무제한'}
+                  현재: {music.totalRewardCount ? music.totalRewardCount.toLocaleString() : '0'}
                 </p>
               </div>
             </div>
 
             {/* 리워드 미리보기 */}
-            <div className="p-4 bg-gradient-to-r from-teal-400/10 to-blue-400/10 border border-teal-400/20 rounded-lg">
-              <h4 className="text-sm font-medium text-teal-300 mb-2">리워드 미리보기</h4>
+            <div className="p-4 bg-white/5 border border-white/10 rounded-lg">
+              <h4 className="text-sm font-medium text-white/80 mb-2">리워드 미리보기</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-white/70">100회 호출 시:</span>
@@ -137,10 +169,10 @@ export default function RewardEditModal({ open, onClose, music }: RewardEditModa
                   <span className="text-white/70">1,000회 호출 시:</span>
                   <span className="text-white font-medium">{(rewardPerPlay * 1000).toFixed(1)} 토큰</span>
                 </div>
-                {maxPlayCount && (
+                {totalRewardCount && (
                   <div className="flex justify-between">
-                    <span className="text-white/70">최대 재생 시 (총 {maxPlayCount.toLocaleString()}회):</span>
-                    <span className="text-white font-medium">{(rewardPerPlay * maxPlayCount).toFixed(1)} 토큰</span>
+                    <span className="text-white/70">총 리워드 수량:</span>
+                    <span className="text-white font-medium">{totalRewardCount.toLocaleString()} 토큰</span>
                   </div>
                 )}
               </div>
@@ -158,7 +190,7 @@ export default function RewardEditModal({ open, onClose, music }: RewardEditModa
             </button>
             <button
               type="submit"
-              disabled={isLoading || (rewardPerPlay === music.rewardPerPlay && maxPlayCount === music.maxPlayCount)}
+              disabled={isLoading || (rewardPerPlay === music.rewardPerPlay && totalRewardCount === music.totalRewardCount)}
               className="flex-1 px-4 py-3 text-sm font-medium text-white bg-teal-500/90 rounded-lg hover:bg-teal-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isLoading ? (

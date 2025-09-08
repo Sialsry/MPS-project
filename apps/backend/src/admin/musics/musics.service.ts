@@ -581,33 +581,87 @@ export class MusicsService implements OnModuleInit {
     const [y, m] = ym.split('-').map(Number)
     const current = isCurrentYM(ym)
     const cte = buildMonthRangeCTE(y, m)
+    
+    // 구독료 - 사용료 계산 (순매출)
     const qCurrent = sql`
       ${cte}
-      SELECT COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS mtd
-      FROM music_plays mp, month_range mr
-      WHERE mp.created_at >= mr.month_start AND mp.created_at <= NOW()
+      SELECT 
+        COALESCE(SUM(subscription_revenue), 0) - COALESCE(SUM(usage_revenue), 0) AS mtd
+      FROM (
+        -- 구독료 (결제일 기준)
+        SELECT 
+          COALESCE(SUM(cs.actual_paid_amount), 0) AS subscription_revenue,
+          0 AS usage_revenue
+        FROM company_subscriptions cs
+        JOIN companies c ON c.id = cs.company_id
+        CROSS JOIN month_range mr
+        WHERE c.grade <> 'free'
+          AND DATE(cs.start_date AT TIME ZONE 'Asia/Seoul') >= mr.month_start
+          AND DATE(cs.start_date AT TIME ZONE 'Asia/Seoul') <= NOW()
+        
+        UNION ALL
+        
+        -- 사용료 (유효재생 기준) - 차감
+        SELECT 
+          0 AS subscription_revenue,
+          COALESCE(SUM(
+            CASE 
+              WHEN mp.use_case = '0' OR mp.use_case = '1' THEN m.price_per_play::numeric
+              WHEN mp.use_case = '2' AND m.inst = false THEN m.lyrics_price::numeric
+              ELSE 0
+            END
+          ), 0) AS usage_revenue
+        FROM music_plays mp
+        JOIN musics m ON m.id = mp.music_id
+        CROSS JOIN month_range mr
+        WHERE mp.is_valid_play = true
+          AND mp.created_at >= mr.month_start
+          AND mp.created_at <= NOW()
+      ) revenue_data
     `
+    
     const qPast = sql`
       ${cte}
-      SELECT COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS mtd
-      FROM music_plays mp, month_range mr
-      WHERE mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
+      SELECT 
+        COALESCE(SUM(subscription_revenue), 0) - COALESCE(SUM(usage_revenue), 0) AS mtd
+      FROM (
+        -- 구독료 (결제일 기준)
+        SELECT 
+          COALESCE(SUM(cs.actual_paid_amount), 0) AS subscription_revenue,
+          0 AS usage_revenue
+        FROM company_subscriptions cs
+        JOIN companies c ON c.id = cs.company_id
+        CROSS JOIN month_range mr
+        WHERE c.grade <> 'free'
+          AND DATE(cs.start_date AT TIME ZONE 'Asia/Seoul') >= mr.month_start
+          AND DATE(cs.start_date AT TIME ZONE 'Asia/Seoul') <= mr.month_end
+        
+        UNION ALL
+        
+        -- 사용료 (유효재생 기준) - 차감
+        SELECT 
+          0 AS subscription_revenue,
+          COALESCE(SUM(
+            CASE 
+              WHEN mp.use_case = '0' OR mp.use_case = '1' THEN m.price_per_play::numeric
+              WHEN mp.use_case = '2' AND m.inst = false THEN m.lyrics_price::numeric
+              ELSE 0
+            END
+          ), 0) AS usage_revenue
+        FROM music_plays mp
+        JOIN musics m ON m.id = mp.music_id
+        CROSS JOIN month_range mr
+        WHERE mp.is_valid_play = true
+          AND mp.created_at >= mr.month_start
+          AND mp.created_at <= mr.month_end
+      ) revenue_data
     `
+    
     const res = await this.db.execute(current ? qCurrent : qPast)
     const row = (res.rows?.[0] as any) || {}
     const mtd = Number(row.mtd ?? 0)
 
-    // days passed (KST) and total days in month
-    const now = new Date()
-    const kst = new Date(now.getTime() + 9 * 3600 * 1000)
-    const curY = kst.getUTCFullYear()
-    const curM = kst.getUTCMonth() + 1
-    const isCurrentMonth = (curY === y && curM === m)
-    const daysInMonth = new Date(y, m, 0).getDate()
-    const dayOfMonth = isCurrentMonth ? kst.getUTCDate() : daysInMonth
-    const forecast = dayOfMonth > 0 ? Math.round((mtd / dayOfMonth) * daysInMonth) : mtd
-
-    return { mtd, forecast, asOf: ym }
+    return { mtd, forecast: mtd, asOf: ym }
   }
 
   async getRewardsFilledStats(query: RewardsFilledStatsQueryDto): Promise<RewardsFilledStatsResponseDto> {
@@ -953,17 +1007,89 @@ export class MusicsService implements OnModuleInit {
     const now = new Date();
     const y = now.getUTCFullYear();
     const m = now.getUTCMonth(); 
-    const next = new Date(Date.UTC(y, m + 1, 1));
-    const ym = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`;
-    const upsertQuery = buildUpsertNextMonthRewardsQuery({
+    const current = new Date(Date.UTC(y, m, 1));
+    const ym = `${current.getUTCFullYear()}-${String(current.getUTCMonth() + 1).padStart(2, '0')}`;
+    
+    // 1단계: 현재 사용량 조회
+    const currentData = await this.db.execute(sql`
+      SELECT total_reward_count, remaining_reward_count
+      FROM monthly_music_rewards
+      WHERE music_id = ${musicId} AND year_month = ${ym}
+    `);
+    
+    console.log('조회된 데이터:', {
       musicId,
       yearMonth: ym,
-      totalRewardCount: dto.totalRewardCount,
-      rewardPerPlay: dto.rewardPerPlay,
+      rowsCount: currentData.rows?.length || 0,
+      rows: currentData.rows
     });
+    
+    let newRemainingCount = dto.totalRewardCount;
+    if (currentData.rows && currentData.rows.length > 0) {
+      const currentRow = currentData.rows[0] as any;
+      const usedCount = currentRow.total_reward_count - currentRow.remaining_reward_count;
+      
+      // 새 한도에서 사용량을 뺀 값이 0보다 크면 그 값을, 아니면 0을 사용
+      if (dto.totalRewardCount > usedCount) {
+        newRemainingCount = dto.totalRewardCount - usedCount;
+      } else {
+        newRemainingCount = 0;
+      }
+      
+      console.log('리워드 수정 로직:', {
+        musicId,
+        yearMonth: ym,
+        currentTotal: currentRow.total_reward_count,
+        currentRemaining: currentRow.remaining_reward_count,
+        usedCount,
+        newTotal: dto.totalRewardCount,
+        newRemaining: newRemainingCount
+      });
+    }
+    
+    // 2단계: 리워드 업데이트 - Drizzle ORM 사용
+    try {
+      // 먼저 기존 레코드가 있는지 확인
+      const existingRecord = await this.db
+        .select()
+        .from(monthly_music_rewards)
+        .where(and(
+          eq(monthly_music_rewards.music_id, musicId),
+          eq(monthly_music_rewards.year_month, ym)
+        ))
+        .limit(1);
 
-    const result = await this.db.execute(upsertQuery);
-    return { message: '다음 달 리워드가 업데이트되었습니다.', musicId, yearMonth: ym };
+      if (existingRecord.length > 0) {
+        // 기존 레코드가 있으면 UPDATE
+        await this.db
+          .update(monthly_music_rewards)
+          .set({
+            total_reward_count: dto.totalRewardCount,
+            remaining_reward_count: newRemainingCount,
+            reward_per_play: dto.rewardPerPlay.toString(),
+            updated_at: new Date(),
+          })
+          .where(and(
+            eq(monthly_music_rewards.music_id, musicId),
+            eq(monthly_music_rewards.year_month, ym)
+          ));
+      } else {
+        // 기존 레코드가 없으면 INSERT
+        await this.db
+          .insert(monthly_music_rewards)
+          .values({
+            music_id: musicId,
+            year_month: ym,
+            total_reward_count: dto.totalRewardCount,
+            remaining_reward_count: newRemainingCount,
+            reward_per_play: dto.rewardPerPlay.toString(),
+          });
+      }
+    } catch (error) {
+      console.error('리워드 업데이트 실패:', error);
+      throw error;
+    }
+    return { message: '현재 달 리워드가 업데이트되었습니다.', musicId, yearMonth: ym };
   }
 
 
