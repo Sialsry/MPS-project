@@ -22,6 +22,13 @@
       "when": 1756901376630,
       "tag": "0002_dark_lockheed",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1757250946432,
+      "tag": "0003_code-first-indexes",
+      "breakpoints": true
     }
   ]
 }

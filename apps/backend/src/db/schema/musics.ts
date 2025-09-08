@@ -18,7 +18,7 @@ export const musics = pgTable('musics', {
   lyrics_text: text('lyrics_text'),
   lyrics_file_path: text('lyrics_file_path'), // 가사 파일 경로 (기존 lyrics_file에서 변경)
   inst: boolean('inst').notNull().default(false), // true: instrumental, false: with vocal. 가사가 없으면 true
-  isrc: text('isrc').unique(),
+  isrc: text('isrc'),
   duration_sec: integer('duration_sec'),
   release_date: date('release_date'),
   cover_image_url: text('cover_image_url'),
@@ -28,8 +28,7 @@ export const musics = pgTable('musics', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   category_id: integer('category_id'),
-  grade: integer('grade_required').notNull().default(0), // 0: free 가능, 1: standard 이상
-  is_active: boolean('is_active').default(true),
+  grade: integer('grade_required').notNull().default(0), // 0: free, standard, business | 1: standard, business (리워드 있음) | 2: standard, business (리워드 없음)
   total_valid_play_count: bigint('valid_play_count', { mode: 'number' }).default(0),
   total_play_count: bigint('total_play_count', { mode: 'number' }).default(0),
   total_rewarded_amount: numeric('total_rewarded_amount').default('0'), // 누적 지급된 리워드 금액

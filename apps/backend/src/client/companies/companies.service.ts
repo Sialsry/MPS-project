@@ -5,7 +5,7 @@ import { OdcloudClient } from './odcloud.client';
 import { CreateCompanyDto } from './dto/create-companie.dto';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes, createHash } from 'node:crypto';
-import { ApiKeyUtil } from 'src/common/utils/api-key.util';
+import { ApiKeyUtil } from '../common/utils/api-key.util';
 // 🔹 레포 타입과의 의존성 최소화를 위해 로컬 최소 타입 정의
 type MinimalSubscriptionRow = {
   start_date: Date | string;

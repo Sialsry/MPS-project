@@ -7,7 +7,7 @@ export const music_tags = pgTable('music_tags', {
   id: serial('id').primaryKey(),
   text: text('text').notNull(),
   music_id: bigint('music_id', { mode: 'number' }).notNull(),
-  raw_tag_id: integer('raw_tag_id').notNull(),
+  raw_tag_id: integer('raw_tag_id'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
 
@@ -20,4 +20,4 @@ export const music_tagsRelations = relations(music_tags, ({ one }) => ({
     fields: [music_tags.raw_tag_id],
     references: [raw_tags.id],
   }),
-})) 
+}))
