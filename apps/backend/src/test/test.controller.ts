@@ -13,15 +13,16 @@ export class TestController {
     @Post('manual-batch')
     async testManualBatch(@Body() body: { targetDate?: string }) {
         const targetDate = body.targetDate ? new Date(body.targetDate) : undefined;
+        // console.log(targetDate, "targetDate 입니다.ㅣ")
         return await this.schedulerService.manualExecute(targetDate);
     }
 
     // 수동 리워드 처리 테스트
-    @Post('manual-reward')
-    async testManualReward(@Body() body: { targetDate?: string }) {
-        const targetDate = body.targetDate ? new Date(body.targetDate) : undefined;
-        return await this.schedulerService.manualRewardExecute(targetDate);
-    }
+    // @Post('manual-reward')
+    // async testManualReward(@Body() body: { targetDate?: string }) {
+    //     const targetDate = body.targetDate ? new Date(body.targetDate) : undefined;
+    //     return await this.schedulerService.manualRewardExecute(targetDate);
+    // }
 
     // 일일 사용량 조회 (pending)
     @Get('daily-usage')
@@ -91,13 +92,18 @@ export class TestController {
 
     // 테스트 데이터 생성 (개발 환경용)
     @Post('create-test-data')
-    async createTestData() {
-        // 이 엔드포인트는 실제 개발/테스트 환경에서만 사용
-        // 프로덕션에서는 제거하거나 비활성화해야 함
+    async createTestData(@Body() body: { recordCount?: number; targetDate?: string }) {
+        const recordCount = body.recordCount || 100;
+        const targetDate = body.targetDate ? new Date(body.targetDate) : undefined;
 
-        return {
-            message: "테스트 데이터 생성 기능은 별도 구현이 필요합니다.",
-            note: "rewards 테이블에 직접 INSERT하는 로직을 추가하세요."
-        };
+        return await this.recordService.createTestData(recordCount, targetDate);
+    }
+
+    // 테스트 데이터 삭제 (개발 환경용)
+    @Post('delete-test-data')
+    async deleteTestData(@Body() body: { targetDate?: string }) {
+        const targetDate = body.targetDate ? new Date(body.targetDate) : undefined;
+
+        return await this.recordService.deleteTestData(targetDate);
     }
 }

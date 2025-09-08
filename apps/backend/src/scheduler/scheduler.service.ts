@@ -12,18 +12,353 @@ export class SchedulerService {
     private rewardTokenContract: ethers.Contract;
 
     constructor(private readonly recordService: RecordService) {
+        // 환경변수 확인
+        this.logger.log('=== 환경변수 확인 ===');
+        this.logger.log(`INFURA_RPC: ${process.env.INFURA_RPC ? '설정됨' : '설정되지 않음'}`);
+        this.logger.log(`PRIVATE_KEY: ${process.env.PRIVATE_KEY ? '설정됨' : '설정되지 않음'}`);
+        this.logger.log(`RECORD_USAGE_CONTRACT_ADDRESS: ${process.env.RECORD_USAGE_CONTRACT_ADDRESS ? '설정됨' : '설정되지 않음'}`);
+        this.logger.log(`REWARD_TOKEN_CONTRACT_ADDRESS: ${process.env.REWARD_TOKEN_CONTRACT_ADDRESS ? '설정됨' : '설정되지 않음'}`);
+
+        // 필수 환경변수 검증
+        if (!process.env.INFURA_RPC) {
+            throw new Error('INFURA_RPC 환경변수가 설정되지 않았습니다.');
+        }
+        if (!process.env.PRIVATE_KEY) {
+            throw new Error('PRIVATE_KEY 환경변수가 설정되지 않았습니다.');
+        }
+        if (!process.env.RECORD_USAGE_CONTRACT_ADDRESS) {
+            throw new Error('RECORD_USAGE_CONTRACT_ADDRESS 환경변수가 설정되지 않았습니다.');
+        }
+        if (!process.env.REWARD_TOKEN_CONTRACT_ADDRESS) {
+            throw new Error('REWARD_TOKEN_CONTRACT_ADDRESS 환경변수가 설정되지 않았습니다.');
+        }
+
         // 블록체인 설정 초기화
         this.provider = new ethers.JsonRpcProvider(process.env.INFURA_RPC);
         this.wallet = new ethers.Wallet(process.env.PRIVATE_KEY!, this.provider);
 
         // RecordUsage 컨트랙트 설정 - 배치 처리용
         const recordUsageAbi = [
-            "function recordDailyUsageBatch(tuple(uint256 company_id, uint256 music_id, uint256 play_id, uint8 reward_code, uint256 created_at)[] usageRecords) external",
-            "function processDailyRewardsBatch(address[] recipients, uint256[] amounts) external",
-            "function approvedCompanies(address) view returns (bool)",
-            "event PlayRecorded(address indexed using_company, uint256 indexed track_id, uint8 use_case, uint256 play_id, uint8 reward_code)",
-            "event BatchRecorded(uint256 recordCount, uint256 timestamp)",
-            "event DailyRewardsBatchProcessed(uint256 recipientCount, uint256 totalAmount)"
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "initial_owner",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "_rewardToken",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
+                "inputs": [],
+                "name": "EmptyBatch",
+                "type": "error"
+            },
+            {
+                "inputs": [],
+                "name": "EnforcedPause",
+                "type": "error"
+            },
+            {
+                "inputs": [],
+                "name": "ExpectedPause",
+                "type": "error"
+            },
+            {
+                "inputs": [],
+                "name": "InvalidTrackId",
+                "type": "error"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "owner",
+                        "type": "address"
+                    }
+                ],
+                "name": "OwnableInvalidOwner",
+                "type": "error"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "account",
+                        "type": "address"
+                    }
+                ],
+                "name": "OwnableUnauthorizedAccount",
+                "type": "error"
+            },
+            {
+                "inputs": [],
+                "name": "ReentrancyGuardReentrantCall",
+                "type": "error"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": true,
+                        "internalType": "address",
+                        "name": "processor",
+                        "type": "address"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "recordCount",
+                        "type": "uint256"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "timestamp",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "BatchRecorded",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "totalRecipients",
+                        "type": "uint256"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "totalAmount",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "DailyRewardsBatchProcessed",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": true,
+                        "internalType": "address",
+                        "name": "previousOwner",
+                        "type": "address"
+                    },
+                    {
+                        "indexed": true,
+                        "internalType": "address",
+                        "name": "newOwner",
+                        "type": "address"
+                    }
+                ],
+                "name": "OwnershipTransferred",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": false,
+                        "internalType": "address",
+                        "name": "account",
+                        "type": "address"
+                    }
+                ],
+                "name": "Paused",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": true,
+                        "internalType": "uint256",
+                        "name": "company_id",
+                        "type": "uint256"
+                    },
+                    {
+                        "indexed": true,
+                        "internalType": "uint256",
+                        "name": "track_id",
+                        "type": "uint256"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "play_id",
+                        "type": "uint256"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "enum RecordUsage.RewardCode",
+                        "name": "reward_code",
+                        "type": "uint8"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "usedAt",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "PlayRecorded",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": false,
+                        "internalType": "address",
+                        "name": "account",
+                        "type": "address"
+                    }
+                ],
+                "name": "Unpaused",
+                "type": "event"
+            },
+            {
+                "inputs": [],
+                "name": "owner",
+                "outputs": [
+                    {
+                        "internalType": "address",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "pause",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "paused",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address[]",
+                        "name": "recipients",
+                        "type": "address[]"
+                    },
+                    {
+                        "internalType": "uint256[]",
+                        "name": "amounts",
+                        "type": "uint256[]"
+                    }
+                ],
+                "name": "processDailyRewardsBatch",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "components": [
+                            {
+                                "internalType": "uint256",
+                                "name": "company_id",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "music_id",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "play_id",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint8",
+                                "name": "reward_code",
+                                "type": "uint8"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "created_at",
+                                "type": "uint256"
+                            }
+                        ],
+                        "internalType": "struct RecordUsage.UsageRecord[]",
+                        "name": "usageRecords",
+                        "type": "tuple[]"
+                    }
+                ],
+                "name": "recordDailyUsageBatch",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "renounceOwnership",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "rewardToken",
+                "outputs": [
+                    {
+                        "internalType": "contract IRewardToken",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "newOwner",
+                        "type": "address"
+                    }
+                ],
+                "name": "transferOwnership",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "unpause",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            }
         ];
 
         this.recordUsageContract = new ethers.Contract(
@@ -33,12 +368,7 @@ export class SchedulerService {
         );
 
         // RewardToken2 컨트랙트 설정
-        const rewardTokenAbi = [
-            "function processDailyRewardsBatch(address[] recipients, uint256[] amounts) external",
-            "function balanceOf(address account) external view returns (uint256)",
-            "function totalSupply() external view returns (uint256)",
-            "event DailyRewardsBatchProcessed(uint256 recipientCount, uint256 totalAmount)"
-        ];
+        const rewardTokenAbi = []
 
         this.rewardTokenContract = new ethers.Contract(
             process.env.REWARD_TOKEN_CONTRACT_ADDRESS!,
@@ -76,10 +406,10 @@ export class SchedulerService {
 
             try {
                 // 배치 처리로 블록체인에 기록
-                const txHash = await this.sendBatchToBlockchain(dailyUsage);
+                const { txHash, gasUsed, blockNumber } = await this.sendBatchToBlockchain(dailyUsage);
 
-                // 모든 레코드의 상태를 성공으로 업데이트
-                // await this.updateAllRecordsStatus(dailyUsage, txHash, 'successed');
+                // 모든 레코드의 상태를 업데이트
+                await this.updateAllRecordsStatus(dailyUsage, txHash, 'pending', gasUsed, blockNumber);
 
                 this.logger.log(`배치 처리 성공 - 총 ${dailyUsage.length}개 레코드, TX: ${txHash}`);
 
@@ -90,7 +420,7 @@ export class SchedulerService {
                 this.logger.error('배치 처리 실패:', error.message);
 
                 // 모든 레코드의 상태를 실패로 업데이트
-                await this.updateAllRecordsStatus(dailyUsage, '', 'falied');
+                await this.updateAllRecordsStatus(dailyUsage, null, 'falied', 0, 0);
             }
 
             this.logger.log('=== 일일 블록체인 기록 스케줄러 완료 ===');
@@ -107,9 +437,10 @@ export class SchedulerService {
         try {
             // 일일 리워드 집계 조회 (reward_code=1, pending 상태)
             const rewardAggregation = await this.recordService.getDailyRewardAggregation(targetDate);
+            console.log(rewardAggregation, "rewardAggregation 결과")
 
             if (rewardAggregation.length === 0) {
-                this.logger.log('처리할 리워드가 없습니다.');
+                this.logger.log('처리할 리워드가 없습니다.21384');
                 return;
             }
 
@@ -136,10 +467,12 @@ export class SchedulerService {
             this.logger.log(`실제 지급 대상: ${recipients.length}개 주소`);
 
             // 리워드 토큰 배치 지급 실행
-            const rewardTxHash = await this.sendRewardTokenBatch(recipients, amounts);
+            const { rewardTxHash, gasUsed, blockNumber } = await this.sendRewardTokenBatch(recipients, amounts);
 
             // 해당 날짜의 모든 reward_code=1 레코드들의 상태 업데이트
-            await this.updateRewardRecordsStatus(companyIds, targetDate, rewardTxHash, 'successed');
+            await this.updateRewardRecordsStatus(companyIds, targetDate, rewardTxHash, 'successed', gasUsed, blockNumber);
+
+            // await this.recordService.updateCompanyAndMusicTotalRewards(rewardAggregation);
 
             this.logger.log(`리워드 토큰 배치 지급 완료 - TX: ${rewardTxHash}`);
 
@@ -152,7 +485,7 @@ export class SchedulerService {
     }
 
     // 리워드 토큰 배치 전송
-    private async sendRewardTokenBatch(recipients: string[], amounts: string[]): Promise<string> {
+    private async sendRewardTokenBatch(recipients: string[], amounts: string[]): Promise<{ rewardTxHash: string, gasUsed: ethers.BigNumberish, blockNumber: number }> {
         try {
             this.logger.log('리워드 토큰 배치 전송 중...');
 
@@ -180,8 +513,11 @@ export class SchedulerService {
             const receipt = await tx.wait();
 
             if (receipt.status === 1) {
-                this.logger.log(`리워드 배치 트랜잭션 성공: ${tx.hash}, 가스 사용량: ${receipt.gasUsed}`);
-                return tx.hash;
+                this.logger.log(`리워드 배치 트랜잭션 성공: ${tx.hash}, 가스 사용량: ${receipt.gasUsed}, 블록 번호: ${receipt.blockNumber}`);
+
+                // await this.updateCompanyAndMusicRewards(recipients, amounts);
+
+                return { rewardTxHash: tx.hash, gasUsed: receipt.gasUsed, blockNumber: receipt.blockNumber };
             } else {
                 throw new Error(`리워드 배치 트랜잭션 실패: ${tx.hash}`);
             }
@@ -192,17 +528,33 @@ export class SchedulerService {
         }
     }
 
+    // 회사 및 음악별 리워드 합계 업데이트
+    // private async updateCompanyAndMusicRewards(recipients: string[], amounts: string[]) {
+    //     this.logger.log('회사 및 음악별 리워드 합계 업데이트 중...');
+    //     for (let i = 0; i < recipients.length; i++) {
+    //         const recipient = recipients[i];
+    //         const amount = parseFloat(ethers.formatEther(amounts[i]));
+    //         try {
+    //     }
+    // }
+
     // 리워드 레코드들의 상태 업데이트
-    private async updateRewardRecordsStatus(companyIds: number[], targetDate: Date, txHash: string, status: 'successed' | 'falied') {
+    private async updateRewardRecordsStatus(companyIds: number[], targetDate: Date, txHash: string, status: 'successed' | 'falied', gasUsed: ethers.BigNumberish, blockNumber: number) {
         this.logger.log(`리워드 레코드 상태 업데이트 중...`);
 
         for (const companyId of companyIds) {
             try {
                 const pendingRewards = await this.recordService.getCompanyPendingRewards(companyId, targetDate);
+                console.log(pendingRewards, "pendingRewards 입니다.람")
+
+                // 회사 및 음악별 총 리워드 합계 업데이트
+                await this.recordService.updateCompanyAndMusicTotalRewards(pendingRewards);
+
                 const playIds = pendingRewards.map(reward => reward.playId);
+                console.log(playIds, "playIds 입니ㅑ댜")
 
                 if (playIds.length > 0) {
-                    await this.recordService.updateRewardBatchStatus(playIds, txHash, status);
+                    await this.recordService.updateRewardBatchStatus(playIds, txHash, status, gasUsed, blockNumber);
                     this.logger.log(`회사 ${companyId}: ${playIds.length}개 리워드 레코드 상태 업데이트 완료`);
                 }
             } catch (error) {
@@ -214,7 +566,7 @@ export class SchedulerService {
     }
 
     // 배치로 레코드들을 블록체인에 전송
-    private async sendBatchToBlockchain(records: any[]): Promise<string> {
+    private async sendBatchToBlockchain(records: any[]): Promise<{ txHash: string, gasUsed: ethers.BigNumberish, blockNumber: number }> {
         try {
             this.logger.log('배치 데이터 준비 중...');
 
@@ -254,7 +606,7 @@ export class SchedulerService {
 
             if (receipt.status === 1) {
                 this.logger.log(`배치 트랜잭션 성공: ${tx.hash}, 가스 사용량: ${receipt.gasUsed}`);
-                return tx.hash;
+                return { txHash: tx.hash, gasUsed: receipt.gasUsed, blockNumber: receipt.blockNumber };
             } else {
                 throw new Error(`배치 트랜잭션 실패: ${tx.hash}`);
             }
@@ -266,12 +618,12 @@ export class SchedulerService {
     }
 
     // 모든 레코드의 상태를 일괄 업데이트
-    private async updateAllRecordsStatus(records: any[], txHash: string, status: 'successed' | 'falied') {
+    private async updateAllRecordsStatus(records: any[], txHash: string | null, status: 'successed' | 'falied' | 'pending', gasUsed?: ethers.BigNumberish, blockNumber?: number) {
         this.logger.log(`${records.length}개 레코드의 상태를 ${status}로 업데이트 중...`);
 
         for (const record of records) {
             try {
-                await this.recordService.updateRewardStatus(record.playId, txHash, status);
+                await this.recordService.updateRewardStatus(record.playId, txHash, status, gasUsed, blockNumber);
             } catch (error) {
                 this.logger.error(`Play ID ${record.playId} 상태 업데이트 실패:`, error);
             }
@@ -291,6 +643,8 @@ export class SchedulerService {
 
         return codeMap[rewardCode] ?? 0;
     }
+
+
 
     // 수동 실행 메서드 (테스트용) - 배치 처리 버전
     async manualExecute(targetDate?: Date): Promise<{ success: boolean; total: number; txHash?: string; rewardTxHash?: string; error?: string }> {
@@ -313,29 +667,31 @@ export class SchedulerService {
 
         try {
             // 1. 사용 내역 배치 처리
-            const txHash = await this.sendBatchToBlockchain(dailyUsage);
-            await this.updateAllRecordsStatus(dailyUsage, txHash, 'successed');
+            const { txHash, gasUsed, blockNumber } = await this.sendBatchToBlockchain(dailyUsage);
+
+            await this.updateAllRecordsStatus(dailyUsage, txHash, 'pending', gasUsed, blockNumber);
 
             this.logger.log(`수동 배치 실행 완료 - 총 ${dailyUsage.length}개 레코드 성공`);
 
             // 2. 리워드 토큰 배치 처리
             let rewardTxHash: string | undefined;
             try {
+                console.log("여기까지 오나요?ㄴ")
                 await this.processRewardTokenBatch(processDate);
                 // 리워드 집계에서 실제 트랜잭션 해시를 가져오기 위해 별도 처리 필요
-                const rewardAggregation = await this.recordService.getDailyRewardAggregation(processDate);
-                if (rewardAggregation.length > 0) {
-                    const recipients = rewardAggregation
-                        .filter(r => r.smartAccountAddress && r.totalRewardAmount > 0)
-                        .map(r => r.smartAccountAddress!);
-                    const amounts = rewardAggregation
-                        .filter(r => r.smartAccountAddress && r.totalRewardAmount > 0)
-                        .map(r => ethers.parseEther(r.totalRewardAmount.toString()).toString());
+                // const rewardAggregation = await this.recordService.getDailyRewardAggregation(processDate);
+                // if (rewardAggregation.length > 0) {
+                //     const recipients = rewardAggregation
+                //         .filter(r => r.smartAccountAddress && r.totalRewardAmount > 0)
+                //         .map(r => r.smartAccountAddress!);
+                //     const amounts = rewardAggregation
+                //         .filter(r => r.smartAccountAddress && r.totalRewardAmount > 0)
+                //         .map(r => ethers.parseEther(r.totalRewardAmount.toString()).toString());
 
-                    if (recipients.length > 0) {
-                        rewardTxHash = await this.sendRewardTokenBatch(recipients, amounts);
-                    }
-                }
+                //     if (recipients.length > 0) {
+                //         rewardTxHash = await this.sendRewardTokenBatch(recipients, amounts);
+                //     }
+                // }
             } catch (rewardError) {
                 this.logger.warn('리워드 처리 실패 (사용 내역 기록은 성공):', rewardError.message);
             }
@@ -344,54 +700,54 @@ export class SchedulerService {
 
         } catch (error) {
             this.logger.error('수동 배치 실행 실패:', error.message);
-            await this.updateAllRecordsStatus(dailyUsage, '', 'falied');
+            await this.updateAllRecordsStatus(dailyUsage, null, 'falied', 0, 0);
 
             return { success: false, total: dailyUsage.length, error: error.message };
         }
     }
 
     // 수동 리워드 처리 메서드 (별도 실행용)
-    async manualRewardExecute(targetDate?: Date): Promise<{ success: boolean; recipients: number; txHash?: string; error?: string }> {
-        this.logger.log('=== 수동 리워드 토큰 처리 실행 ===');
+    // async manualRewardExecute(targetDate?: Date): Promise<{ success: boolean; recipients: number; txHash?: string; error?: string }> {
+    //     this.logger.log('=== 수동 리워드 토큰 처리 실행 ===');
 
-        const processDate = targetDate || (() => {
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            return yesterday;
-        })();
+    //     const processDate = targetDate || (() => {
+    //         const yesterday = new Date();
+    //         yesterday.setDate(yesterday.getDate() - 1);
+    //         return yesterday;
+    //     })();
 
-        try {
-            const rewardAggregation = await this.recordService.getDailyRewardAggregation(processDate);
+    //     try {
+    //         const rewardAggregation = await this.recordService.getDailyRewardAggregation(processDate);
 
-            if (rewardAggregation.length === 0) {
-                this.logger.log('처리할 리워드가 없습니다.');
-                return { success: true, recipients: 0 };
-            }
+    //         if (rewardAggregation.length === 0) {
+    //             this.logger.log('처리할 리워드가 없습니다.');
+    //             return { success: true, recipients: 0 };
+    //         }
 
-            const recipients = rewardAggregation
-                .filter(r => r.smartAccountAddress && r.totalRewardAmount > 0)
-                .map(r => r.smartAccountAddress!);
-            const amounts = rewardAggregation
-                .filter(r => r.smartAccountAddress && r.totalRewardAmount > 0)
-                .map(r => ethers.parseEther(r.totalRewardAmount.toString()).toString());
+    //         const recipients = rewardAggregation
+    //             .filter(r => r.smartAccountAddress && r.totalRewardAmount > 0)
+    //             .map(r => r.smartAccountAddress!);
+    //         const amounts = rewardAggregation
+    //             .filter(r => r.smartAccountAddress && r.totalRewardAmount > 0)
+    //             .map(r => ethers.parseEther(r.totalRewardAmount.toString()).toString());
 
-            if (recipients.length === 0) {
-                this.logger.log('유효한 리워드 지급 대상이 없습니다.');
-                return { success: true, recipients: 0 };
-            }
+    //         if (recipients.length === 0) {
+    //             this.logger.log('유효한 리워드 지급 대상이 없습니다.');
+    //             return { success: true, recipients: 0 };
+    //         }
 
-            const txHash = await this.sendRewardTokenBatch(recipients, amounts);
+    //         const txHash = await this.sendRewardTokenBatch(recipients, amounts);
 
-            // 상태 업데이트
-            const companyIds = rewardAggregation.map(r => r.companyId);
-            await this.updateRewardRecordsStatus(companyIds, processDate, txHash, 'successed');
+    //         // 상태 업데이트
+    //         const companyIds = rewardAggregation.map(r => r.companyId);
+    //         await this.updateRewardRecordsStatus(companyIds, processDate, txHash, 'successed');
 
-            this.logger.log(`수동 리워드 처리 완료 - ${recipients.length}개 주소, TX: ${txHash}`);
-            return { success: true, recipients: recipients.length, txHash };
+    //         this.logger.log(`수동 리워드 처리 완료 - ${recipients.length}개 주소, TX: ${txHash}`);
+    //         return { success: true, recipients: recipients.length, txHash };
 
-        } catch (error) {
-            this.logger.error('수동 리워드 처리 실패:', error.message);
-            return { success: false, recipients: 0, error: error.message };
-        }
-    }
+    //     } catch (error) {
+    //         this.logger.error('수동 리워드 처리 실패:', error.message);
+    //         return { success: false, recipients: 0, error: error.message };
+    //     }
+    // }
 }
