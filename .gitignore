@@ -11,6 +11,8 @@ mps-api/
 .DS_Store
 Thumbs.db
 
+apps/backend/dist/
+
 # ---------------------------- hardhat에서 자동으로 생성 --------------------------------------------------------------
 
 # Hardhat Ignition default folder for deployments against a local node

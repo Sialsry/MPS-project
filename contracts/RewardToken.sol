@@ -57,4 +57,19 @@ contract RewardToken is ERC20, Ownable, Pausable, ReentrancyGuard {
             }
         }
     }
+
+    function burn(address account, uint256 amount) external onlyOwner {
+        _burn(account, amount);
+    }
+
+    function _update(
+        address from,
+        address to,
+        uint256 value
+    ) internal override {
+        if (from != address(0) && to != address(0) && authorizedMinter[msg.sender] != true) { 
+            revert("NonTransferable");
+        }
+        super._update(from, to, value);
+    }
 }
