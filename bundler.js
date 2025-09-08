@@ -23,13 +23,13 @@ app.post("/userop", async (req, res) => {
     }
 })
 
-app.get("/mempool", (req, res) => {
-    try {
-        res.json({mempool})
-    } catch (error) {
-        res.json({error})
-    }
-})
+// app.get("/mempool", (req, res) => {
+//     try {
+//         res.json({mempool})
+//     } catch (error) {
+//         res.json({error})
+//     }
+// })
 
 const setTimeInterval = (callback, intervalTime) => {
     const loop = async () => {
