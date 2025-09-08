@@ -6,7 +6,5 @@ apps/backend/uploads/
 # -------------- contract branch에서 추가함 -------
 artifacts/
 cache/
-copilot_tests/
 ignition/
-mps-api/
 # -------------- contract branch에서 추가함 -------
