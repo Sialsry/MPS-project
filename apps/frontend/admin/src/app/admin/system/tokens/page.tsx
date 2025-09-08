@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Card from '@/components/ui/Card'
 import Title from '@/components/ui/Title'
 import DailyTxDetailModal from '@/components/modals/DailyTxDetailModal'
@@ -21,71 +21,86 @@ type DailyRewardBatch = {
 }
 
 export default function RewardsTokensPage() {
-  // 대납자 지갑 정보 (샘플)
-  const [sponsorWallet, setSponsorWallet] = useState({
-    address: '0x9f8a...bC42',
-    ethBalance: 2.3456,
-    lastUpdated: '2025-09-04 14:42:15'
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+  
+  // 토큰 정보
+  const [tokenInfo, setTokenInfo] = useState({
+    contractAddress: '',
+    totalSupply: 0,
+    totalIssued: 0,
+    totalBurned: 0,
+    circulatingSupply: 0,
+    tokenName: '',
+    tokenSymbol: '',
+    decimals: 18
   })
 
-  // 일별 집계 (샘플 데이터)
-  const [dailyBatches] = useState<DailyRewardBatch[]>([
-    {
-      id: '2025-09-04',
-      date: '2025-09-04',
-      executedAt: null,
-      totalReward: 0,
-      dbValidPlayCount: 1234,
-      onchainRecordedPlayCount: 0,
-      txHash: null,
-      status: 'not-executed',
-      mismatch: true
-    },
-    {
-      id: '2025-09-03',
-      date: '2025-09-03',
-      executedAt: '2025-09-03 23:59:43',
-      totalReward: 45210,
-      dbValidPlayCount: 9812,
-      onchainRecordedPlayCount: 9812,
-      txHash: '0xabc123...89ef',
-      status: 'success',
-      mismatch: false,
-      blockNumber: 18456732,
-      gasUsed: 185000
-    },
-    {
-      id: '2025-09-02',
-      date: '2025-09-02',
-      executedAt: '2025-09-02 23:58:55',
-      totalReward: 43890,
-      dbValidPlayCount: 9655,
-      onchainRecordedPlayCount: 9601,
-      txHash: '0xdef456...12aa',
-      status: 'success',
-      mismatch: true,
-      blockNumber: 18432110,
-      gasUsed: 192340
-    },
-    {
-      id: '2025-09-01',
-      date: '2025-09-01',
-      executedAt: '2025-09-01 23:59:10',
-      totalReward: 40110,
-      dbValidPlayCount: 9100,
-      onchainRecordedPlayCount: 9100,
-      txHash: '0x9876ff...cc21',
-      status: 'failed',
-      mismatch: true,
-      blockNumber: 18411002,
-      gasUsed: 90000
-    }
-  ])
+  // 대납자 지갑 정보
+  const [sponsorWallet, setSponsorWallet] = useState({
+    address: '',
+    ethBalance: 0,
+    lastUpdated: ''
+  })
+
+  // 일별 집계 데이터
+  const [dailyBatches, setDailyBatches] = useState<DailyRewardBatch[]>([])
+  const [loading, setLoading] = useState(true)
 
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null)
   const selectedBatch = dailyBatches.find(b => b.id === selectedBatchId) || null
 
   const [isProcessingToday, setIsProcessingToday] = useState(false)
+
+  // API 호출 함수들
+  const fetchTokenInfo = async () => {
+    try {
+      const response = await fetch(`${baseUrl}/admin/tokens/info`)
+      if (response.ok) {
+        const data = await response.json()
+        setTokenInfo(data)
+      }
+    } catch (error) {
+      console.error('토큰 정보 조회 실패:', error)
+    }
+  }
+
+  const fetchWalletInfo = async () => {
+    try {
+      const response = await fetch(`${baseUrl}/admin/tokens/wallet`)
+      if (response.ok) {
+        const data = await response.json()
+        setSponsorWallet(data)
+      }
+    } catch (error) {
+      console.error('지갑 정보 조회 실패:', error)
+    }
+  }
+
+  const fetchDailyBatches = async () => {
+    try {
+      const response = await fetch(`${baseUrl}/admin/tokens/batches?limit=10`)
+      if (response.ok) {
+        const data = await response.json()
+        setDailyBatches(data)
+      }
+    } catch (error) {
+      console.error('일별 배치 조회 실패:', error)
+    }
+  }
+
+  // 컴포넌트 마운트 시 데이터 로드
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true)
+      await Promise.all([
+        fetchTokenInfo(),
+        fetchWalletInfo(),
+        fetchDailyBatches()
+      ])
+      setLoading(false)
+    }
+    loadData()
+  }, [])
 
   const handleProcessToday = async () => {
     if (isProcessingToday) return
@@ -98,6 +113,10 @@ export default function RewardsTokensPage() {
     } finally {
       setIsProcessingToday(false)
     }
+  }
+
+  const handleRefreshWallet = async () => {
+    await fetchWalletInfo()
   }
 
   const getBatchStatusBadge = (status: DailyRewardBatch['status']) => {
@@ -113,6 +132,22 @@ export default function RewardsTokensPage() {
       default:
         return { text: status, className: 'bg-white/10 text-white/80 border-white/20' }
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <Title variant="section">토큰/온체인 관리</Title>
+          <div className="text-sm text-white/60">
+            블록체인 연동 상태: <span className="text-yellow-400 font-semibold">연결 중...</span>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-white/60">데이터를 불러오는 중...</div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -131,19 +166,19 @@ export default function RewardsTokensPage() {
           <div className="mt-4 space-y-3 text-sm">
             <div className="flex justify-between">
               <span className="text-white/60">컨트랙트 주소:</span>
-              <span className="text-white font-mono">0x1234...abcd</span>
+              <span className="text-white font-mono">{tokenInfo.contractAddress}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-white/60">총 발행량:</span>
-              <span className="text-white font-semibold">1,000,000 토큰</span>
+              <span className="text-white font-semibold">{tokenInfo.totalIssued.toLocaleString()} 토큰</span>
             </div>
             <div className="flex justify-between">
               <span className="text-white/60">현재 유통량:</span>
-              <span className="text-teal-300 font-semibold">876,543 토큰</span>
+              <span className="text-teal-300 font-semibold">{tokenInfo.circulatingSupply.toLocaleString()} 토큰</span>
             </div>
             <div className="flex justify-between">
               <span className="text-white/60">소각된 토큰:</span>
-              <span className="text-red-400 font-semibold">12,345 토큰</span>
+              <span className="text-red-400 font-semibold">{tokenInfo.totalBurned.toLocaleString()} 토큰</span>
             </div>
           </div>
         </Card>
@@ -161,11 +196,11 @@ export default function RewardsTokensPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-white/60">마지막 업데이트:</span>
-              <span className="text-white/70">{sponsorWallet.lastUpdated}</span>
+              <span className="text-white/70">{sponsorWallet.lastUpdated ? new Date(sponsorWallet.lastUpdated).toLocaleString() : '-'}</span>
             </div>
             <div className="pt-1">
               <button
-                onClick={() => setSponsorWallet(prev => ({ ...prev, lastUpdated: new Date().toISOString().replace('T', ' ').slice(0, 19) }))}
+                onClick={handleRefreshWallet}
                 className="w-full rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-2 text-xs text-white/80 transition"
               >
                 잔액 새로고침
@@ -197,7 +232,14 @@ export default function RewardsTokensPage() {
         <div className="flex items-center justify-between mb-4">
           <Title variant="card">트랜잭션 모니터링 (일별 집계)</Title>
           <div className="flex gap-2">
-            <button className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white hover:bg-white/10 transition-colors duration-200">
+            <button 
+              onClick={() => {
+                fetchDailyBatches()
+                fetchTokenInfo()
+                fetchWalletInfo()
+              }}
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white hover:bg-white/10 transition-colors duration-200"
+            >
               새로고침
             </button>
           </div>
@@ -207,11 +249,11 @@ export default function RewardsTokensPage() {
             <thead className="text-left text-white/60">
               <tr className="border-b border-white/10">
                 <th className="py-3 pr-4">날짜</th>
-                <th className="py-3 pr-4">실행 시간</th>
-                <th className="py-3 pr-4">리워드 발행 총량</th>
+                <th className="py-3 pr-4">트랜잭션 완료 시간</th>
+                <th className="py-3 pr-4">분배된 리워드 총량</th>
                 <th className="py-3 pr-4">DB 유효재생</th>
                 <th className="py-3 pr-4">온체인 기록</th>
-                <th className="py-3 pr-4">불일치</th>
+                <th className="py-3 pr-4">발생한 이벤트</th>
                 <th className="py-3 pr-4">Tx Hash</th>
                 <th className="py-3 pr-4">상태</th>
                 <th className="py-3 pr-0 text-right">액션</th>
@@ -220,7 +262,6 @@ export default function RewardsTokensPage() {
             <tbody>
               {dailyBatches.map(batch => {
                 const badge = getBatchStatusBadge(batch.status)
-                const mismatch = batch.mismatch && batch.dbValidPlayCount !== batch.onchainRecordedPlayCount
                 return (
                   <tr key={batch.id} className="border-b border-white/5 hover:bg-white/5 transition-all cursor-pointer" onClick={() => setSelectedBatchId(batch.id)}>
                     <td className="py-3 pr-4 font-mono text-xs text-white/80">{batch.date}</td>
@@ -228,7 +269,11 @@ export default function RewardsTokensPage() {
                     <td className="py-3 pr-4 text-white font-medium">{batch.totalReward.toLocaleString()} <span className="text-white/50 text-xs">토큰</span></td>
                     <td className="py-3 pr-4 text-white/80">{batch.dbValidPlayCount.toLocaleString()}</td>
                     <td className="py-3 pr-4 text-white/80">{batch.onchainRecordedPlayCount.toLocaleString()}</td>
-                    <td className="py-3 pr-4 text-xs">{mismatch ? <span className="text-red-400 font-semibold">불일치</span> : <span className="text-teal-300/70">OK</span>}</td>
+                    <td className="py-3 pr-4 text-xs">
+                      <span className="text-teal-300/70">
+                        {batch.onchainRecordedPlayCount > 0 ? `${batch.onchainRecordedPlayCount}개 Transfer 이벤트` : '이벤트 없음'}
+                      </span>
+                    </td>
                     <td className="py-3 pr-4 font-mono text-xs text-white/60">{batch.txHash || '-'}</td>
                     <td className="py-3 pr-4">
                       <span className={`inline-flex items-center px-2 py-1 rounded-full border text-xs font-medium ${badge.className}`}>{badge.text}</span>

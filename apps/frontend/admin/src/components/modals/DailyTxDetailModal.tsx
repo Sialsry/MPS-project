@@ -1,5 +1,5 @@
 "use client"
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 
 interface DailyTxDetailModalProps {
     open: boolean
@@ -20,37 +20,36 @@ interface DailyTxDetailModalProps {
 }
 
 export default function DailyTxDetailModal({ open, onClose, batch }: DailyTxDetailModalProps) {
-    if (!open || !batch) return null
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+    const [companyDistributions, setCompanyDistributions] = useState([])
+    const [validPlayHistory, setValidPlayHistory] = useState([])
+    const [loading, setLoading] = useState(false)
 
-    const companyDistributions = [
-        { company: 'Company A', amount: 12100, percent: 26.8 },
-        { company: 'Company B', amount: 9800, percent: 21.7 },
-        { company: 'Company C', amount: 7500, percent: 16.6 },
-        { company: 'Company D', amount: 6400, percent: 14.2 },
-        { company: '기타', amount: 60410 - (12100 + 9800 + 7500 + 6400), percent: 20.7 }
-    ]
-
-    const validPlayHistory = Array.from({ length: 50 }, (_, i) => {
-        const hour = Math.floor(Math.random() * 24)
-        const minute = Math.floor(Math.random() * 60)
-        const second = Math.floor(Math.random() * 60)
-        const companies = ['Company A', 'Company B', 'Company C', 'Company D']
-        const musics = [
-            { title: 'Dream of Sky', id: 'M001' },
-            { title: 'Ocean Whisper', id: 'M002' },
-            { title: 'Neon Nights', id: 'M003' },
-            { title: 'Silent Echo', id: 'M004' },
-            { title: 'Pulse Runner', id: 'M005' }
-        ]
-        const music = musics[Math.floor(Math.random() * musics.length)]
-        return {
-            id: 'play-' + i,
-            time: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:${second.toString().padStart(2, '0')}`,
-            company: companies[Math.floor(Math.random() * companies.length)],
-            musicTitle: music.title,
-            musicId: music.id
+    useEffect(() => {
+        if (open && batch) {
+            fetchBatchDetail()
         }
-    }).sort((a, b) => a.time.localeCompare(b.time))
+    }, [open, batch])
+
+    const fetchBatchDetail = async () => {
+        if (!batch) return
+        
+        setLoading(true)
+        try {
+            const response = await fetch(`${baseUrl}/admin/tokens/batches/${batch.date}`)
+            if (response.ok) {
+                const data = await response.json()
+                setCompanyDistributions(data.companyDistributions || [])
+                setValidPlayHistory(data.validPlayHistory || [])
+            }
+        } catch (error) {
+            console.error('배치 상세 조회 실패:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    if (!open || !batch) return null
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -104,57 +103,77 @@ export default function DailyTxDetailModal({ open, onClose, batch }: DailyTxDeta
 
                     <section>
                         <h3 className="text-sm font-semibold text-white/80 mb-3">기업별 리워드 분배</h3>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="text-left text-white/50">
-                                    <tr className="border-b border-white/10">
-                                        <th className="py-2 pr-4">기업</th>
-                                        <th className="py-2 pr-4">지급량</th>
-                                        <th className="py-2 pr-0">비중</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {companyDistributions.map(d => (
-                                        <tr key={d.company} className="border-b border-white/5">
-                                            <td className="py-2 pr-4 text-white/80">{d.company}</td>
-                                            <td className="py-2 pr-4 text-white">{d.amount.toLocaleString()} <span className="text-white/40 text-xs">토큰</span></td>
-                                            <td className="py-2 pr-0 text-white/70">{d.percent.toFixed(1)}%</td>
+                        {loading ? (
+                            <div className="text-white/60 text-sm">데이터를 불러오는 중...</div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="text-left text-white/50">
+                                        <tr className="border-b border-white/10">
+                                            <th className="py-2 pr-4">기업</th>
+                                            <th className="py-2 pr-4">지급량</th>
+                                            <th className="py-2 pr-0">비중</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+                                    <tbody>
+                                        {companyDistributions.length > 0 ? (
+                                            companyDistributions.map((d: any) => (
+                                                <tr key={d.company} className="border-b border-white/5">
+                                                    <td className="py-2 pr-4 text-white/80">{d.company}</td>
+                                                    <td className="py-2 pr-4 text-white">{d.amount.toLocaleString()} <span className="text-white/40 text-xs">토큰</span></td>
+                                                    <td className="py-2 pr-0 text-white/70">{d.percent.toFixed(1)}%</td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={3} className="py-4 text-center text-white/60">데이터가 없습니다</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </section>
 
                     <section>
                         <h3 className="text-sm font-semibold text-white/80 mb-3">유효재생 히스토리</h3>
                         <div className="mb-3 flex items-center gap-3 text-xs text-white/50">
-                            <span>해당 일자 집계에 포함된 유효재생 로그 (샘플 데이터)</span>
+                            <span>해당 일자 집계에 포함된 유효재생 로그</span>
                         </div>
-                        <div className="overflow-hidden rounded-lg border border-white/10 bg-white/5">
-                            <div className="max-h-64 overflow-y-auto custom-scroll">
-                                <table className="w-full text-xs">
-                                    <thead className="sticky top-0 bg-neutral-900/80 backdrop-blur text-white/50">
-                                        <tr className="border-b border-white/10">
-                                            <th className="py-2 px-3 text-left">시간</th>
-                                            <th className="py-2 px-3 text-left">기업</th>
-                                            <th className="py-2 px-3 text-left">음원</th>
-                                            <th className="py-2 px-3 text-left">음원 ID</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {validPlayHistory.map(row => (
-                                            <tr key={row.id} className="border-b border-white/5 hover:bg-white/10 transition-colors">
-                                                <td className="py-2 px-3 font-mono text-white/70">{row.time}</td>
-                                                <td className="py-2 px-3 text-white/80">{row.company}</td>
-                                                <td className="py-2 px-3 text-white">{row.musicTitle}</td>
-                                                <td className="py-2 px-3 font-mono text-white/60">{row.musicId}</td>
+                        {loading ? (
+                            <div className="text-white/60 text-sm">데이터를 불러오는 중...</div>
+                        ) : (
+                            <div className="overflow-hidden rounded-lg border border-white/10 bg-white/5">
+                                <div className="max-h-64 overflow-y-auto custom-scroll">
+                                    <table className="w-full text-xs">
+                                        <thead className="sticky top-0 bg-neutral-900/80 backdrop-blur text-white/50">
+                                            <tr className="border-b border-white/10">
+                                                <th className="py-2 px-3 text-left">시간</th>
+                                                <th className="py-2 px-3 text-left">기업</th>
+                                                <th className="py-2 px-3 text-left">음원</th>
+                                                <th className="py-2 px-3 text-left">음원 ID</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            {validPlayHistory.length > 0 ? (
+                                                validPlayHistory.map((row: any) => (
+                                                    <tr key={row.id} className="border-b border-white/5 hover:bg-white/10 transition-colors">
+                                                        <td className="py-2 px-3 font-mono text-white/70">{row.time}</td>
+                                                        <td className="py-2 px-3 text-white/80">{row.company}</td>
+                                                        <td className="py-2 px-3 text-white">{row.musicTitle}</td>
+                                                        <td className="py-2 px-3 font-mono text-white/60">{row.musicId}</td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={4} className="py-4 text-center text-white/60">데이터가 없습니다</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </section>
                 </div>
                 <div className="p-4 border-t border-white/10 flex justify-end gap-3">
