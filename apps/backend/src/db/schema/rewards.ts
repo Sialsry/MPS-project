@@ -4,7 +4,7 @@ import { companies } from './companies'
 import { musics } from './musics'
 import { music_plays } from './music_plays'
 
-export const rewardStatusEnum = pgEnum('reward_status', ['pending', 'paid'])
+export const rewardStatusEnum = pgEnum('reward_status', ['successed', 'falied', 'pending'])
 export const rewardCodeEnum2 = pgEnum('reward_code', ['0', '1', '2', '3'])
 
 
