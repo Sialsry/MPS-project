@@ -12,100 +12,76 @@ export default function RevenueDashboardPage() {
   const [company, setCompany] = useState<'전체'|'Company A'|'Company B'|'Company C'|'Company D'>('전체')
   const [lifecycleFilter, setLifecycleFilter] = useState<'전체'|'1월'|'2월'|'3월'|'4월'|'5월'|'6월'|'7월'|'8월'|'9월'|'10월'|'11월'|'12월'>('전체')
   const [currentMonth, setCurrentMonth] = useState(new Date())
-
-  // 달력 데이터 생성
-  const generateCalendarData = (date: Date) => {
-    const year = date.getFullYear()
-    const month = date.getMonth()
-    const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
-    const startDate = new Date(firstDay)
-    startDate.setDate(startDate.getDate() - firstDay.getDay())
-    
-    const calendar = []
-    const currentDate = new Date(startDate)
-    
-    for (let week = 0; week < 6; week++) {
-      const weekData = []
-      for (let day = 0; day < 7; day++) {
-        const isCurrentMonth = currentDate.getMonth() === month
-        const isToday = currentDate.toDateString() === new Date().toDateString()
-        
-        // 고정 매출 데이터 (실제로는 API에서 가져올 데이터)
-        const subscriptionRevenue = isCurrentMonth ? 250000 : 0
-        const usageRevenue = isCurrentMonth ? 120000 : 0
-        const totalRevenue = subscriptionRevenue + usageRevenue
-        
-        weekData.push({
-          date: new Date(currentDate),
-          isCurrentMonth,
-          isToday,
-          subscriptionRevenue,
-          usageRevenue,
-          totalRevenue
-        })
-        
-        currentDate.setDate(currentDate.getDate() + 1)
-      }
-      calendar.push(weekData)
-    }
-    
-    return calendar
-  }
-
-  const calendarData = generateCalendarData(currentMonth)
-
-  // TOP 기업 데이터
-  const standardTop = [
-    { name: 'Company A', amount: 1234567, pct: 35, growth: '+12.3%' },
-    { name: 'Company B', amount: 987654, pct: 28, growth: '+8.7%' },
-    { name: 'Company C', amount: 654321, pct: 18, growth: '+15.2%' },
-    { name: 'Company D', amount: 432198, pct: 12, growth: '+5.4%' },
-    { name: '기타 5개사', amount: 234567, pct: 7, growth: '+3.1%' },
-  ]
-  const businessTop = [
-    { name: 'Company A', amount: 1234567, pct: 35, growth: '+18.9%' },
-    { name: 'Company B', amount: 987654, pct: 28, growth: '+11.2%' },
-    { name: 'Company C', amount: 654321, pct: 18, growth: '+22.5%' },
-    { name: 'Company D', amount: 432198, pct: 12, growth: '+7.8%' },
-    { name: '기타 5개사', amount: 234567, pct: 7, growth: '+4.2%' },
-  ]
-
-  // 차트 데이터
-  const labels = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월']
   
-  const subscriptionSeries = [
+  // API 데이터 상태
+  const [revenueTrends, setRevenueTrends] = useState<any>(null)
+  const [standardCompanies, setStandardCompanies] = useState<any[]>([])
+  const [businessCompanies, setBusinessCompanies] = useState<any[]>([])
+  const [calendarData, setCalendarData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+
+  // 차트 데이터 (API에서 가져온 데이터 사용)
+  const labels = revenueTrends?.items?.map((item: any) => item.month) || ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월']
+  
+  const subscriptionSeries = revenueTrends ? [
     {
       label: 'Standard',
-      data: [4000000, 4200000, 4400000, 4600000, 4800000, 5000000, 5200000, 5400000, 5600000, 5800000, 6000000, 6200000]
+      data: revenueTrends.items.map((item: any) => item.subscriptionRevenue.standard)
     },
     {
       label: 'Business',
-      data: [2500000, 2700000, 2900000, 3100000, 3300000, 3500000, 3700000, 3900000, 4100000, 4300000, 4500000, 4700000]
+      data: revenueTrends.items.map((item: any) => item.subscriptionRevenue.business)
+    }
+  ] : [
+    {
+      label: 'Standard',
+      data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    },
+    {
+      label: 'Business',
+      data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     }
   ]
 
-  const usageSeries = [
+  const usageSeries = revenueTrends ? [
     {
       label: '일반음원',
-      data: [1500000, 1650000, 1800000, 1950000, 2100000, 2250000, 2400000, 2550000, 2700000, 2850000, 3000000, 3150000]
+      data: revenueTrends.items.map((item: any) => item.usageRevenue.general)
     },
     {
       label: '가사만',
-      data: [600000, 650000, 700000, 750000, 800000, 850000, 900000, 950000, 1000000, 1050000, 1100000, 1150000]
+      data: revenueTrends.items.map((item: any) => item.usageRevenue.lyrics)
     },
     {
       label: 'Inst음원',
-      data: [400000, 450000, 500000, 550000, 600000, 650000, 700000, 750000, 800000, 850000, 900000, 950000]
+      data: revenueTrends.items.map((item: any) => item.usageRevenue.instrumental)
+    }
+  ] : [
+    {
+      label: '일반음원',
+      data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    },
+    {
+      label: '가사만',
+      data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    },
+    {
+      label: 'Inst음원',
+      data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     }
   ]
 
 
 
-  const formatRevenue = (amount: number) => {
-    if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`
-    if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`
-    return amount.toString()
+  const formatAmountFull = (amount: number) => {
+    if (amount === 0) return '0'
+    const hasFraction = Math.abs(amount % 1) > 0
+    return amount.toLocaleString('ko-KR', {
+      minimumFractionDigits: hasFraction ? 2 : 0,
+      maximumFractionDigits: 2,
+    })
   }
 
   const changeMonth = (direction: 'prev' | 'next') => {
@@ -117,6 +93,60 @@ export default function RevenueDashboardPage() {
     }
     setCurrentMonth(newDate)
   }
+
+  const fetchCalendarData = async (year: number, month: number) => {
+    try {
+      const yearMonth = `${year}-${String(month + 1).padStart(2, '0')}`
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/companies/revenue/calendar?yearMonth=${yearMonth}`)
+      if (res.ok) {
+        const data = await res.json()
+        setCalendarData(data)
+      }
+    } catch (e) {
+      console.error('달력 데이터 조회 실패:', e)
+    }
+  }
+
+  useEffect(() => {
+    const fetchRevenueData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const [trendsRes, standardRes, businessRes] = await Promise.all([
+          fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/companies/revenue/trends`),
+          fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/companies/revenue/companies?grade=standard`),
+          fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/companies/revenue/companies?grade=business`)
+        ])
+        
+        if (trendsRes.ok) {
+          const trendsData = await trendsRes.json()
+          setRevenueTrends(trendsData)
+        }
+        
+        if (standardRes.ok) {
+          const standardData = await standardRes.json()
+          setStandardCompanies(standardData.items || [])
+        }
+        
+        if (businessRes.ok) {
+          const businessData = await businessRes.json()
+          setBusinessCompanies(businessData.items || [])
+        }
+      } catch (e: any) {
+        setError(e.message || '데이터 조회 실패')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchRevenueData()
+    fetchCalendarData(currentMonth.getFullYear(), currentMonth.getMonth())
+  }, [])
+
+  useEffect(() => {
+    fetchCalendarData(currentMonth.getFullYear(), currentMonth.getMonth())
+  }, [currentMonth])
 
   useEffect(() => {
     // 마지막 업데이트 시간
@@ -145,19 +175,19 @@ export default function RevenueDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <Title variant="section">월별 매출 달력</Title>
             
-            {/* 월별 요약 정보 */}
+            {/* 월별 요약 정보 (총 매출 제거) */}
             <div className="flex items-center gap-6">
               <div className="text-center">
                 <div className="text-xs text-white/60">이번 달 구독료</div>
-                <div className="text-base font-bold text-teal-400">₩7,750,000</div>
+                <div className="text-base font-bold text-teal-400">
+                  ₩{calendarData?.monthlySummary?.subscriptionRevenue?.toLocaleString() || '0'}
+                </div>
               </div>
               <div className="text-center">
                 <div className="text-xs text-white/60">이번 달 사용료</div>
-                <div className="text-base font-bold text-blue-400">₩3,720,000</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xs text-white/60">이번 달 총 매출</div>
-                <div className="text-lg font-bold text-white">₩11,470,000</div>
+                <div className="text-base font-bold text-blue-400">
+                  ₩{calendarData?.monthlySummary?.usageRevenue?.toLocaleString() || '0'}
+                </div>
               </div>
             </div>
             
@@ -191,35 +221,42 @@ export default function RevenueDashboardPage() {
             <div className="p-2 text-center text-xs font-medium text-white/60">토</div>
             
             {/* 날짜 그리드 */}
-            {calendarData.flat().map((day, index) => (
-              <div
-                key={index}
-                className={`
-                  min-h-[60px] p-2 border-b border-r border-white/10
-                  ${!day.isCurrentMonth ? 'opacity-40' : ''}
-                  ${day.isToday ? 'bg-teal-500/20 border-teal-400' : ''}
-                  ${index % 7 === 6 ? 'border-r-0' : ''}
-                  ${index >= calendarData.flat().length - 7 ? 'border-b-0' : ''}
-                `}
-              >
-                <div className="text-xs text-white/60 mb-1">
-                  {day.date.getDate()}
-                </div>
-                {day.isCurrentMonth && day.totalRevenue > 0 && (
-                  <div className="space-y-0.5">
-                    <div className="text-sm font-bold text-white">
-                      ₩{formatRevenue(day.totalRevenue)}
-                    </div>
-                    <div className="text-xs text-teal-400">
-                      구독: ₩{formatRevenue(day.subscriptionRevenue)}
-                    </div>
-                    <div className="text-xs text-blue-400">
-                      사용: ₩{formatRevenue(day.usageRevenue)}
-                    </div>
+            {calendarData?.days?.map((day: any, index: number) => {
+              const date = new Date(day.date)
+              const isToday = date.toDateString() === new Date().toDateString()
+              const isCurrentMonth = date.getMonth() === currentMonth.getMonth()
+              
+              return (
+                <div
+                  key={index}
+                  className={`
+                    min-h-[60px] p-2 border-b border-r border-white/10
+                    ${!isCurrentMonth ? 'opacity-40' : ''}
+                    ${isToday ? 'bg-teal-500/20 border-teal-400' : ''}
+                    ${index % 7 === 6 ? 'border-r-0' : ''}
+                    ${index >= (calendarData.days.length - 1) ? 'border-b-0' : ''}
+                  `}
+                >
+                  <div className="text-xs text-white/60 mb-1">
+                    {date.getDate()}
                   </div>
-                )}
+                  {isCurrentMonth && (
+                    <div className="space-y-0.5">
+                      <div className="text-xs text-teal-400">
+                        구독: ₩{formatAmountFull(day.subscriptionRevenue)}
+                      </div>
+                      <div className="text-xs text-blue-400">
+                        사용: ₩{formatAmountFull(day.usageRevenue)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            }) || (
+              <div className="col-span-7 py-8 text-center text-white/40">
+                데이터를 불러오는 중...
               </div>
-            ))}
+            )}
           </div>
           
           
@@ -263,16 +300,22 @@ export default function RevenueDashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="text-sm">
-                  {standardTop.map((company, i) => (
-                    <tr key={i} className="border-b border-white/5">
-                      <td className={`py-2 px-3 font-medium text-center ${
-                        i < 3 ? 'text-teal-300' : 'text-white/60'
-                      }`}>{i + 1}</td>
-                      <td className="py-2 px-3 text-white/80 text-center">{company.name}</td>
-                      <td className="py-2 px-3 text-teal-400 font-semibold text-center">₩{company.amount.toLocaleString()}</td>
-                      <td className="py-2 px-3 text-white/60 text-center">{company.pct}%</td>
+                  {standardCompanies.length > 0 ? (
+                    standardCompanies.map((company, i) => (
+                      <tr key={i} className="border-b border-white/5">
+                        <td className={`py-2 px-3 font-medium text-center ${
+                          i < 3 ? 'text-teal-300' : 'text-white/60'
+                        }`}>{company.rank}</td>
+                        <td className="py-2 px-3 text-white/80 text-center">{company.companyName}</td>
+                        <td className="py-2 px-3 text-teal-400 font-semibold text-center">₩{company.totalRevenue.toLocaleString()}</td>
+                        <td className="py-2 px-3 text-white/60 text-center">{company.percentage}%</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="py-4 px-3 text-center text-white/40">데이터를 불러오는 중...</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
@@ -292,16 +335,22 @@ export default function RevenueDashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="text-sm">
-                  {businessTop.map((company, i) => (
-                    <tr key={i} className="border-b border-white/5">
-                      <td className={`py-2 px-3 font-medium text-center ${
-                        i < 3 ? 'text-teal-300' : 'text-white/60'
-                      }`}>{i + 1}</td>
-                      <td className="py-2 px-3 text-white/80 text-center">{company.name}</td>
-                      <td className="py-2 px-3 text-teal-400 font-semibold text-center">₩{company.amount.toLocaleString()}</td>
-                      <td className="py-2 px-3 text-white/60 text-center">{company.pct}%</td>
+                  {businessCompanies.length > 0 ? (
+                    businessCompanies.map((company, i) => (
+                      <tr key={i} className="border-b border-white/5">
+                        <td className={`py-2 px-3 font-medium text-center ${
+                          i < 3 ? 'text-teal-300' : 'text-white/60'
+                        }`}>{company.rank}</td>
+                        <td className="py-2 px-3 text-white/80 text-center">{company.companyName}</td>
+                        <td className="py-2 px-3 text-teal-400 font-semibold text-center">₩{company.totalRevenue.toLocaleString()}</td>
+                        <td className="py-2 px-3 text-white/60 text-center">{company.percentage}%</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="py-4 px-3 text-center text-white/40">데이터를 불러오는 중...</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>

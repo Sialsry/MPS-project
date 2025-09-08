@@ -8,8 +8,12 @@ import { getDefaultYearMonthKST, isValidYearMonth, resolveYearMonthKST } from '.
 import { normalizePagination } from '../../common/utils/pagination.util';
 import { normalizeSort } from '../../common/utils/sort.util';
 import { buildSummaryQuery, buildDailyQuery, buildByMusicQuery, buildSummaryListBaseQuery, buildDailyIndustryAvgQuery, buildMonthlyCompanyQuery, buildMonthlyIndustryAvgQuery } from './queries/rewards.queries';
-import { buildRenewalStatsQuery, buildHourlyValidPlaysQuery, buildTierDistributionQuery } from './queries/stats.queries';
+import { buildRenewalStatsQuery, buildHourlyValidPlaysQuery, buildTierDistributionQuery, buildRevenueCalendarQuery, buildRevenueTrendsQuery, buildRevenueCompaniesQuery, buildRevenueCompaniesCumulativeQuery } from './queries/stats.queries';
+import { RevenueCalendarQueryDto, RevenueCalendarResponseDto, RevenueCalendarDayDto } from './dto/revenue-calendar.dto';
+import { RevenueTrendsQueryDto, RevenueTrendsResponseDto, RevenueTrendsItemDto } from './dto/revenue-trends.dto';
+import { RevenueCompaniesQueryDto, RevenueCompaniesResponseDto, RevenueCompaniesItemDto } from './dto/revenue-companies.dto';
 import { CompanyTotalStatsQueryDto, CompanyTotalStatsResponseDto } from './dto/company-stats.dto';
+import { APP_CONFIG } from '../../config/app.config';
 import { RenewalStatsQueryDto, RenewalStatsResponseDto } from './dto/renewal-stats.dto';
 import { HourlyPlaysQueryDto, HourlyPlaysResponseDto } from './dto/hourly-plays.dto';
 import { TierDistributionQueryDto, TierDistributionResponseDto } from './dto/tier-distribution.dto';
@@ -212,5 +216,97 @@ export class CompanyService {
     const business = Number(row.business || 0)
     const total = Number(row.total || 0)
     return { yearMonth: ym, free, standard, business, total }
+  }
+
+  async getRevenueCalendar(query: RevenueCalendarQueryDto): Promise<RevenueCalendarResponseDto> {
+    const ym = resolveYearMonthKST(query.yearMonth)
+    const [y, m] = ym.split('-').map(Number)
+    const tz = 'Asia/Seoul'
+
+    const q = buildRevenueCalendarQuery(y, m, tz)
+    const res = await this.db.execute(q)
+    const rows = (res.rows || []) as any[]
+    
+    const days: RevenueCalendarDayDto[] = rows.map((r: any) => ({
+      date: r.date || '',
+      subscriptionRevenue: Number(r.subscription_revenue || 0),
+      usageRevenue: Number(r.usage_revenue || 0),
+      totalRevenue: Number(r.total_revenue || 0),
+    }))
+
+    const monthlySummary = {
+      subscriptionRevenue: days.reduce((sum, day) => sum + day.subscriptionRevenue, 0),
+      usageRevenue: days.reduce((sum, day) => sum + day.usageRevenue, 0),
+      totalRevenue: days.reduce((sum, day) => sum + day.totalRevenue, 0),
+    }
+
+    return { yearMonth: ym, days, monthlySummary }
+  }
+
+  async getRevenueTrends(query: RevenueTrendsQueryDto): Promise<RevenueTrendsResponseDto> {
+    const startYear = query.year ?? 2024
+    const startMonth = 10
+    const months = Math.min(Math.max(query.months ?? 15, 1), 24)
+
+    const q = buildRevenueTrendsQuery(startYear, startMonth, months)
+    const res = await this.db.execute(q)
+    const rows = (res.rows || []) as any[]
+    
+    const items: RevenueTrendsItemDto[] = rows.map((r: any) => {
+      const standardSub = Number(r.standard_subscription || 0)
+      const businessSub = Number(r.business_subscription || 0)
+      const generalUsage = Number(r.general_usage || 0)
+      const lyricsUsage = Number(r.lyrics_usage || 0)
+      const instrumentalUsage = Number(r.instrumental_usage || 0)
+      
+      const year = r.year || APP_CONFIG.REVENUE.DEFAULT_START_YEAR + 1
+      const monthNum = r.month || 1
+      const monthLabel = year === APP_CONFIG.REVENUE.DEFAULT_START_YEAR ? `${monthNum}월(24)` : `${monthNum}월`
+      
+      return {
+        month: monthLabel,
+        subscriptionRevenue: {
+          standard: standardSub,
+          business: businessSub,
+          total: standardSub + businessSub,
+        },
+        usageRevenue: {
+          general: generalUsage,
+          lyrics: lyricsUsage,
+          instrumental: instrumentalUsage,
+          total: generalUsage + lyricsUsage + instrumentalUsage,
+        },
+        totalRevenue: standardSub + businessSub + generalUsage + lyricsUsage + instrumentalUsage,
+      }
+    })
+
+    return { year: startYear, items }
+  }
+
+  async getRevenueCompanies(query: RevenueCompaniesQueryDto): Promise<RevenueCompaniesResponseDto> {
+    const grade = query.grade || 'standard'
+    const limit = Math.min(Math.max(query.limit ?? 5, 1), 20)
+
+    // 누적 구독료만으로 랭킹
+    const q = buildRevenueCompaniesCumulativeQuery(grade, limit)
+    const res = await this.db.execute(q)
+    const rows = (res.rows || []) as any[]
+    
+    const items: RevenueCompaniesItemDto[] = rows.map((r: any) => ({
+      rank: Number(r.rank || 0),
+      companyId: Number(r.company_id || 0),
+      companyName: r.company_name || 'Unknown',
+      grade: r.grade || grade,
+      subscriptionRevenue: Number(r.subscription_revenue || 0),
+      usageRevenue: Number(r.usage_revenue || 0),
+      totalRevenue: Number(r.total_revenue || 0),
+      percentage: Number(r.percentage || 0),
+      growth: '+0.0%', // TODO: 전월 대비 계산
+    }))
+
+    // 누적 랭킹이므로 yearMonth는 생략 가능하지만, 프론트 호환을 위해 현재 월을 반환
+    const now = new Date()
+    const ymStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
+    return { yearMonth: ymStr, grade, items }
   }
 }

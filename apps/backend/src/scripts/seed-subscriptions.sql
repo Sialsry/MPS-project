@@ -194,8 +194,8 @@ priced AS (
       ELSE 0
     END::numeric(12,2) AS base_price,
     CASE pm.tier
-      WHEN 'business' THEN ROUND(((0.10 + random()*0.20) * 1200000)::numeric, 2)
-      WHEN 'standard' THEN ROUND(((0.08 + random()*0.15) * 500000)::numeric, 2)
+      WHEN 'business' THEN ROUND(((0.10 + random()*0.20) * 1200000)::numeric, 2)  -- 10~30% 할인
+      WHEN 'standard' THEN ROUND(((0.08 + random()*0.15) * 500000)::numeric, 2)   -- 8~23% 할인
       ELSE 0
     END::numeric(12,2) AS discount_amount
   FROM plan_months pm

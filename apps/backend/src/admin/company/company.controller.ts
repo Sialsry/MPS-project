@@ -8,6 +8,9 @@ import { CompanyTotalStatsQueryDto } from './dto/company-stats.dto';
 import { RenewalStatsQueryDto } from './dto/renewal-stats.dto';
 import { HourlyPlaysQueryDto } from './dto/hourly-plays.dto';
 import { TierDistributionQueryDto } from './dto/tier-distribution.dto';
+import { RevenueCalendarQueryDto } from './dto/revenue-calendar.dto';
+import { RevenueTrendsQueryDto } from './dto/revenue-trends.dto';
+import { RevenueCompaniesQueryDto } from './dto/revenue-companies.dto';
 
 @Controller('/admin/companies')
 export class CompanyController {
@@ -48,6 +51,21 @@ export class CompanyController {
   @Get('stats/tier-distribution')
   async getTierDistribution(@Query(new ValidationPipe({ transform: true })) query: TierDistributionQueryDto) {
     return this.companyService.getTierDistribution(query)
+  }
+
+  @Get('revenue/calendar')
+  async getRevenueCalendar(@Query(new ValidationPipe({ transform: true })) query: RevenueCalendarQueryDto) {
+    return this.companyService.getRevenueCalendar(query);
+  }
+
+  @Get('revenue/trends')
+  async getRevenueTrends(@Query(new ValidationPipe({ transform: true })) query: RevenueTrendsQueryDto) {
+    return this.companyService.getRevenueTrends(query);
+  }
+
+  @Get('revenue/companies')
+  async getRevenueCompanies(@Query(new ValidationPipe({ transform: true })) query: RevenueCompaniesQueryDto) {
+    return this.companyService.getRevenueCompanies(query);
   }
 
   @Get(':id/rewards/detail')
