@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import React, { useState } from 'react'
 
 type Music = {
   id: string
@@ -18,12 +18,29 @@ interface BulkRewardEditModalProps {
 }
 
 export default function BulkRewardEditModal({ open, onClose, selectedMusics, onSuccess }: BulkRewardEditModalProps) {
+  const [currentStep, setCurrentStep] = useState(1)
+  const [editType, setEditType] = useState<'remove' | 'modify' | null>(null)
   const [rewardPercentage, setRewardPercentage] = useState<number | ''>('')
   const [limitPercentage, setLimitPercentage] = useState<number | ''>('')
   const [isLoading, setIsLoading] = useState(false)
   const [missingPolicy, setMissingPolicy] = useState<'skip' | 'default'>('skip')
   const [defaultRpp, setDefaultRpp] = useState<number | ''>('')
   const [defaultLimit, setDefaultLimit] = useState<number | ''>('')
+  const [grade, setGrade] = useState<0 | 2>(0)
+
+  // 모달이 열릴 때 초기화
+  React.useEffect(() => {
+    if (open) {
+      setCurrentStep(1)
+      setEditType(null)
+      setRewardPercentage('')
+      setLimitPercentage('')
+      setMissingPolicy('skip')
+      setDefaultRpp('')
+      setDefaultLimit('')
+      setGrade(0)
+    }
+  }, [open])
 
   if (!open || selectedMusics.length === 0) return null
 
@@ -32,6 +49,29 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics, onS
     setIsLoading(true)
     try {
       const tasks = selectedMusics.map(async (music) => {
+        // 리워드 제거 처리
+        if (editType === 'remove') {
+          const body = {
+            totalRewardCount: 0,
+            rewardPerPlay: 0,
+            removeReward: true,
+            grade: grade,
+          }
+
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${music.id}/rewards`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`)
+          }
+
+          return true
+        }
+
+        // 기존 리워드 수정 로직
         const applyRpp = rewardPercentage !== ''
         const applyLimit = limitPercentage !== ''
         let baseRpp = Number(music.rewardPerPlay || 0)
@@ -58,40 +98,46 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics, onS
           totalRewardCount: newLimit,
           rewardPerPlay: newRpp,
         }
+
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${music.id}/rewards`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`)
+        }
+
         return true
       })
+
       await Promise.all(tasks)
       
-      // 성공 시 콜백 실행 (페이지 새로고침)
       if (onSuccess) {
         onSuccess()
       }
       
       onClose()
-    } catch (err) {
-      console.error('일괄 수정 실패:', err)
-      alert('일괄 수정에 실패했습니다.')
+    } catch (error) {
+      console.error('일괄 수정 실패:', error)
+      alert('일괄 수정에 실패했습니다. 다시 시도해주세요.')
     } finally {
       setIsLoading(false)
     }
   }
 
   const calculateNewReward = (currentReward: number) => {
-    const base = (currentReward && currentReward > 0) ? currentReward : (missingPolicy === 'default' && defaultRpp !== '' ? Number(defaultRpp) : currentReward)
-    if (!rewardPercentage) return base
-    return base * (1 + Number(rewardPercentage) / 100)
+    if (!rewardPercentage) return currentReward
+    return Number((currentReward * (1 + Number(rewardPercentage) / 100)).toFixed(6))
   }
 
   const calculateNewLimit = (currentLimit: number | null) => {
-    // 미설정 음원 처리
-    if (!currentLimit || currentLimit === 0) {
-      if (missingPolicy === 'default' && defaultLimit !== '') {
+    if (!limitPercentage) return currentLimit
+
+    // 미설정 상태인 경우
+    if (currentLimit == null || currentLimit === 0) {
+      if (missingPolicy === 'default') {
         const base = Number(defaultLimit);
         if (!limitPercentage) return base;
         return Math.round(base * (1 + Number(limitPercentage) / 100));
@@ -104,36 +150,109 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics, onS
     return Math.round(currentLimit * (1 + Number(limitPercentage) / 100));
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* 배경 오버레이 */}
-      <div 
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      
-      {/* 모달 */}
-      <div className="relative w-full max-w-2xl bg-neutral-900 border border-white/10 rounded-xl shadow-2xl">
-        {/* 헤더 */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-white">일괄 리워드 수정</h2>
-            <span className="text-sm text-teal-300 bg-teal-400/10 px-2 py-1 rounded-full">
-              {selectedMusics.length}개 선택됨
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors"
-          >
-            <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+  const renderStep1 = () => (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h3 className="text-lg font-medium text-white mb-2">수정 유형을 선택해주세요</h3>
+        <p className="text-sm text-white/60">선택된 {selectedMusics.length}개 음원에 적용할 작업을 선택하세요</p>
+      </div>
 
-        {/* 내용 */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+      <div className="grid grid-cols-1 gap-4">
+        <button
+          type="button"
+          onClick={() => {
+            setEditType('modify')
+            setCurrentStep(2)
+          }}
+          className="p-6 text-left bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors group"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-teal-500/20 rounded-lg flex items-center justify-center group-hover:bg-teal-500/30 transition-colors">
+              <svg className="w-6 h-6 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </div>
+            <div>
+              <h4 className="font-medium text-white">리워드 수정</h4>
+              <p className="text-sm text-white/60 mt-1">기존 리워드 값을 퍼센트로 조정합니다</p>
+            </div>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setEditType('remove')
+            setCurrentStep(2)
+          }}
+          className="p-6 text-left bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors group"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-red-500/20 rounded-lg flex items-center justify-center group-hover:bg-red-500/30 transition-colors">
+              <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            <div>
+              <h4 className="font-medium text-white">리워드 제거</h4>
+              <p className="text-sm text-white/60 mt-1">모든 리워드를 제거하고 음원 등급을 변경합니다</p>
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
+  )
+
+  const renderStep2 = () => {
+    if (editType === 'remove') {
+      return (
+        <div className="space-y-6">
+          <div className="text-center">
+            <h3 className="text-lg font-medium text-white mb-2">리워드 제거 설정</h3>
+            <p className="text-sm text-white/60">제거 후 설정할 음원 등급을 선택하세요</p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <p className="text-sm text-white/60">음원 등급을 선택해주세요:</p>
+              <div className="space-y-2">
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="radio"
+                    name="grade"
+                    value="0"
+                    checked={grade === 0}
+                    onChange={(e) => setGrade(0)}
+                    className="w-4 h-4 text-teal-400 bg-white/5 border-white/20 focus:ring-teal-400 focus:ring-2"
+                  />
+                  <span className="text-sm text-white/80">0: 모든 등급 접근 가능 (Free, Standard, Business)</span>
+                </label>
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="radio"
+                    name="grade"
+                    value="2"
+                    checked={grade === 2}
+                    onChange={(e) => setGrade(2)}
+                    className="w-4 h-4 text-teal-400 bg-white/5 border-white/20 focus:ring-teal-400 focus:ring-2"
+                  />
+                  <span className="text-sm text-white/80">2: Standard, Business만 접근 가능 (리워드 없음)</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    if (editType === 'modify') {
+      return (
+        <div className="space-y-6">
+          <div className="text-center">
+            <h3 className="text-lg font-medium text-white mb-2">리워드 수정 설정</h3>
+            <p className="text-sm text-white/60">기존 리워드 값을 퍼센트로 조정합니다</p>
+          </div>
+
           {/* 미설정 음원 처리 옵션 */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-white/80">리워드 미설정 음원 처리</h3>
@@ -183,35 +302,6 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics, onS
                 </div>
               </div>
             )}
-          </div>
-
-          {/* 선택된 음원 목록 */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-white/80">선택된 음원</h3>
-            <div className="h-64 overflow-y-auto space-y-2">
-              {selectedMusics.length > 0 ? (
-                selectedMusics.map((music) => (
-                  <div key={music.id} className="flex items-center gap-3 p-3 bg-white/5 rounded-lg border border-white/10">
-                    <div className="flex-1">
-                      <div className="font-medium text-white">
-                        {music.title} · <span className="text-white/60">{music.category}</span>
-                      </div>
-                      <div className="text-xs text-teal-300">
-                        현재: {(music.rewardPerPlay ?? 0).toFixed(3)} 토큰
-                        {music.totalRewardCount ? ` / ${music.totalRewardCount.toLocaleString()}회` : ' / 한도 없음'}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-8 text-white/40">
-                  <svg className="w-12 h-12 mx-auto mb-3 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                  </svg>
-                  <p className="text-sm">음원을 선택해주세요</p>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* 수정 설정 */}
@@ -295,12 +385,11 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics, onS
                     {selectedMusics.slice(0, 3).map((music) => {
                       const currentLimit = music.totalRewardCount || 0;
                       const newLimit = calculateNewLimit(music.totalRewardCount);
-                      
                       return (
                         <div key={music.id} className="flex justify-between">
                           <span className="text-white/70 truncate">{music.title}</span>
                           <span className="text-white font-medium">
-                            {currentLimit > 0 ? currentLimit.toLocaleString() : '미설정'} → {newLimit ? newLimit.toLocaleString() : '미설정'}
+                            {currentLimit ? currentLimit.toLocaleString() : '미설정'} → {newLimit ? newLimit.toLocaleString() : '미설정'}
                           </span>
                         </div>
                       );
@@ -320,33 +409,81 @@ export default function BulkRewardEditModal({ open, onClose, selectedMusics, onS
               )}
             </div>
           </div>
+        </div>
+      )
+    }
+
+    return null
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* 배경 오버레이 */}
+      <div 
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      {/* 모달 */}
+      <div className="relative w-full max-w-2xl bg-neutral-900 border border-white/10 rounded-xl shadow-2xl">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-white">일괄 리워드 수정</h2>
+            <span className="text-sm text-teal-300 bg-teal-400/10 px-2 py-1 rounded-full">
+              {selectedMusics.length}개 선택됨
+            </span>
+            <span className="text-sm text-white/60 bg-white/5 px-2 py-1 rounded-full">
+              Step {currentStep}/2
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors"
+          >
+            <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* 내용 */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {currentStep === 1 && renderStep1()}
+          {currentStep === 2 && renderStep2()}
 
           {/* 버튼 */}
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-2 text-xs font-medium text-white/70 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading || (!rewardPercentage && !limitPercentage && missingPolicy === 'skip')}
-              className="px-3 py-2 text-xs font-medium text-white bg-teal-500/90 rounded-lg hover:bg-teal-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  수정 중...
-                </div>
-              ) : (
-                '일괄 수정'
+          <div className="flex justify-between gap-3 pt-4">
+            {currentStep === 2 && (
+              <button
+                type="button"
+                onClick={() => setCurrentStep(1)}
+                className="px-3 py-2 text-xs font-medium text-white/70 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                이전
+              </button>
+            )}
+            <div className="flex gap-3 ml-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3 py-2 text-xs font-medium text-white/70 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                취소
+              </button>
+              {currentStep === 2 && (
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="px-4 py-2 text-xs font-medium text-white bg-teal-500 hover:bg-teal-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+                >
+                  {isLoading ? '처리 중...' : '일괄 수정'}
+                </button>
               )}
-            </button>
+            </div>
           </div>
         </form>
       </div>
     </div>
   )
-} 
+}

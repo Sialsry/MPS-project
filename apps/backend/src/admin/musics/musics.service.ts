@@ -581,8 +581,6 @@ export class MusicsService implements OnModuleInit {
     const [y, m] = ym.split('-').map(Number)
     const current = isCurrentYM(ym)
     const cte = buildMonthRangeCTE(y, m)
-    
-    // 구독료 - 사용료 계산 (순매출)
     const qCurrent = sql`
       ${cte}
       SELECT 
@@ -971,7 +969,6 @@ export class MusicsService implements OnModuleInit {
 
   async delete(ids: number[]) {
     try {
-      // 모든 음원이 존재하는지 한 번에 확인
       const existingMusics = await this.db.select({ id: musics.id }).from(musics).where(inArray(musics.id, ids));
       const existingIds = existingMusics.map(m => m.id);
       const missingIds = ids.filter(id => !existingIds.includes(id));
@@ -982,8 +979,6 @@ export class MusicsService implements OnModuleInit {
       await this.db.delete(music_tags).where(inArray(music_tags.music_id, ids));
       await this.db.delete(music_plays).where(inArray(music_plays.music_id, ids));
       await this.db.delete(musics).where(inArray(musics.id, ids));
-
-      // 고아 카테고리 정리
       await this.cleanupOrphanCategories();
 
       const message = ids.length === 1 
@@ -1009,8 +1004,6 @@ export class MusicsService implements OnModuleInit {
     const m = now.getUTCMonth(); 
     const current = new Date(Date.UTC(y, m, 1));
     const ym = `${current.getUTCFullYear()}-${String(current.getUTCMonth() + 1).padStart(2, '0')}`;
-    
-    // 1단계: 현재 사용량 조회
     const currentData = await this.db.execute(sql`
       SELECT total_reward_count, remaining_reward_count
       FROM monthly_music_rewards
@@ -1024,66 +1017,118 @@ export class MusicsService implements OnModuleInit {
       rows: currentData.rows
     });
     
+    // 실제 사용량 계산 (music_plays에서 유효재생들의 use_price 합계)
+    const usedCountResult = await this.db.execute(sql`
+      SELECT COALESCE(SUM(use_price), 0) as used_count
+      FROM music_plays 
+      WHERE music_id = ${musicId} 
+        AND is_valid_play = true
+        AND EXTRACT(YEAR FROM created_at) = ${parseInt(ym.split('-')[0])}
+        AND EXTRACT(MONTH FROM created_at) = ${parseInt(ym.split('-')[1])}
+    `);
+    
+    const usedCount = Number((usedCountResult.rows?.[0] as any)?.used_count || 0);
+    
     let newRemainingCount = dto.totalRewardCount;
-    if (currentData.rows && currentData.rows.length > 0) {
-      const currentRow = currentData.rows[0] as any;
-      const usedCount = currentRow.total_reward_count - currentRow.remaining_reward_count;
-      
-      // 새 한도에서 사용량을 뺀 값이 0보다 크면 그 값을, 아니면 0을 사용
-      if (dto.totalRewardCount > usedCount) {
-        newRemainingCount = dto.totalRewardCount - usedCount;
-      } else {
-        newRemainingCount = 0;
-      }
-      
-      console.log('리워드 수정 로직:', {
-        musicId,
-        yearMonth: ym,
-        currentTotal: currentRow.total_reward_count,
-        currentRemaining: currentRow.remaining_reward_count,
-        usedCount,
-        newTotal: dto.totalRewardCount,
-        newRemaining: newRemainingCount
-      });
+    if (dto.totalRewardCount > usedCount) {
+      newRemainingCount = dto.totalRewardCount - usedCount;
+    } else {
+      newRemainingCount = 0;
     }
     
-    // 2단계: 리워드 업데이트 - Drizzle ORM 사용
+    console.log('리워드 수정 로직:', {
+      musicId,
+      yearMonth: ym,
+      usedCount,
+      newTotal: dto.totalRewardCount,
+      newRemaining: newRemainingCount
+    });
+    
     try {
-      // 먼저 기존 레코드가 있는지 확인
-      const existingRecord = await this.db
-        .select()
-        .from(monthly_music_rewards)
-        .where(and(
-          eq(monthly_music_rewards.music_id, musicId),
-          eq(monthly_music_rewards.year_month, ym)
-        ))
-        .limit(1);
-
-      if (existingRecord.length > 0) {
-        // 기존 레코드가 있으면 UPDATE
+      // 리워드 제거 처리
+      if (dto.removeReward === true) {
+        // 1. musics.grade 업데이트
         await this.db
-          .update(monthly_music_rewards)
-          .set({
-            total_reward_count: dto.totalRewardCount,
-            remaining_reward_count: newRemainingCount,
-            reward_per_play: dto.rewardPerPlay.toString(),
-            updated_at: new Date(),
-          })
+          .update(musics)
+          .set({ grade: dto.grade || 0 })
+          .where(eq(musics.id, musicId));
+
+        // 2. monthly_music_rewards 업데이트 (0으로 설정)
+        const existingRecord = await this.db
+          .select()
+          .from(monthly_music_rewards)
           .where(and(
             eq(monthly_music_rewards.music_id, musicId),
             eq(monthly_music_rewards.year_month, ym)
-          ));
+          ))
+          .limit(1);
+
+        if (existingRecord.length > 0) {
+          await this.db
+            .update(monthly_music_rewards)
+            .set({
+              total_reward_count: 0,
+              remaining_reward_count: 0,
+              reward_per_play: '0',
+              updated_at: new Date(),
+            })
+            .where(and(
+              eq(monthly_music_rewards.music_id, musicId),
+              eq(monthly_music_rewards.year_month, ym)
+            ));
+        } else {
+          await this.db
+            .insert(monthly_music_rewards)
+            .values({
+              music_id: musicId,
+              year_month: ym,
+              total_reward_count: 0,
+              remaining_reward_count: 0,
+              reward_per_play: '0',
+            });
+        }
       } else {
-        // 기존 레코드가 없으면 INSERT
+        // 기존 리워드 추가/수정 로직
+        // 1. musics.grade를 1로 업데이트 (리워드 있음)
         await this.db
-          .insert(monthly_music_rewards)
-          .values({
-            music_id: musicId,
-            year_month: ym,
-            total_reward_count: dto.totalRewardCount,
-            remaining_reward_count: newRemainingCount,
-            reward_per_play: dto.rewardPerPlay.toString(),
-          });
+          .update(musics)
+          .set({ grade: 1 })
+          .where(eq(musics.id, musicId));
+
+        // 2. monthly_music_rewards 업데이트
+        const existingRecord = await this.db
+          .select()
+          .from(monthly_music_rewards)
+          .where(and(
+            eq(monthly_music_rewards.music_id, musicId),
+            eq(monthly_music_rewards.year_month, ym)
+          ))
+          .limit(1);
+
+        if (existingRecord.length > 0) {
+          await this.db
+            .update(monthly_music_rewards)
+            .set({
+              total_reward_count: dto.totalRewardCount,
+              remaining_reward_count: newRemainingCount,
+              reward_per_play: dto.rewardPerPlay.toString(),
+              updated_at: new Date(),
+            })
+            .where(and(
+              eq(monthly_music_rewards.music_id, musicId),
+              eq(monthly_music_rewards.year_month, ym)
+            ));
+        } else {
+          await this.db
+            .insert(monthly_music_rewards)
+            .values({
+              music_id: musicId,
+              year_month: ym,
+              total_reward_count: dto.totalRewardCount,
+              remaining_reward_count: newRemainingCount,
+              reward_per_play: dto.rewardPerPlay.toString(),
+            });
+        }
       }
     } catch (error) {
       console.error('리워드 업데이트 실패:', error);

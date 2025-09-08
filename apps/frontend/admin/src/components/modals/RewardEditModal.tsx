@@ -21,12 +21,16 @@ export default function RewardEditModal({ open, onClose, music, onSuccess }: Rew
   const [rewardPerPlay, setRewardPerPlay] = useState(music?.rewardPerPlay || 0)
   const [totalRewardCount, setTotalRewardCount] = useState<number | ''>(music?.totalRewardCount || '')
   const [isLoading, setIsLoading] = useState(false)
+  const [removeReward, setRemoveReward] = useState(false)
+  const [grade, setGrade] = useState<0 | 2>(0)
 
   // 모달이 열릴 때 초기값 설정
   React.useEffect(() => {
     if (open && music) {
       setRewardPerPlay(music.rewardPerPlay || 0)
       setTotalRewardCount(music.totalRewardCount || '')
+      setRemoveReward(false)
+      setGrade(0)
       console.log('모달 초기값 설정:', {
         rewardPerPlay: music.rewardPerPlay,
         totalRewardCount: music.totalRewardCount,
@@ -42,8 +46,10 @@ export default function RewardEditModal({ open, onClose, music, onSuccess }: Rew
     setIsLoading(true)
     
     const requestData = {
-      totalRewardCount: totalRewardCount || 0,
-      rewardPerPlay: rewardPerPlay,
+      totalRewardCount: removeReward ? 0 : (totalRewardCount || 0),
+      rewardPerPlay: removeReward ? 0 : rewardPerPlay,
+      removeReward: removeReward,
+      grade: removeReward ? grade : undefined,
     }
     
     console.log('리워드 수정 요청 데이터:', requestData)
@@ -113,51 +119,101 @@ export default function RewardEditModal({ open, onClose, music, onSuccess }: Rew
             </div>
           </div>
 
-          {/* 리워드 설정 */}
+          {/* 리워드 제거 옵션 */}
           <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
-                  1회 재생당 리워드 (토큰) <span className="text-red-400">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    value={rewardPerPlay}
-                    onChange={(e) => setRewardPerPlay(parseFloat(e.target.value) || 0)}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-teal-400/50 transition-colors text-sm"
-                    placeholder="0.000"
-                  />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/40 text-sm">
-                    토큰
-                  </div>
-                </div>
-                <p className="text-xs text-white/50 mt-1">
-                  현재: {music.rewardPerPlay.toFixed(3)} 토큰
-                </p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
-                  총 리워드 수량 <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={totalRewardCount}
-                  onChange={(e) => setTotalRewardCount(e.target.value ? Number(e.target.value) : '')}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-teal-400/50 transition-colors text-sm"
-                  placeholder="1000"
-                />
-                <p className="text-xs text-white/50 mt-1">
-                  현재: {music.totalRewardCount ? music.totalRewardCount.toLocaleString() : '0'}
-                </p>
-              </div>
+            <div className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                id="removeReward"
+                checked={removeReward}
+                onChange={(e) => setRemoveReward(e.target.checked)}
+                className="w-4 h-4 text-teal-400 bg-white/5 border-white/20 rounded focus:ring-teal-400 focus:ring-2"
+              />
+              <label htmlFor="removeReward" className="text-sm font-medium text-white/80">
+                리워드 제거
+              </label>
             </div>
 
-            {/* 리워드 미리보기 */}
+            {removeReward && (
+              <div className="ml-7 space-y-3">
+                <p className="text-sm text-white/60">음원 등급을 선택해주세요:</p>
+                <div className="space-y-2">
+                  <label className="flex items-center space-x-3">
+                    <input
+                      type="radio"
+                      name="grade"
+                      value="0"
+                      checked={grade === 0}
+                      onChange={(e) => setGrade(0)}
+                      className="w-4 h-4 text-teal-400 bg-white/5 border-white/20 focus:ring-teal-400 focus:ring-2"
+                    />
+                  <span className="text-sm text-white/80">0: 모든 등급 접근 가능 (Free, Standard, Business)</span>
+                </label>
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="radio"
+                    name="grade"
+                    value="2"
+                    checked={grade === 2}
+                    onChange={(e) => setGrade(2)}
+                    className="w-4 h-4 text-teal-400 bg-white/5 border-white/20 focus:ring-teal-400 focus:ring-2"
+                  />
+                  <span className="text-sm text-white/80">2: Standard, Business만 접근 가능 (리워드 없음)</span>
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 리워드 설정 */}
+          {!removeReward && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-white/80 mb-2">
+                    1회 재생당 리워드 (토큰) <span className="text-red-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      value={rewardPerPlay}
+                      onChange={(e) => setRewardPerPlay(parseFloat(e.target.value) || 0)}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-teal-400/50 transition-colors text-sm"
+                      placeholder="0.000"
+                    />
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/40 text-sm">
+                      토큰
+                    </div>
+                  </div>
+                  <p className="text-xs text-white/50 mt-1">
+                    현재: {music.rewardPerPlay.toFixed(3)} 토큰
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-white/80 mb-2">
+                    총 리워드 수량 <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={totalRewardCount}
+                    onChange={(e) => setTotalRewardCount(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-teal-400/50 transition-colors text-sm"
+                    placeholder="1000"
+                  />
+                  <p className="text-xs text-white/50 mt-1">
+                    현재: {music.totalRewardCount ? music.totalRewardCount.toLocaleString() : '0'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 리워드 미리보기 */}
+          {!removeReward && (
             <div className="p-4 bg-white/5 border border-white/10 rounded-lg">
               <h4 className="text-sm font-medium text-white/80 mb-2">리워드 미리보기</h4>
               <div className="space-y-2 text-sm">
@@ -177,7 +233,7 @@ export default function RewardEditModal({ open, onClose, music, onSuccess }: Rew
                 )}
               </div>
             </div>
-          </div>
+          )}
 
           {/* 버튼 */}
           <div className="flex gap-3 pt-4">
