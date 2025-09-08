@@ -1,77 +1,98 @@
-# Daily Reward Processor
+<p align="center">
+  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+</p>
 
-하루마다 DB에 저장된 음원 사용 기록을 블록체인 컨트랙트에 전송하는 백엔드 서비스입니다.
+[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
+[circleci-url]: https://circleci.com/gh/nestjs/nest
 
-## 설치 및 설정
+  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
+    <p align="center">
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
+<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
+<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
+<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
+<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
+  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
+    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
+  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
+</p>
+  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
+  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
-1. 의존성 설치:
+## Description
+
+[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+
+## Project setup
+
 ```bash
-npm install
+$ npm install
 ```
 
-2. 환경 변수 설정:
+## Compile and run the project
+
 ```bash
-cp .env.example .env.local
-# .env.local 파일을 열어서 실제 값으로 수정
+# development
+$ npm run start
+
+# watch mode
+$ npm run start:dev
+
+# production mode
+$ npm run start:prod
 ```
 
-3. 컨트랙트 배포 (필요한 경우):
-- RecordUsage 컨트랙트가 배포되어 있어야 함
-- 환경 변수에 컨트랙트 주소 설정
+## Run tests
 
-## 실행 방법
-
-### 개발 환경
 ```bash
-# 즉시 테스트 실행
-npm run test
+# unit tests
+$ npm run test
 
-# 개발 모드 (파일 변경 시 자동 재시작)
-npm run dev
+# e2e tests
+$ npm run test:e2e
 
-# 일반 실행
-npm start
+# test coverage
+$ npm run test:cov
 ```
 
-### 프로덕션 환경
-```bash
-# 빌드
-npm run build
+## Deployment
 
-# 실행
-npm run start:prod
+When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+
+If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+
+```bash
+$ npm install -g @nestjs/mau
+$ mau deploy
 ```
 
-## 주요 기능
+With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
 
-1. **일일 배치 처리**: 매일 00:05에 자동으로 전날 데이터를 처리
-2. **DB 쿼리**: `rewards` 테이블에서 `status='pending'`인 데이터를 가져옴
-3. **데이터 가공**: 컨트랙트 전송을 위한 형태로 변환
-4. **블록체인 전송**: 가공된 데이터를 컨트랙트의 `recordDailyUsage` 함수로 전송
-5. **상태 업데이트**: 전송 결과에 따라 DB 상태를 `successed` 또는 `falied`로 업데이트
+## Resources
 
-## 데이터 흐름
+Check out a few resources that may come in handy when working with NestJS:
 
-1. `rewards` 테이블에서 pending 상태인 데이터 조회
-2. 다음 필드들을 추출:
-   - `company_id`: 사용한 기업 ID
-   - `music_id`: 사용된 음원 ID  
-   - `play_id`: DB 비교용 ID
-   - `reward_code`: 리워드 지급 여부 (0=무보상, 1=보상, 2=음원한도, 3=기업한도)
-   - `created_at`: 사용 시간 (초 단위 타임스탬프로 변환)
-3. 컨트랙트 `recordDailyUsage(company_id, music_id, play_id, reward_code, created_at)` 호출
-4. 트랜잭션 결과에 따라 DB 상태 업데이트
+- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
+- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
+- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
+- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
+- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
+- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
+- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
+- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
 
-## 환경 변수
+## Support
 
-- `DATABASE_URL`: PostgreSQL 연결 문자열
-- `INFURA_RPC`: Ethereum RPC 엔드포인트
-- `PRIVATE_KEY`: 트랜잭션 서명용 개인키
-- `RECORD_USAGE_CONTRACT_ADDRESS`: RecordUsage 컨트랙트 주소
+Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
 
-## 주의사항
+## Stay in touch
 
-1. **컨트랙트 ABI**: `src/dailyRewardProcessor.ts`에서 실제 컨트랙트 ABI로 교체 필요
-2. **가스 최적화**: 네트워크 상황에 따라 가스비 조정 필요
-3. **에러 처리**: 실패한 트랜잭션은 자동으로 `falied` 상태로 마킹
-4. **트랜잭션 간격**: 네트워크 부하 방지를 위해 2초 간격으로 전송
+- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
+- Website - [https://nestjs.com](https://nestjs.com/)
+- Twitter - [@nestframework](https://twitter.com/nestframework)
+
+## License
+
+Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).

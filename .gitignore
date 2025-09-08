@@ -53,3 +53,13 @@ node_modules
 ignition/deployments/chain-31337
 
 # ---------------------------- hardhat에서 자동으로 생성 --------------------------------------------------------------
+.DS_Store
+.env*
+node_modules/
+apps/backend/scripts/
+apps/backend/uploads/
+# -------------- contract branch에서 추가함 -------
+artifacts/
+cache/
+ignition/
+# -------------- contract branch에서 추가함 -------
