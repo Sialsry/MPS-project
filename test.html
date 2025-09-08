@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MPS 서비스 테스트</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .action-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .action-button {
+            flex: 1;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .action-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .action-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .speaker-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            height: 60px;
+            background: #f8f9fa;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .speaker-icon {
+            font-size: 2rem;
+            color: #ccc;
+            transition: all 0.3s ease;
+        }
+
+        .speaker-container.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .speaker-container.active .speaker-icon {
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .status-message {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-info {
+            background: #cce7ff;
+            color: #004085;
+            border: 1px solid #b3d7ff;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .audio-controls {
+            margin-top: 1rem;
+            text-align: center;
+        }
+
+        .quick-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .quick-button {
+            padding: 0.4rem 0.8rem;
+            background: #f8f9fa;
+            color: #495057;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .quick-button:hover {
+            background: #e9ecef;
+        }
+
+        .logs {
+            margin-top: 1.5rem;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .log-entry {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            margin-bottom: 0.5rem;
+            padding: 0.3rem;
+            border-radius: 4px;
+        }
+
+        .log-request {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .log-response {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+
+        .log-error {
+            background: #ffebee;
+            color: #c62828;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 MPS 테스트</h1>
+            <p>음원 재생 및 가사 다운로드 테스트</p>
+        </div>
+
+        <div class="form-group">
+            <label for="endpoint">API 엔드포인트</label>
+            <input 
+                type="text" 
+                id="endpoint" 
+                placeholder="예: api/music/1/play 또는 api/lyric/1/download"
+                value="api/music/1/play"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="apiKey">API Key</label>
+            <input 
+                type="text" 
+                id="apiKey" 
+                placeholder="여기에 API 키를 입력하세요"
+                value="free_test_api_key_64_characters_long_string_for_testing_purpose"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="serverUrl">서버 URL</label>
+            <input 
+                type="text" 
+                id="serverUrl" 
+                placeholder="백엔드 서버 URL"
+                value="http://localhost:3001"
+            >
+        </div>
+
+        <div class="quick-buttons">
+            <button class="quick-button" onclick="setQuickTest('api/music/1/play', 'free')">Free - 음원1 재생</button>
+            <button class="quick-button" onclick="setQuickTest('api/music/2/play', 'standard')">Standard - 음원2 재생</button>
+            <button class="quick-button" onclick="setQuickTest('api/music/3/play', 'business')">Business - 음원3 재생</button>
+            <button class="quick-button" onclick="setQuickTest('api/lyric/1/download', 'free')">Free - 가사1 다운로드</button>
+            <button class="quick-button" onclick="setQuickTest('api/lyric/2/download', 'standard')">Standard - 가사2 다운로드</button>
+        </div>
+
+        <div class="action-section">
+            <button class="action-button" id="actionButton">
+                <span id="buttonText">재생</span>
+                <span class="loading hidden" id="loadingSpinner"></span>
+            </button>
+            <div class="speaker-container" id="speakerContainer">
+                <div class="speaker-icon">🔊</div>
+            </div>
+        </div>
+
+        <div class="status-message hidden" id="statusMessage"></div>
+        
+        <div class="audio-controls hidden" id="audioControls">
+            <audio controls id="audioPlayer" preload="metadata">
+                <source src="" type="audio/mpeg">
+                Your browser does not support the audio element.
+            </audio>
+        </div>
+
+        <div class="logs hidden" id="logsContainer">
+            <div style="font-weight: bold; margin-bottom: 0.5rem;">요청/응답 로그:</div>
+            <div id="logsContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const endpointInput = document.getElementById('endpoint');
+        const apiKeyInput = document.getElementById('apiKey');
+        const serverUrlInput = document.getElementById('serverUrl');
+        const actionButton = document.getElementById('actionButton');
+        const buttonText = document.getElementById('buttonText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const speakerContainer = document.getElementById('speakerContainer');
+        const statusMessage = document.getElementById('statusMessage');
+        const audioControls = document.getElementById('audioControls');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const logsContainer = document.getElementById('logsContainer');
+        const logsContent = document.getElementById('logsContent');
+
+        // 재생 세션 추적 변수 (표시용)
+        let currentSessionId = null;
+        let currentMusicId = null;
+        let playStartTime = null;
+        let totalPlayTime = 0;
+
+        // API 키 매핑
+        const API_KEYS = {
+            'free': 'free_test_api_key_64_characters_long_string_for_testing_purpose',
+            'standard': 'standard_test_api_key_64_characters_long_string_for_testing',
+            'business': 'business_test_api_key_64_characters_long_string_for_testing'
+        };
+
+        // 재생 시간 표시용 함수들 (서버에서 자동 처리되므로 표시용으로만 사용)
+        function startPlayTimeTracking() {
+            if (!playStartTime) {
+                playStartTime = Date.now();
+                addLog('클라이언트 재생 시간 표시 시작 (서버에서 자동 추적)', 'response');
+            }
+        }
+        
+        function pausePlayTimeTracking() {
+            if (playStartTime) {
+                totalPlayTime += Math.floor((Date.now() - playStartTime) / 1000);
+                playStartTime = null;
+                addLog(`클라이언트 표시 - 총 재생시간: ${totalPlayTime}초 (참고용)`, 'response');
+            }
+        }
+        
+        function stopPlayTimeTracking() {
+            if (playStartTime) {
+                totalPlayTime += Math.floor((Date.now() - playStartTime) / 1000);
+                playStartTime = null;
+            }
+            const finalPlayTime = totalPlayTime;
+            totalPlayTime = 0;
+            addLog(`클라이언트 표시 - 최종 재생시간: ${finalPlayTime}초 (참고용)`, 'response');
+            return finalPlayTime;
+        }
+        
+        
+        function setQuickTest(endpoint, grade) {
+            endpointInput.value = endpoint;
+            apiKeyInput.value = API_KEYS[grade];
+            updateButtonText();
+            addLog(`퀵 테스트 설정: ${grade} 등급으로 ${endpoint}`, 'request');
+        }
+
+        // 로그 추가
+        function addLog(message, type) {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsContent.appendChild(logEntry);
+            logsContainer.classList.remove('hidden');
+            logsContent.scrollTop = logsContent.scrollHeight;
+        }
+
+        // 엔드포인트 변경 감지 및 버튼 텍스트 업데이트
+        endpointInput.addEventListener('input', updateButtonText);
+
+        function updateButtonText() {
+            const endpoint = endpointInput.value.trim();
+            if (endpoint.includes('/music/') && endpoint.includes('/play')) {
+                buttonText.textContent = '재생';
+            } else if (endpoint.includes('/lyric/download')) {
+                buttonText.textContent = '가사 다운로드';
+            } else {
+                buttonText.textContent = '요청';
+            }
+        }
+
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = `status-message status-${type}`;
+            statusMessage.classList.remove('hidden');
+        }
+
+        function hideStatus() {
+            statusMessage.classList.add('hidden');
+        }
+
+        function setLoading(loading) {
+            if (loading) {
+                buttonText.classList.add('hidden');
+                loadingSpinner.classList.remove('hidden');
+                actionButton.disabled = true;
+            } else {
+                buttonText.classList.remove('hidden');
+                loadingSpinner.classList.add('hidden');
+                actionButton.disabled = false;
+            }
+        }
+
+        function activateSpeaker() {
+            speakerContainer.classList.add('active');
+        }
+
+        function deactivateSpeaker() {
+            speakerContainer.classList.remove('active');
+        }
+
+        function downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+
+        // 실제 API 호출 함수
+        async function makeActualRequest(endpoint, apiKey, serverUrl) {
+            const fullUrl = `${serverUrl}/${endpoint}`;
+            
+            addLog(`요청: ${fullUrl}`, 'request');
+            addLog(`API Key: ${apiKey.substring(0, 20)}...`, 'request');
+
+            try {
+                const response = await fetch(fullUrl, {
+                    method: 'GET',
+                    headers: {
+                        'x-api-key': apiKey,
+                        'User-Agent': 'MPS-Test-Client/1.0'
+                    }
+                });
+
+                addLog(`응답: ${response.status} ${response.statusText}`, 'response');
+
+                // 음원 재생 응답에서 세션 ID 추출
+                if (endpoint.includes('/music/') && endpoint.includes('/play')) {
+                    const sessionId = response.headers.get('X-Session-ID');
+                    if (sessionId) {
+                        addLog(`세션 ID 수신: ${sessionId}`, 'response');
+                        return { response, sessionId: parseInt(sessionId) };
+                    }
+                }
+
+                if (!response.ok) {
+                    let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                    try {
+                        const errorText = await response.text();
+                        if (errorText) {
+                            const errorData = JSON.parse(errorText);
+                            errorMessage = errorData.message || errorMessage;
+                        }
+                    } catch (e) {
+                        // JSON 파싱 실패시 기본 에러 메시지 사용
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                return { response };
+            } catch (error) {
+                addLog(`오류: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        async function makeRequest() {
+            const endpoint = endpointInput.value.trim();
+            const apiKey = apiKeyInput.value.trim();
+            const serverUrl = serverUrlInput.value.trim();
+
+            if (!endpoint || !apiKey || !serverUrl) {
+                showStatus('모든 필드를 입력해주세요.', 'error');
+                return;
+            }
+
+            setLoading(true);
+            hideStatus();
+            deactivateSpeaker();
+            audioControls.classList.add('hidden');
+
+            try {
+                if (endpoint.includes('/music/') && endpoint.includes('/play')) {
+                    // 음원 재생 처리
+                    const musicId = endpoint.match(/music\/(\d+)\/play/)?.[1];
+                    if (!musicId) {
+                        throw new Error('잘못된 음원 엔드포인트 형식입니다.');
+                    }
+
+                    addLog(`음원 ${musicId}번 재생 요청 시작`, 'request');
+                    
+                    const result = await makeActualRequest(endpoint, apiKey, serverUrl);
+                    const response = result.response;
+                    const sessionId = result.sessionId;
+                    
+                    // 세션 정보 저장
+                    currentSessionId = sessionId;
+                    currentMusicId = parseInt(musicId);
+                    
+                    if (sessionId) {
+                        addLog(`재생 세션 시작: ${sessionId}`, 'response');
+                    }
+                    
+                    // 음원 스트리밍 처리 (쿼리 파라미터로 API 키 전달)
+                    // 브라우저 오디오 요소는 커스텀 헤더를 보낼 수 없으므로 쿼리 파라미터 사용
+                    const fullUrl = `${serverUrl}/${endpoint}?api_key=${encodeURIComponent(apiKey)}`;
+                    
+                    // Custom fetch로 API 키 헤더를 포함한 프록시 URL 생성
+                    // 실제 환경에서는 서버에서 인증된 스트리밍 URL을 제공해야 함
+                    // 브라우저 오디오 요소를 위해 쿼리 파라미터로 API 키 전달
+                    audioPlayer.src = fullUrl;
+                    
+                    // 브라우저의 Range 요청 감지를 위한 이벤트 리스너
+                    audioPlayer.addEventListener('loadstart', function() {
+                        addLog('브라우저가 Range 요청을 시작합니다', 'response');
+                        addLog('서버에서 각 Range 요청마다 진행도를 자동 추적합니다', 'response');
+                    });
+                    
+                    audioPlayer.addEventListener('progress', function() {
+                        if (audioPlayer.buffered.length > 0) {
+                            const buffered = audioPlayer.buffered.end(0);
+                            const duration = audioPlayer.duration;
+                            if (duration > 0) {
+                                const progressPercent = Math.round((buffered / duration) * 100);
+                                addLog(`버퍼링 진행도: ${progressPercent}% (Range 요청 누적)`, 'response');
+                            }
+                        }
+                    });
+                    
+                    audioControls.classList.remove('hidden');
+                    
+                    showStatus(`음원 ${musicId}번 스트리밍 준비 중...`, 'info');
+                    addLog(`음원 로드 완료 - 자동 재생 시작`, 'response');
+                    
+                    // 기존 이벤트 리스너 제거 (중복 방지)
+                    audioPlayer.onplay = null;
+                    audioPlayer.onpause = null;
+                    audioPlayer.onended = null;
+                    audioPlayer.onerror = null;
+                    audioPlayer.onloadeddata = null;
+                    
+                    // 실제 재생 시간 추적을 위한 이벤트 리스너
+                    audioPlayer.onplay = () => {
+                        activateSpeaker();
+                        showStatus(`음원 ${musicId}번 재생 중... (서버에서 자동 추적)`, 'info');
+                        addLog(`▶️ 음원 ${musicId}번 재생 시작 - 서버에서 유효재생 자동 판정`, 'response');
+                        startPlayTimeTracking();
+                    };
+                    
+                    audioPlayer.onpause = () => {
+                        deactivateSpeaker();
+                        showStatus(`음원 ${musicId}번 일시정지`, 'info');
+                        addLog(`⏸️ 음원 ${musicId}번 일시정지`, 'response');
+                        pausePlayTimeTracking();
+                    };
+                    
+                    audioPlayer.onended = () => {
+                        deactivateSpeaker();
+                        const finalPlayTime = stopPlayTimeTracking();
+                        showStatus(`음원 ${musicId}번 재생 완료`, 'success');
+                        addLog(`🏁 음원 ${musicId}번 재생 완료 - 서버에서 자동으로 유효재생 처리`, 'response');
+                        
+                        currentSessionId = null;
+                        currentMusicId = null;
+                    };
+                    
+                    audioPlayer.onerror = (e) => {
+                        console.error('오디오 재생 오류:', e);
+                        deactivateSpeaker();
+                        stopPlayTimeTracking();
+                        showStatus('오디오 재생 중 오류가 발생했습니다.', 'error');
+                        addLog('❌ 오디오 재생 오류', 'error');
+                        
+                        currentSessionId = null;
+                        currentMusicId = null;
+                    };
+                    
+                    // 음원 데이터 로드 완료 시 자동 재생
+                    audioPlayer.onloadeddata = () => {
+                        addLog(`음원 데이터 로드 완료 - 자동 재생 시작`, 'response');
+                        audioPlayer.play().catch(error => {
+                            console.error('자동 재생 실패:', error);
+                            addLog(`자동 재생 실패: ${error.message}`, 'error');
+                            showStatus('자동 재생이 차단되었습니다. 수동으로 재생 버튼을 눌러주세요.', 'error');
+                        });
+                    };
+
+                } else if (endpoint.includes('/lyric/') && endpoint.includes('/download')) {
+                    // 가사 다운로드 처리
+                    const musicId = endpoint.match(/lyric\/(\d+)\/download/)?.[1];
+                    if (!musicId) {
+                        throw new Error('잘못된 가사 엔드포인트 형식입니다.');
+                    }
+
+                    addLog(`음원 ${musicId}번 가사 다운로드 요청 시작`, 'request');
+                    
+                    const { response } = await makeActualRequest(endpoint, apiKey, serverUrl);
+
+                    // 가사 파일 다운로드 (Response 객체 확인)
+                    if (!response || typeof response.text !== 'function') {
+                        throw new Error('가사 응답 객체가 올바르지 않습니다.');
+                    }
+                    const lyricsText = await response.text();
+                    downloadFile(lyricsText, `lyrics_${musicId}.txt`, 'text/plain');
+                    
+                    showStatus(`음원 ${musicId}번 가사 다운로드 완료`, 'success');
+                    addLog(`음원 ${musicId}번 가사 다운로드 완료`, 'response');
+                    
+                } else {
+                    throw new Error('지원하지 않는 엔드포인트 형식입니다.');
+                }
+
+            } catch (error) {
+                console.error('요청 실패:', error);
+                
+                if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+                    showStatus('유효하지 않은 API 키입니다.', 'error');
+                } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
+                    showStatus('재생 권한이 없습니다. 구독 등급을 확인해주세요.', 'error');
+                } else if (error.message.includes('404') || error.message.includes('Not Found')) {
+                    showStatus('요청한 리소스를 찾을 수 없습니다.', 'error');
+                } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    showStatus('서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.', 'error');
+                } else {
+                    showStatus(`요청 실패: ${error.message}`, 'error');
+                }
+                
+                deactivateSpeaker();
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // 버튼 클릭 이벤트
+        actionButton.addEventListener('click', makeRequest);
+
+        // 엔터 키 처리
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !actionButton.disabled) {
+                makeRequest();
+            }
+        });
+
+        // 초기화
+        updateButtonText();
+        addLog('MPS API 테스트 클라이언트 초기화 완료', 'response');
+    </script>
+</body>
+</html>
