@@ -23,6 +23,7 @@ type Props = {
     rewardPerPlay?: number;
     maxPlayCount?: number;
     accessTier?: 'all' | 'subscribed';
+    grade?: number;
     lyricist?: string;
     composer?: string;
     arranger?: string;
@@ -181,6 +182,36 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                     </div>
                   </div>
                   <div>
+                    <span className="text-white/60">사용 가능 등급</span>
+                    <div className="mt-1">
+                      {musicData?.grade !== undefined ? (
+                        <div className="flex flex-wrap gap-1">
+                          {musicData.grade === 0 ? (
+                            <>
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-500/20 text-orange-400">Free</span>
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400">Standard</span>
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-500/20 text-rose-400">Business</span>
+                            </>
+                          ) : musicData.grade === 1 ? (
+                            <>
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400">Standard</span>
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-500/20 text-rose-400">Business</span>
+                            </>
+                          ) : musicData.grade === 2 ? (
+                            <>
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400">Standard</span>
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-500/20 text-rose-400">Business</span>
+                            </>
+                          ) : (
+                            <span className="text-white/40">-</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-white/40">-</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
                     <span className="text-white/60">발매일</span>
                     <div className="text-white font-medium">{formatDateHyphen(musicData?.releaseDate)}</div>
                   </div>
@@ -209,7 +240,7 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                 <div className="text-center p-4 rounded-lg border border-white/10">
                   <div className="text-white/60 text-sm mb-1">음악 가격</div>
                   <div className="text-teal-400 font-medium text-sm">
-                    {musicData?.priceMusicOnly ? `${musicData.priceMusicOnly} 토큰` : '-'}
+                    {musicData?.priceMusicOnly ? `${musicData.priceMusicOnly}원` : '-'}
                   </div>
                 </div>
               ) : (
@@ -218,13 +249,13 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                   <div className="text-center p-4 rounded-lg border border-white/10">
                     <div className="text-white/60 text-sm mb-1">음악 가격</div>
                     <div className="text-teal-400 font-medium text-sm">
-                      {musicData?.priceMusicOnly ? `${musicData.priceMusicOnly} 토큰` : '-'}
+                      {musicData?.priceMusicOnly ? `${musicData.priceMusicOnly}원` : '-'}
                     </div>
                   </div>
                   <div className="text-center p-4 rounded-lg border border-white/10">
                     <div className="text-white/60 text-sm mb-1">가사 가격</div>
                     <div className="text-teal-400 font-medium text-sm">
-                      {musicData?.priceLyricsOnly ? `${musicData.priceLyricsOnly} 토큰` : '-'}
+                      {musicData?.priceLyricsOnly ? `${musicData.priceLyricsOnly}원` : '-'}
                     </div>
                   </div>
                 </>
@@ -242,7 +273,7 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
               <div>
                 <span className="text-white/60 text-sm">재생당 리워드</span>
                 <div className="text-teal-400 font-medium text-sm">
-                  {musicData?.rewardPerPlay ? `${musicData.rewardPerPlay} 토큰` : '-'}
+                  {musicData?.rewardPerPlay ? `${musicData.rewardPerPlay}원` : '-'}
                 </div>
               </div>
               <div>
@@ -255,7 +286,7 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                 <span className="text-white/60 text-sm">최대 리워드</span>
                 <div className="text-teal-400 font-medium text-sm">
                   {musicData?.rewardPerPlay && musicData?.maxPlayCount 
-                    ? `${(musicData.rewardPerPlay * musicData.maxPlayCount).toLocaleString()} 토큰`
+                    ? `${(musicData.rewardPerPlay * musicData.maxPlayCount).toLocaleString()}원`
                     : musicData?.rewardPerPlay && !musicData?.maxPlayCount
                     ? '무제한'
                     : '-'
@@ -343,7 +374,23 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                 ) : null}
               </div>
               <div className="text-white/80 text-sm leading-relaxed max-h-32 overflow-hidden whitespace-pre-line">
-                {musicData?.lyricsText && musicData.lyricsText.trim().length > 0 ? musicData.lyricsText : '가사가 없습니다.'}
+                {musicData?.lyricsText && musicData.lyricsText.trim().length > 0 
+                  ? musicData.lyricsText 
+                  : musicData?.lyricsFilePath 
+                    ? (
+                        <div className="flex items-center gap-2">
+                          <span>가사 파일이 등록되어 있습니다.</span>
+                          <a 
+                            href={`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${musicData.id}/lyrics?mode=download`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-teal-400 hover:text-teal-300 underline text-xs"
+                          >
+                            다운로드
+                          </a>
+                        </div>
+                      )
+                    : '가사가 없습니다.'}
               </div>
             </div>
           )}
@@ -380,7 +427,38 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
               {/* 가사 내용 */}
               <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                 <div className="text-white/80 text-base leading-relaxed whitespace-pre-line">
-                  {musicData?.lyricsText && musicData.lyricsText.trim().length > 0 ? musicData.lyricsText : '가사가 없습니다.'}
+                  {musicData?.lyricsText && musicData.lyricsText.trim().length > 0 
+                    ? musicData.lyricsText 
+                    : musicData?.lyricsFilePath 
+                      ? (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <span>가사 파일이 등록되어 있습니다.</span>
+                              <div className="flex gap-2">
+                                <a 
+                                  href={`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${musicData.id}/lyrics?mode=inline`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-400 hover:text-blue-300 underline text-sm"
+                                >
+                                  새 창에서 보기
+                                </a>
+                                <a 
+                                  href={`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics/${musicData.id}/lyrics?mode=download`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-teal-400 hover:text-teal-300 underline text-sm"
+                                >
+                                  다운로드
+                                </a>
+                              </div>
+                            </div>
+                            <div className="text-sm text-white/60">
+                              가사 파일을 보려면 위의 링크를 클릭하세요.
+                            </div>
+                          </div>
+                        )
+                      : '가사가 없습니다.'}
                 </div>
               </div>
             </div>

@@ -49,10 +49,12 @@ export default function MusicsPage() {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin/musics?page=${currentPage}&limit=10&search=${searchQuery}&category=${genreFilter}&musicType=${musicTypeFilter}`)
       const data = await response.json()
-      setMusics(data.musics)
-      setTotalCount(data.totalCount || data.musics.length)
+      setMusics(data.musics || [])
+      setTotalCount(data.totalCount || (data.musics ? data.musics.length : 0))
     } catch (error) {
       console.error('음원 조회 실패:', error)
+      setMusics([])
+      setTotalCount(0)
     } finally {
       setLoading(false)
     }
@@ -523,7 +525,7 @@ export default function MusicsPage() {
                     genre: item.category || '미분류',               // 카테고리 (category 필드 사용)
                     tags: item.tags || '태그 없음',                  // 태그 (tags 필드 사용)
                     releaseDate: item.releasedate ? new Date(item.releasedate).toLocaleDateString() : '미정', // 발매일 (releasedate 필드 사용)
-                    maxRewardLimit: `${item.maxrewardlimit}토큰`,   // 월 최대 리워드 한도 (maxrewardlimit 필드 사용)
+                    maxRewardLimit: item.maxrewardlimit && item.maxrewardlimit > 0 ? `${item.maxrewardlimit}토큰` : '-',   // 월 최대 리워드 한도 (maxrewardlimit 필드 사용)
                   }
                 })
                 
@@ -625,6 +627,7 @@ export default function MusicsPage() {
                            arranger: data.arranger,
                            priceMusicOnly: data.priceMusicOnly,
                            priceLyricsOnly: data.priceLyricsOnly,
+                           grade: data.grade,
                            rewardPerPlay: data.rewardPerPlay,
                            maxPlayCount: data.maxPlayCount,
                            accessTier: data.accessTier
@@ -721,6 +724,7 @@ export default function MusicsPage() {
                               composer: data.composer,
                               arranger: data.arranger,
                               priceMusicOnly: data.priceMusicOnly,
+                              grade: data.grade,
                               priceLyricsOnly: data.priceLyricsOnly,
                               rewardPerPlay: data.rewardPerPlay,
                               maxPlayCount: data.maxPlayCount,
