@@ -27,6 +27,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     min-h-screen bg-white text-zinc-900
                     dark:bg-zinc-900 dark:text-zinc-100`}
       >
+        {/* 👇 모든 페이지 전환마다 로딩 오버레이 */}
+        <RouteLoader />
+
         <Providers>
           <ThemeProvider>
             <Header />

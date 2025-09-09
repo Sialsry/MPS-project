@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards,Body, Patch, UseInterceptors, UploadedFile, Post  } from '@nestjs/common';
+import { Controller, Get, Req, UseGuards,Body, Patch, UseInterceptors, UploadedFile, Post, Query,  Delete, Param,ParseIntPipe  } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { diskStorage } from 'multer';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -10,6 +10,8 @@ import { MeResponseDto, SubscriptionDto } from './dto/me.response.dto';
 import { UpdateProfileDto } from './dto/update-me.dto';
 import { existsSync, mkdirSync } from 'fs';
 import { SubscribeDto } from './dto/subscribe.dto';
+import { GetMeRewardsQueryDto, MeRewardsResponseDto } from './dto/me-rewards.dto';
+import { GetMePlaysQueryDto, MePlaysResponseDto } from './dto/me-plays.dto';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads', 'profile');
 if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -35,7 +37,7 @@ export class MeController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('profile')
-  @UseInterceptors(FileInterceptor('profile_image', {   // ← 프론트에서 이 필드명으로 파일 보냄
+  @UseInterceptors(FileInterceptor('profile_image', {   
     storage: diskStorage({
       destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
       filename: (_req, file, cb) => {
@@ -70,6 +72,24 @@ export class MeController {
     const companyId: number = req.user.sub;
     return this.me.getHistory(companyId);
   }
+  
+  @Get('rewards')
+  async rewards(@Req() req: any, @Query() q: GetMeRewardsQueryDto) {
+    console.log('[rewards] sub(type):', typeof req.user?.sub, 'days:', q.days, 'musicId:', q.musicId);
+    const companyId = Number(req.user?.sub); // number 유지
+    return this.me.getRewardsSummary({ companyId, days: q.days, musicId: q.musicId });
+  }
+
+@Get('plays')
+async plays(@Req() req: any, @Query() q: GetMePlaysQueryDto): Promise<MePlaysResponseDto> {
+  const companyId = Number(req.user?.sub); 
+  return this.me.getPlays({ companyId, musicId: q.musicId, page: q.page, limit: q.limit });
+  }
+  @Delete('using/:musicId')
+  async removeUsing(@Req() req, @Param('musicId', ParseIntPipe) musicId: number) {
+    const companyId = Number(req.user.sub);
+    return this.me.removeUsing(companyId, musicId);
+  }
 }
 //   @Post('subscription-settings')
 //   async updateSubscriptionSettings(@Req() req, @Body() dto: UpdateSubscriptionSettingsDto) {
@@ -83,4 +103,3 @@ export class MeController {
 //     const companyId = Number(req.user.sub);
 //     return this.me.rotateApiKey(companyId, /* userId(optional) */ null);
 //   }
-

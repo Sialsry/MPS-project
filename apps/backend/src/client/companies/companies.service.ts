@@ -36,7 +36,6 @@ export class CompaniesService {
     private readonly blockchainService: BlockchainService,
   ) {}
 
-  /* -------------------- 유틸 -------------------- */
   private normalizeBizno(s: string) {
     const n = (s ?? '').replace(/[^0-9]/g, '').trim();
     return n.length === 10 ? n : ''; // 10자리 강제
@@ -50,12 +49,6 @@ export class CompaniesService {
     return ((10 - (sum % 10)) % 10) === d[9];
   }
 
-  /**
-   * ODCloud(국세청) 조회: 견고한 판정
-   * - POST + { b_no: [bizno] }
-   * - match_cnt와 b_stt_cd(03=폐업)로 판정 (문구 의존 X)
-   * - 7초 타임아웃
-   */
   private async verifyWithNts(bizno: string): Promise<{ ok: boolean; closed?: boolean; tax_type?: string | null; reason?: string }> {
     try {
       const resp: any = await Promise.race([
@@ -80,7 +73,6 @@ export class CompaniesService {
     }
   }
 
-  /* -------------------- 회원가입 -------------------- */
   // HYBRID 검증 + 비번 해시 + API 키 발급(해시 저장) + 평문 키 1회 노출
   async create(dto: CreateCompanyDto, skipNts = false) {
     const bizno = this.normalizeBizno(dto.business_number);
@@ -285,17 +277,17 @@ export class CompaniesService {
   }
   
   async regenerateApiKey(companyId: number | string) {
-  const id = typeof companyId === 'string' ? parseInt(companyId, 10) : companyId; // number로 통일
+  const id = typeof companyId === 'string' ? parseInt(companyId, 10) : companyId; 
   const { key, last4, kid, version, hash } = this.apiKeyUtil.generate('live');
 
   await this.repo.updateApiKeyByCompanyId(id, {
     api_key_hash: hash,
-    api_key_id: kid,          // 컬럼 없으면 레포에서 무시하게 작성돼 있음
+    api_key_id: kid,          
     api_key_last4: last4,
     api_key_version: version,
   });
   
-  return { api_key: key, last4 }; // 평문 1회 노출
+  return { api_key: key, last4 };
   }
 
   /**

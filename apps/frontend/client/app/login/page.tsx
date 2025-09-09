@@ -1,27 +1,31 @@
-// app/login/page.tsx
 "use client";
+
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { login, me } from "@/lib/api";          
+import { login } from "@/lib/api";
 import { setAccessToken } from "../../lib/api/auth/token";
-import { normalizeLoginError}  from "../../lib/api/core/error"
-
+import { normalizeLoginError } from "../../lib/api/core/error";
+import { api } from "@/lib/api/core/http";
+import SuccessModal from "../components/sections/SuccessModal";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false); // ✅ 모달 상태
   const r = useRouter();
 
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, []);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (loading) return; // 중복 제출 방지
+    if (loading) return;
     setErr("");
     setLoading(true);
 
@@ -32,11 +36,26 @@ export default function LoginPage() {
     };
 
     try {
-      const resp = await login(payload);     // POST /auth/login
-      setAccessToken(resp.accessToken);      // 토큰 저장(sessionStorage)
-      window.dispatchEvent(new Event('mps:auth:changed'));
-      try { await me(); } catch {}           // 헤더 즉시 갱신 원하면 me() 한번
-      r.replace("/");                        // 홈으로 이동
+      const resp = await login(payload);
+      setAccessToken(resp.accessToken);
+      window.dispatchEvent(new Event("mps:auth:changed"));
+
+      // 토큰 반영 후 me 호출(실패 무시)
+      try {
+        await api("/auth/me", { skipAuthRedirect: true });
+      } catch {}
+
+      const returnTo = sessionStorage.getItem("returnTo") || "/";
+      sessionStorage.removeItem("returnTo");
+
+      // ✅ 성공 모달 열기
+      setShowSuccess(true);
+
+      // 모달 닫힐 때 페이지 이동
+      setTimeout(() => {
+        setShowSuccess(false);
+        r.replace(returnTo);
+      }, 1500);
     } catch (e: any) {
       setErr(normalizeLoginError(e));
     } finally {
@@ -46,6 +65,16 @@ export default function LoginPage() {
 
   return (
     <div className="relative h-dvh w-full overflow-hidden text-white">
+      {/* ✅ 성공 모달 */}
+      <SuccessModal
+        isOpen={showSuccess}
+        message="로그인이 완료되었습니다."
+        variant="success"
+        mode="modal"
+        autoCloseMs={1500}
+        onClose={() => setShowSuccess(false)}
+      />
+
       {/* 배경 비디오 */}
       <video
         className="pointer-events-none absolute inset-0 h-full w-full object-cover"
@@ -76,14 +105,18 @@ export default function LoginPage() {
           <div
             className="mx-auto mt-10 w-[360px] rounded-xl p-6"
             style={{
-              background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.04))",
+              background:
+                "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.04))",
               border: "1px solid rgba(255,255,255,.08)",
-              boxShadow: "0 1px 0 rgba(255,255,255,.06) inset, 0 12px 40px rgba(0,0,0,.45)",
+              boxShadow:
+                "0 1px 0 rgba(255,255,255,.06) inset, 0 12px 40px rgba(0,0,0,.45)",
               backdropFilter: "blur(10px)",
             }}
           >
             <form onSubmit={onSubmit} className="space-y-4">
-              <label className="block text-[10px] tracking-wider text-white/60">이메일</label>
+              <label className="block text-[10px] tracking-wider text-white/60">
+                이메일
+              </label>
               <input
                 className="w-full rounded-md bg-white/5 border border-white/10 px-4 py-3 text-sm placeholder-white/40 outline-none focus:border-white/25 focus:bg-white/[.07] transition"
                 type="email"
@@ -93,7 +126,9 @@ export default function LoginPage() {
                 required
               />
 
-              <label className="block text-[10px] tracking-wider text-white/60">비밀번호</label>
+              <label className="block text-[10px] tracking-wider text-white/60">
+                비밀번호
+              </label>
               <input
                 className="w-full rounded-md bg-white/5 border border-white/10 px-4 py-3 text-sm placeholder-white/40 outline-none focus:border-white/25 focus:bg-white/[.07] transition"
                 type="password"
