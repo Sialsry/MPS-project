@@ -51,7 +51,7 @@ export default function SubscriptionModal({
   onChangePlannedReward?: (value: number) => void;
   onApplyReward?: (value: number) => void;
 }) {
-  if (!open) return null;
+ 
 
   /* ----- 합계(차감 내역은 음수 합계) ----- */
   const totalMinus = useMemo(
@@ -85,7 +85,8 @@ export default function SubscriptionModal({
   const expectedCharge = typeof planPrice === "number"
     ? Math.max(0, Math.floor(planPrice - value))
     : undefined;
-
+    
+    if (!open) return null;
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />

@@ -1,16 +1,11 @@
-// lib/api/musics.ts
 import type { Music, Page } from "@/lib/types/music";
 
 export type Category = { category_id: number; category_name: string };
 
-// ---- 1) 듀얼 모드 스위치 ----
-//   - NEXT_PUBLIC_API_MODE=local 이거나
-//   - NEXT_PUBLIC_API_BASE/URL 둘 다 없으면 => 로컬 DB 모드
 const USE_LOCAL =
   process.env.NEXT_PUBLIC_API_MODE === "local" ||
   (!process.env.NEXT_PUBLIC_API_BASE && !process.env.NEXT_PUBLIC_API_URL);
 
-// ---- 2) 원래 BASE (백엔드 있을 때만 사용) ----
 const BASE =
   process.env.NEXT_PUBLIC_API_BASE ??
   (process.env.NEXT_PUBLIC_API_URL
@@ -679,6 +674,7 @@ const db = {
       }
     ]
 }
+
 // ---- 4) 공통 헬퍼 ----
 const qs = (o: Record<string, any>) => {
   const p = new URLSearchParams();
@@ -693,6 +689,32 @@ const normalize = (m: any): Music => ({
   ...m,
   cover: (m as any).cover ?? (m as any).cover_image_url ?? "",
 });
+
+// 원격 응답 안전 파서 (백엔드 { success, data, message } 형태/직접 items 둘 다 허용)
+async function safeJson(r: Response) {
+  const text = await r.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`HTTP ${r.status} – invalid JSON: ${text?.slice(0, 200)}`);
+  }
+}
+
+function pickArray<T = any>(obj: any, key: string): T[] | undefined {
+  if (!obj) return undefined;
+  if (Array.isArray(obj[key])) return obj[key];
+  if (obj.data && Array.isArray(obj.data[key])) return obj.data[key];
+  if (Array.isArray(obj.data)) return obj.data; // data가 배열 자체인 경우
+  return undefined;
+}
+
+function pickValue<T = any>(obj: any, ...keys: string[]): T | undefined {
+  for (const k of keys) {
+    if (obj && obj[k] !== undefined) return obj[k];
+    if (obj?.data && obj.data[k] !== undefined) return obj.data[k];
+  }
+  return undefined;
+}
 
 // ---- 5) 로컬 구현 ----
 function localFilterByCategory(list: any[], category?: string | number) {
@@ -720,30 +742,39 @@ function localSort(list: any[], sort?: "new" | "popular") {
 }
 
 function localPaginateByCursor(list: any[], cursor?: number | "first", limit = 20) {
-  // 커서: 마지막 아이템 id를 내려받아 그보다 "이전"만 가져오는 방식
   const sorted = localSort(list, "new"); // 커서는 최신순 기준으로
   let startIdx = 0;
-
   if (cursor && cursor !== "first") {
     const idx = sorted.findIndex((m) => m.id === Number(cursor));
     startIdx = idx >= 0 ? idx + 1 : 0; // cursor 다음부터
   }
-
   const items = sorted.slice(startIdx, startIdx + limit);
   const nextCursor = items.length ? items[items.length - 1].id : null;
-
   return { items, nextCursor };
 }
 
-// ---- 6) API (듀얼 모드) ----
+
 export async function fetchCategories(): Promise<Category[]> {
-  if (USE_LOCAL) {
+  if (USE_LOCAL) return db.categories;
+
+  try {
+    // 백엔드 경로: /musics/categories
+    const r = await fetch(`${BASE}/musics/categories`, { cache: "no-store" });
+    if (!r.ok) throw new Error(`GET ${BASE}/musics/categories ${r.status}`);
+    const j = await safeJson(r);
+
+    // { items: [...] } | { data: [...] } | data가 배열인 경우 모두 허용
+    const arr =
+      (Array.isArray(j.items) ? j.items :
+      (Array.isArray(j.data?.items) ? j.data.items :
+      (Array.isArray(j.data) ? j.data : undefined))) as Category[] | undefined;
+
+    if (Array.isArray(arr)) return arr;
+    throw new Error(`Unexpected categories response: ${JSON.stringify(j).slice(0, 200)}`);
+  } catch (e) {
+    console.warn("[fetchCategories] remote failed → fallback to local:", e);
     return db.categories;
   }
-  const r = await fetch(`${BASE}/categories`, { cache: "no-store" });
-  if (!r.ok) throw new Error(`GET ${BASE}/categories ${r.status}`);
-  const j = await r.json();
-  return j.items as Category[];
 }
 
 export async function fetchPopular(params: { category?: string | number; limit?: number } = {}) {
@@ -753,10 +784,26 @@ export async function fetchPopular(params: { category?: string | number; limit?:
     const limited = sorted.slice(0, params.limit ?? 10);
     return limited.map(normalize);
   }
-  const r = await fetch(`${BASE}/musics/popular${qs(params)}`, { cache: "no-store" });
-  if (!r.ok) throw new Error(`GET ${BASE}/musics/popular ${r.status}`);
-  const j = await r.json();
-  return (j.items as Music[]).map(normalize);
+
+  try {
+    const r = await fetch(`${BASE}/musics/popular${qs(params)}`, { cache: "no-store" });
+    if (!r.ok) throw new Error(`GET ${BASE}/musics/popular ${r.status}`);
+    const j = await safeJson(r);
+
+    const items =
+      (Array.isArray(j.items) ? j.items :
+      (Array.isArray(j.data?.items) ? j.data.items :
+      (Array.isArray(j.data) ? j.data : Array.isArray(j) ? j : undefined))) as Music[] | undefined;
+
+    if (!items) throw new Error(`Unexpected popular response: ${JSON.stringify(j).slice(0, 200)}`);
+    return items.map(normalize);
+  } catch (e) {
+    console.warn("[fetchPopular] remote failed → fallback to local:", e);
+    const filtered = localFilterByCategory(db.musics, params.category);
+    const sorted = localSort(filtered, "popular");
+    const limited = sorted.slice(0, params.limit ?? 10);
+    return limited.map(normalize);
+  }
 }
 
 export async function fetchMusics(params: {
@@ -769,16 +816,55 @@ export async function fetchMusics(params: {
     const filtered = localFilterByCategory(db.musics, params.category);
     const sorted = localSort(filtered, params.sort);
     const { items, nextCursor } = localPaginateByCursor(sorted, params.cursor, params.limit ?? 20);
+    return { items: items.map(normalize), nextCursor, hasMore: Boolean(nextCursor) };
+  }
+
+  try {
+    // 서버 파라미터 매핑
+    const serverParams: Record<string, any> = {};
+    if (params.category !== undefined) serverParams.category_id = params.category;
+    if (params.limit !== undefined) serverParams.limit = params.limit;
+    if (params.cursor && params.cursor !== "first") serverParams.cursor = params.cursor;
+    if (params.sort) serverParams.sort = params.sort === "popular" ? "most_played" : "newest";
+
+    const r = await fetch(`${BASE}/musics${qs(serverParams)}`, { cache: "no-store" });
+    if (!r.ok) throw new Error(`GET ${BASE}/musics ${r.status}`);
+    const j = await safeJson(r);
+
+    const items =
+      (Array.isArray(j.items) ? j.items :
+      (Array.isArray(j.data?.items) ? j.data.items :
+      (Array.isArray(j.data) ? j.data : undefined))) as Music[] | undefined;
+
+    const nextCursorRaw =
+      (j.next_cursor ?? j.nextCursor ?? j.data?.next_cursor ?? j.data?.nextCursor) ?? null;
+
+    const hasMoreFlag =
+      (j.has_more ?? j.hasMore ?? j.data?.has_more ?? j.data?.hasMore) ?? false;
+
+    if (!items) {
+      throw new Error(`Unexpected musics response: ${JSON.stringify(j).slice(0, 200)}`);
+    }
+
+    // ✅ Page<Music>의 nextCursor: number | null 로 강제 변환
+    let nextCursorNum: number | null = null;
+    if (nextCursorRaw !== null && nextCursorRaw !== undefined) {
+      const n = typeof nextCursorRaw === "number" ? nextCursorRaw : Number(nextCursorRaw);
+      nextCursorNum = Number.isFinite(n) ? n : null;
+    }
+
     return {
       items: items.map(normalize),
-      nextCursor,
-      hasMore: Boolean(nextCursor),
+      nextCursor: nextCursorNum,
+      hasMore: Boolean(hasMoreFlag || nextCursorNum !== null),
     };
+  } catch (e) {
+    console.warn("[fetchMusics] remote failed → fallback to local:", e);
+    const filtered = localFilterByCategory(db.musics, params.category);
+    const sorted = localSort(filtered, params.sort);
+    const { items, nextCursor } = localPaginateByCursor(sorted, params.cursor, params.limit ?? 20);
+    return { items: items.map(normalize), nextCursor, hasMore: Boolean(nextCursor) };
   }
-  const r = await fetch(`${BASE}/musics${qs(params)}`, { cache: "no-store" });
-  if (!r.ok) throw new Error(`GET ${BASE}/musics ${r.status}`);
-  const j = (await r.json()) as Page<Music>;
-  return { ...j, items: j.items.map(normalize) };
 }
 
 export async function fetchMusic(id: number | string): Promise<Music> {
@@ -787,7 +873,16 @@ export async function fetchMusic(id: number | string): Promise<Music> {
     if (!one) throw new Error(`music not found: ${id}`);
     return normalize(one);
   }
-  const r = await fetch(`${BASE}/musics/${id}`, { cache: "no-store" });
-  if (!r.ok) throw new Error(`GET ${BASE}/musics/${id} ${r.status}`);
-  return normalize(await r.json());
+  try {
+    const r = await fetch(`${BASE}/musics/${id}`, { cache: "no-store" });
+    if (!r.ok) throw new Error(`GET ${BASE}/musics/${id} ${r.status}`);
+    const j = await safeJson(r);
+    const obj = j?.data ?? j;
+    return normalize(obj);
+  } catch (e) {
+    console.warn("[fetchMusic] remote failed → fallback to local:", e);
+    const one = db.musics.find((m) => String(m.id) === String(id));
+    if (!one) throw new Error(`music not found: ${id}`);
+    return normalize(one);
+  }
 }
