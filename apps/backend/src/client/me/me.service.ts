@@ -7,20 +7,24 @@ import {
   company_subscriptions,
   musics,
   company_musics,
+  monthly_music_rewards,
+  rewards,
+  music_plays,
 } from '../../db/schema';
+import { REWARD_CODE_EARNING } from './dto/me-rewards.dto';
+
+const TZ = 'Asia/Seoul';
 
 @Injectable()
 export class MeService {
   private readonly logger = new Logger(MeService.name);
   constructor(@Inject('DB') private readonly db: any) {}
 
-  // 구독 월정액 (원)
   private PLAN_PRICE: Record<'standard' | 'business', number> = {
     standard: 19000,
     business: 29000,
   };
 
-  /** 안전 select 유틸: undefined/null 키 제거 + 사전 검증 */
   private buildSelect<T extends Record<string, any>>(entries: Array<[keyof T & string, any]>): T {
     const filtered = entries.filter(([, v]) => v !== undefined && v !== null);
     const obj = Object.fromEntries(filtered) as T;
@@ -32,7 +36,6 @@ export class MeService {
     return obj;
   }
 
-  /** 내 정보 + 구독/사용 요약 */
   async getMe(companyId: number) {
     // --- Company
     const companySelect = this.buildSelect([
@@ -54,7 +57,6 @@ export class MeService {
       .where(eq(companies.id, (companyId)))
       .limit(1);
 
-    // --- Subscription (reserved_mileage_next_payment 컬럼이 없을 수도 있음)
     const reservedCol =
       (company_subscriptions as any).reserved_mileage_next_payment as any | undefined;
 
@@ -74,16 +76,12 @@ export class MeService {
       .orderBy(desc(company_subscriptions.end_date), desc(company_subscriptions.start_date))
       .limit(1);
 
-    // --- Using summary/list  (company_musics + musics)
-    // 총 사용(보유) 곡 수: company_musics에서 회사에 연결된 곡 수
     const usingCountP = this.db.execute(sql`
       SELECT COUNT(*) AS cnt
       FROM ${company_musics} cm
       WHERE cm.company_id = ${companyId}
     `);
 
-    // 최근 목록: company_musics ↔ musics 조인
-    // last_used_at은 지금은 NULL (로그 테이블 생기면 MAX(created_at)로 치환 가능)
     const usingListP = this.db.execute(sql`
       SELECT
         m.id               AS music_id,
@@ -100,7 +98,6 @@ export class MeService {
 
     const [usingCountRow, usingRows] = await Promise.all([usingCountP, usingListP]);
 
-    // --- Derived values
     const earned = Number(company?.total_rewards_earned ?? 0);
     const used   = Number(company?.total_rewards_used ?? 0);
     const rewardBalance = Math.max(0, earned - used);
@@ -170,7 +167,6 @@ export class MeService {
     };
   }
 
-  /** 프로필 편집 */
   async updateProfile(
     companyId: number,
     dto: { ceo_name?: string; phone?: string; homepage_url?: string; profile_image_url?: string },
@@ -192,7 +188,6 @@ export class MeService {
     return this.getMe(companyId);
   }
 
-  /** 구독 구매 (즉시 결제) */
   async subscribe(companyId: number, dto: { tier: 'standard' | 'business'; use_rewards: number }) {
     const price = this.PLAN_PRICE[dto.tier];
     if (!price) throw new BadRequestException('invalid tier');
@@ -201,11 +196,11 @@ export class MeService {
     const start_date = dayjs(now).startOf('day').toDate();
     const end_date = dayjs(start_date).add(1, 'month').toDate();
 
-    return await this.db.transaction(async (tx) => {
+    return await this.db.transaction(async (tx: any) => {
       // 1) 회사 잠금 후 보유 리워드 확인
       const { rows } = await tx.execute(sql`
         SELECT total_rewards_earned, total_rewards_used
-        FROM companies
+        FROM ${companies}
         WHERE id = ${BigInt(companyId)}
         FOR UPDATE
       `);
@@ -216,13 +211,11 @@ export class MeService {
       const used = Number(c.total_rewards_used ?? 0);
       const balance = Math.max(0, earned - used);
 
-      // 2) 30% 캡
       const cap = Math.floor((price * 3) / 10);
       const wantUse = Math.max(0, Math.floor(dto.use_rewards || 0));
       const use = Math.min(wantUse, cap, balance);
       const actualPaid = Math.max(0, price - use);
 
-      // 3) 구독 생성
       await tx.insert(company_subscriptions).values({
         company_id: companyId,
         tier: dto.tier,
@@ -236,7 +229,6 @@ export class MeService {
         updated_at: now,
       } as any);
 
-      // 4) 리워드 사용 누적
       await tx
         .update(companies)
         .set({
@@ -246,16 +238,10 @@ export class MeService {
         } as any)
         .where(eq(companies.id, (companyId)));
 
-      // 5) 최신 상태 반환
       return this.getMe(companyId);
     });
   }
 
-  /**
-   * 다음 결제에 사용할 리워드 예약값 갱신
-   * - 예약만 저장(실제 차감은 결제 처리 시점)
-   * - 사유는 '구독권 할인'으로 고정
-   */
   async updateSubscriptionSettings(
     companyIdNum: number,
     dto: { useMileage: number; reset?: boolean },
@@ -263,7 +249,6 @@ export class MeService {
     const companyId = companyIdNum; // company_subscriptions.company_id는 number 모드
 
     return await this.db.transaction(async (tx: any) => {
-      // 1) 최신 활성 구독 조회 (end_date > now)
       const reservedCol =
         (company_subscriptions as any).reserved_mileage_next_payment as any | undefined;
 
@@ -286,10 +271,9 @@ export class MeService {
         throw new BadRequestException('활성화된 구독이 없습니다.');
       }
 
-      // 2) 회사 보유 리워드 확보(잠금)
       const { rows } = await tx.execute(sql`
         SELECT total_rewards_earned, total_rewards_used
-        FROM companies
+        FROM ${companies}
         WHERE id = ${BigInt(companyId)}
         FOR UPDATE
       `);
@@ -300,12 +284,10 @@ export class MeService {
       const used = Number(c.total_rewards_used ?? 0);
       const balance = Math.max(0, earned - used);
 
-      // 3) 플랜 가격 기반 30% 캡
       const planPrice = this.PLAN_PRICE[sub.tier as 'standard' | 'business'];
       if (!planPrice) throw new BadRequestException('invalid plan for reservation');
       const cap = Math.floor(planPrice * 0.3);
 
-      // 4) 요청값 클램프(0 ~ min(balance, cap))
       const requested = dto.reset ? 0 : Math.max(0, Math.floor(Number(dto.useMileage || 0)));
       const maxUsable = Math.max(0, Math.min(balance, cap));
       const clamped = Math.min(requested, maxUsable);
@@ -321,7 +303,6 @@ export class MeService {
         };
       }
 
-      // 5) 예약값 업데이트 (컬럼명 안전 폴백)
       const reservedName =
         (company_subscriptions as any).reserved_mileage_next_payment?.name ??
         'reserved_mileage_next_payment';
@@ -401,5 +382,253 @@ export class MeService {
       }));
 
     return { purchases, mileageLogs };
+  }
+
+  /* =========================
+   *  /me/rewards & /me/plays
+   * ========================= */
+
+  /** /me/rewards : 아코디언/상단 요약/최근 N일 */
+  async getRewardsSummary(params: { companyId: number; days?: number; musicId?: number }) {
+    const { companyId, musicId } = params;
+    const days = Number(params.days ?? 7);
+    if (!companyId) throw new BadRequestException('companyId missing');
+    if (days <= 0 || days > 60) throw new BadRequestException('invalid days');
+
+    // 월 레이블
+    const monthRes = await this.db.execute(sql`
+      SELECT to_char(timezone(${TZ}, now()), 'YYYY-MM') AS ym
+    `);
+    const month = (monthRes as any).rows?.[0]?.ym ?? '';
+
+    // 회사가 보유한 음원
+    const musicFilter = musicId ? sql`AND cm.music_id = ${musicId}` : sql``;
+    const musicsRes = await this.db.execute(sql`
+      SELECT m.id AS music_id, m.title, m.cover_image_url
+      FROM ${company_musics} cm
+      JOIN ${musics} m ON m.id = cm.music_id
+      WHERE cm.company_id = ${companyId}
+      ${musicFilter}
+      ORDER BY m.id
+    `);
+    const musicRows: Array<{ music_id: number; title: string|null; cover_image_url: string|null }> =
+      (musicsRes as any).rows ?? [];
+
+    if (musicRows.length === 0) {
+      return { month, days, items: [], totals: { monthBudget: 0, monthSpent: 0, monthRemaining: 0, lifetimeExtracted: 0 } };
+    }
+
+    const items = await Promise.all(
+      musicRows.map(async (m) => {
+        const mid = m.music_id;
+
+        // 월 계획
+        const planRes = await this.db.execute(sql`
+          SELECT reward_per_play::text, total_reward_count, remaining_reward_count
+          FROM ${monthly_music_rewards}
+          WHERE music_id = ${mid}
+            AND year_month = to_char(timezone(${TZ}, now()), 'YYYY-MM')
+          LIMIT 1
+        `);
+        const plan = (planRes as any).rows?.[0] ?? null;
+        const rewardPerPlay = plan?.reward_per_play ? Number(plan.reward_per_play) : null;
+        const totalRewardCount = plan?.total_reward_count ?? null;
+        const remainingRewardCount = plan?.remaining_reward_count ?? null;
+
+        const monthBudget =
+          rewardPerPlay != null && totalRewardCount != null ? rewardPerPlay * totalRewardCount : 0;
+        const remainingByPlanAmount =
+          rewardPerPlay != null && remainingRewardCount != null ? rewardPerPlay * remainingRewardCount : null;
+
+        // 이번달 사용액/누적/최근사용/시작일
+        const aggRes = await this.db.execute(sql`
+          WITH month_spent AS (
+            SELECT COALESCE(SUM(amount),0)::numeric AS v
+            FROM ${rewards}
+            WHERE company_id = ${companyId} AND music_id = ${mid}
+              AND reward_code = ${REWARD_CODE_EARNING}::reward_code
+              AND status = ANY(${sql`ARRAY['pending'::reward_status,'successed'::reward_status]`})
+              AND date_trunc('month', created_at AT TIME ZONE ${TZ})
+                  = date_trunc('month', timezone(${TZ}, now()))
+          ),
+          lifetime AS (
+            SELECT COALESCE(SUM(amount),0)::numeric AS v
+            FROM ${rewards}
+            WHERE company_id = ${companyId} AND music_id = ${mid}
+            AND reward_code = ${REWARD_CODE_EARNING}::reward_code
+            AND status IN ('pending'::reward_status,'successed'::reward_status)
+          ),
+         last_used AS (
+            SELECT MAX(p.created_at) AS v
+            FROM ${music_plays} p
+            WHERE p.using_company_id = ${companyId} AND p.music_id = ${mid}
+          ),
+          start_date AS (
+            SELECT MIN(p.created_at) AS v
+            FROM ${music_plays} p
+            WHERE p.using_company_id = ${companyId} AND p.music_id = ${mid}
+          )
+          SELECT
+            month_spent.v::text AS month_spent,
+            lifetime.v::text    AS lifetime,
+            to_char(timezone(${TZ}, last_used.v),  'YYYY-MM-DD HH24:MI') AS last_used_at,
+            to_char(timezone(${TZ}, start_date.v), 'YYYY-MM-DD HH24:MI') AS start_date
+          FROM month_spent, lifetime, last_used, start_date
+        `);
+        const agg = (aggRes as any).rows?.[0] ?? {};
+        const monthSpent = Number(agg?.month_spent ?? '0');
+        const lifetimeExtracted = Number(agg?.lifetime ?? '0');
+        const lastUsedAt = agg?.last_used_at ?? null;
+        const startDate = agg?.start_date ?? null;
+        const monthRemaining = Math.max(monthBudget - monthSpent, 0);
+
+        // 최근 N일
+        const dailyRes = await this.db.execute(sql`
+          WITH days AS (
+            SELECT dd::date AS d
+            FROM generate_series(
+              (timezone(${TZ}, now())::date - (${days}::int - 1)),
+              timezone(${TZ}, now())::date,
+              interval '1 day'
+            ) AS dd
+          )
+          SELECT to_char(d, 'YYYY-MM-DD') AS date,
+                 COALESCE(SUM(r.amount),0)::numeric::text AS amount
+          FROM days
+          LEFT JOIN ${rewards} r
+            ON r.company_id = ${companyId} AND r.music_id = ${mid}
+            AND r.reward_code = ${REWARD_CODE_EARNING}::reward_code
+            AND r.status IN ('pending'::reward_status,'successed'::reward_status)
+            AND (r.created_at AT TIME ZONE ${TZ})::date = d
+          GROUP BY d
+          ORDER BY d
+        `);
+        const dailyRows: Array<{ date: string; amount: string }> = (dailyRes as any).rows ?? [];
+
+        return {
+          musicId: mid,
+          title: m.title,
+          coverImageUrl: m.cover_image_url,
+          // ⬇ 프리픽스 없이 반환
+          playEndpoint: `/music/${mid}/play`,
+          lyricsEndpoint: `/lyric/${mid}/download`,
+          startDate,
+          rewardPerPlay,
+          monthBudget,
+          monthSpent,
+          monthRemaining,
+          remainingByPlanCount: remainingRewardCount,
+          remainingByPlanAmount,
+          lifetimeExtracted,
+          lastUsedAt,
+          daily: dailyRows.map((x) => ({ date: x.date, amount: Number(x.amount) })),
+          leadersEarned: lifetimeExtracted,
+        };
+      }),
+    );
+
+    const totals = items.reduce(
+      (a, x) => {
+        a.monthBudget += x.monthBudget;
+        a.monthSpent += x.monthSpent;
+        a.monthRemaining += x.monthRemaining;
+        a.lifetimeExtracted += x.lifetimeExtracted;
+        return a;
+      },
+      { monthBudget: 0, monthSpent: 0, monthRemaining: 0, lifetimeExtracted: 0 },
+    );
+
+    return { month, days, items, totals };
+  }
+
+  /** /me/plays : 모달 리스트(유효/무효 포함, 리워드 join=earning만) */
+  async getPlays(params: { companyId: number; musicId: number; page?: number; limit?: number }) {
+    const { companyId, musicId } = params;
+    const page = Number(params.page ?? 1);
+    const limit = Number(params.limit ?? 20);
+    if (!companyId || !musicId) throw new BadRequestException('companyId/musicId missing');
+    const offset = (page - 1) * limit;
+  
+    // 총 개수
+    const cntRes = await this.db.execute(sql`
+      SELECT COUNT(*)::text AS c
+      FROM ${music_plays} p
+      WHERE p.using_company_id = ${companyId} AND p.music_id = ${musicId}
+    `);
+    const total = Number((cntRes as any).rows?.[0]?.c ?? '0');
+  
+    // 리스트: p.meta 제거 → NULL로 대체
+    const listRes = await this.db.execute(sql`
+      SELECT
+        p.id AS play_id,
+        to_char(timezone(${TZ}, p.created_at), 'YYYY-MM-DD HH24:MI') AS played_at,
+        CASE
+          WHEN r.id IS NOT NULL
+           AND r.status = ANY(${sql`ARRAY['pending'::reward_status,'successed'::reward_status]`})
+          THEN TRUE ELSE FALSE
+        END AS is_valid,
+        NULL::jsonb AS meta,                    -- ⬅⬅⬅ 여기!
+        r.id   AS reward_id,
+        r.reward_code,
+        r.amount::text AS amount,
+        r.status
+      FROM ${music_plays} p
+      LEFT JOIN ${rewards} r
+        ON r.play_id = p.id
+       AND r.reward_code = ${REWARD_CODE_EARNING}::reward_code
+      WHERE p.using_company_id = ${companyId} AND p.music_id = ${musicId}
+      ORDER BY p.created_at DESC, p.id DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+  
+    const rows: Array<{
+      play_id: number; played_at: string; is_valid: boolean; meta: any;
+      reward_id: number | null; reward_code: '0'|'1'|'2'|'3' | null;
+      amount: string | null; status: 'pending'|'successed' | null;
+    }> = (listRes as any).rows ?? [];
+  
+    return {
+      page, limit, total,
+      items: rows.map((r) => ({
+        playId: r.play_id,
+        playedAt: r.played_at,
+        isValid: !!r.is_valid,
+        meta: r.meta ?? null,
+        rewardId: r.reward_id,
+        rewardCode: r.reward_code,
+        amount: r.amount != null ? Number(r.amount) : null,
+        status: r.status,
+      })),
+    };
+  }
+  async removeUsing(companyIdNum: number, musicIdNum: number) {
+    const companyId = companyIdNum; // company_musics.company_id 가 number 타입이라면 그대로 사용
+    const musicId = musicIdNum;
+  
+    return await this.db.transaction(async (tx: any) => {
+      // 존재 확인 (없어도 idempotent 하게 처리하려면 선택)
+      const chk = await tx.execute(sql`
+        SELECT 1
+        FROM ${company_musics}
+        WHERE company_id = ${companyId} AND music_id = ${musicId}
+        LIMIT 1
+      `);
+  
+      if (!chk?.rows?.length) {
+        // 이미 제거됐거나 없으면 현재 me 상태만 반환(아이덤포턴트)
+        return this.getMe(companyId);
+        // 또는 에러 원하면:
+        // throw new BadRequestException('이미 삭제되었거나 사용 중이 아닙니다.');
+      }
+  
+      // 연결만 제거 (이력/리워드는 그대로 보존)
+      await tx.execute(sql`
+        DELETE FROM ${company_musics}
+        WHERE company_id = ${companyId} AND music_id = ${musicId}
+      `);
+  
+      // 최신 마이페이지 오버뷰 반환
+      return this.getMe(companyId);
+    });
   }
 }

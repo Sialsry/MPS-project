@@ -150,7 +150,13 @@ export function useMeOverview() {
         const vm = normalize(raw);
         setData(vm);
       } catch (e: any) {
-        if (e?.name !== "AbortError") setErr(e?.message ?? "failed");
+        if (e?.name === "AbortError" || String(e?.message).includes("aborted")) return;
+        if (e?.status === 401 || e?.response?.status === 401) {
+          setData(null);
+          setErr(null);
+          return;
+        }
+        setErr(e?.message ?? "failed");
       } finally {
         setLoading(false);
       }

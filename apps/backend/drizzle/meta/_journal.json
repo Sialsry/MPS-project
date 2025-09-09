@@ -29,6 +29,13 @@
       "when": 1757250946432,
       "tag": "0003_code-first-indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1757322595354,
+      "tag": "0004_crazy_blue_shield",
+      "breakpoints": true
     }
   ]
 }

@@ -23,3 +23,7 @@ createdb -U postgres DBNAME
 
 
 npx drizzle-kit migrate
+
+
+# 카테고리 실행
+ "seed:music-categories": "ts-node src/scripts/seedCategories.ts" 

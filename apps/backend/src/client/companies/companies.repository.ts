@@ -9,7 +9,6 @@ export type CompanySubscriptionRow = typeof company_subscriptions.$inferSelect;
 @Injectable()
 export class CompaniesRepository {
   constructor(@Inject('DB') private readonly db: any) {}
-  // 중복 체크: eq/or 대신 sql 템플릿 사용 (심볼 충돌 회피)
   findDuplicate(email: string, name: string, bizno: string) {
     return db.query.companies.findFirst({
       where: (c, { sql }) =>
@@ -18,7 +17,6 @@ export class CompaniesRepository {
     });
   }
 
-  // HYBRID용: 로컬 허용 사업자번호 존재 여부
   async existsBizno(bizno: string): Promise<boolean> {
     const row = await db.query.business_numbers.findFirst({
       where: (b, { sql }) => sql`regexp_replace(${b.number}, '\D', '', 'g') = ${bizno}`,
@@ -27,7 +25,6 @@ export class CompaniesRepository {
     return !!row;
   }
 
-  // 삽입: 전체 반환(심볼 출처 갈림 방지)
   async insert(values: typeof companies.$inferInsert) {
     return db.insert(companies).values(values).returning();
   }
@@ -43,11 +40,10 @@ export class CompaniesRepository {
 
   findById(id: number) {
     return db.query.companies.findFirst({
-      where: (c, { sql }) => sql`${c.id} = ${id}`,   // ← operators 구조분해 말고 sql 템플릿
+      where: (c, { sql }) => sql`${c.id} = ${id}`,  
     });
   }
 
-  // 선택: 로그인 등에서 이메일 조회
   findByEmail(email: string) {
     return db.query.companies.findFirst({
       where: (c, { sql }) => sql`${c.email} = ${email}`,

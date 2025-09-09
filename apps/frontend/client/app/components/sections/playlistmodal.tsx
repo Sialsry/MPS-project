@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { RxCross2 } from "react-icons/rx";
 import { IoPlay, IoPlaySkipBack, IoPlaySkipForward } from "react-icons/io5";
 import { useAudioPlayer } from "../../providers/AudioPlayerProvider";
+import SuccessModal from "./SuccessModal";
 
 export type Track = {
   id: number;
@@ -18,8 +19,13 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   tracks: Track[];
-  initialIndex?: number;                  
-  onUseSelected?: (trackIds: number[]) => Promise<void> | void; 
+  initialIndex?: number;
+  /** 선택 사용하기 */
+  onUseSelected?: (trackIds: number[]) => Promise<void> | void;
+  /** 선택 삭제하기 (플레이리스트에서 제외) */
+  onRemoveSelected?: (trackIds: number[]) => Promise<void> | void;
+  /** 모달 제목(선택) */
+  title?: string;
 };
 
 export default function PlaylistModal({
@@ -28,10 +34,13 @@ export default function PlaylistModal({
   tracks,
   initialIndex = 0,
   onUseSelected,
+  onRemoveSelected,
+  title = "플레이리스트",
 }: Props) {
   const [index, setIndex] = useState(initialIndex);
-
   const [checked, setChecked] = useState<Record<number, boolean>>({});
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
   const allChecked = useMemo(
     () => tracks.length > 0 && tracks.every(t => checked[t.id]),
     [tracks, checked]
@@ -70,7 +79,7 @@ export default function PlaylistModal({
       if (e.key === "ArrowLeft") handlePrev();
       if (e.key === " ") {
         e.preventDefault();
-        handlePlayCurrentAndClose(); // 스페이스로 현재곡 재생 + 닫기
+        handlePlayCurrentAndClose();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -93,9 +102,7 @@ export default function PlaylistModal({
     if (!queueTracks.length) return;
     const queue = toQueue(queueTracks);
     const target = queue[startIdx];
-    // 전역 큐 세팅 + 자동재생
     playTrack(target, queue, startIdx);
-    // 바로 닫으면서 재생바로 넘어감
     onClose();
   };
 
@@ -121,7 +128,6 @@ export default function PlaylistModal({
   const handlePlaySelectedAndClose = () => {
     const selected = tracks.filter(t => checked[t.id]);
     if (!selected.length) return;
-    // 시작곡은 선택 목록에서 현재 인덱스 곡을 우선, 없으면 첫 곡
     const currentId = tracks[index]?.id;
     const startIdx = Math.max(0, selected.findIndex(t => t.id === currentId));
     playQueueAndClose(selected, startIdx >= 0 ? startIdx : 0);
@@ -131,7 +137,24 @@ export default function PlaylistModal({
   const handleUseSelected = async () => {
     const ids = tracks.filter(t => checked[t.id]).map(t => t.id);
     if (!ids.length) return;
-    await onUseSelected?.(ids);
+    try {
+      await onUseSelected?.(ids);
+      setSuccessMsg("체크된 음원을 사용하였습니다.");
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // 선택 삭제하기
+  const handleRemoveSelected = async () => {
+    const ids = tracks.filter(t => checked[t.id]).map(t => t.id);
+    if (!ids.length) return;
+    try {
+      await onRemoveSelected?.(ids);
+      setSuccessMsg("체크된 음원을 삭제하였습니다.");
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   // 체크박스 핸들러
@@ -156,15 +179,32 @@ export default function PlaylistModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center" aria-modal role="dialog">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center"
+      aria-modal
+      role="dialog"
+    >
+      {/* ✅ 성공 모달 */}
+      <SuccessModal
+        isOpen={!!successMsg}
+        message={successMsg ?? ""}
+        onClose={() => setSuccessMsg(null)}
+        autoCloseMs={1500}
+      />
+
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
 
       {/* Modal */}
       <div className="relative z-[101] w-full max-w-3xl rounded-2xl bg-white p-4 shadow-2xl dark:bg-zinc-900 md:p-6">
         {/* 헤더 */}
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-zinc-900 dark:text-white">플레이리스트</h3>
+          <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+            {title}
+          </h3>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setAll(true)}
@@ -178,7 +218,6 @@ export default function PlaylistModal({
             >
               전체 해제
             </button>
-
             <button
               onClick={onClose}
               className="rounded-xl p-2 hover:bg-black/5 dark:hover:bg-white/10"
@@ -189,7 +228,7 @@ export default function PlaylistModal({
           </div>
         </div>
 
-        {/* 상단 액션바: 선택 재생 / 선택 사용 */}
+        {/* 상단 액션바 */}
         <div className="mb-3 flex items-center justify-between text-xs">
           <div className="text-zinc-500 dark:text-zinc-400">
             선택됨: {tracks.filter(t => checked[t.id]).length}/{tracks.length}
@@ -210,43 +249,65 @@ export default function PlaylistModal({
             >
               선택 사용하기
             </button>
+            {onRemoveSelected && (
+              <button
+                onClick={handleRemoveSelected}
+                disabled={!someChecked}
+                className="h-8 rounded-md bg-rose-600 px-3 text-xs font-semibold text-white enabled:hover:bg-rose-500 disabled:opacity-50"
+                title="플레이리스트에서 제거"
+              >
+                선택 삭제
+              </button>
+            )}
           </div>
         </div>
 
-        {/* 본문: 좌(커버/컨트롤) / 우(트랙리스트) */}
+        {/* 본문 */}
         <div className="grid gap-4 md:grid-cols-[1.1fr_1fr]">
-          {/* 좌측 현재 트랙 + 컨트롤 */}
+          {/* 좌측 현재 트랙 */}
           <div className="rounded-2xl border border-black/5 bg-black/3 p-4 dark:border-white/10 dark:bg-white/5">
             <div className="flex gap-4">
               {/* 커버 */}
               <div className="h-28 w-28 shrink-0 overflow-hidden rounded-xl bg-zinc-200 dark:bg-zinc-800">
                 {track?.coverUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={track.coverUrl} alt={track.title} className="h-full w-full object-cover" draggable={false} />
+                  <img
+                    src={track.coverUrl}
+                    alt={track.title}
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
                 )}
               </div>
 
               {/* 정보 + 컨트롤 */}
               <div className="min-w-0">
-                <div className="truncate text-base font-semibold text-zinc-900 dark:text-white">{track?.title}</div>
-                <div className="truncate text-sm text-zinc-600 dark:text-zinc-300">{track?.artist}</div>
+                <div className="truncate text-base font-semibold text-zinc-900 dark:text-white">
+                  {track?.title}
+                </div>
+                <div className="truncate text-sm text-zinc-600 dark:text-zinc-300">
+                  {track?.artist}
+                </div>
 
                 <div className="mt-2 flex items-center gap-2">
-                  <button onClick={handlePrev} className="rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10" aria-label="이전 곡">
+                  <button
+                    onClick={handlePrev}
+                    className="rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
+                    aria-label="이전 곡"
+                  >
                     <IoPlaySkipBack className="h-6 w-6" />
                   </button>
-
-                  {/* 현재 인덱스부터 전체 큐로 재생하고 닫기 */}
                   <button
                     onClick={handlePlayCurrentAndClose}
                     className="rounded-full bg-zinc-900 p-3 text-white hover:opacity-90 dark:bg-white dark:text-zinc-900"
                     aria-label="재생"
-                    title="재생(닫고 재생)"
                   >
                     <IoPlay className="h-6 w-6 translate-x-[1px]" />
                   </button>
-
-                  <button onClick={handleNext} className="rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10" aria-label="다음 곡">
+                  <button
+                    onClick={handleNext}
+                    className="rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
+                    aria-label="다음 곡"
+                  >
                     <IoPlaySkipForward className="h-6 w-6" />
                   </button>
                 </div>
@@ -258,7 +319,7 @@ export default function PlaylistModal({
             </div>
           </div>
 
-          {/* 우측 트랙 리스트 (체크박스 + 행클릭 재생) */}
+          {/* 우측 리스트 */}
           <div className="max-h-[420px] overflow-auto rounded-2xl border border-black/5 dark:border-white/10">
             <ul className="divide-y divide-black/5 dark:divide-white/10">
               {tracks.map((t, i) => {
@@ -266,9 +327,12 @@ export default function PlaylistModal({
                 return (
                   <li
                     key={t.id}
-                    className={`flex items-center gap-3 px-3 py-2 ${selectedRow ? "bg-black/5 dark:bg-white/10" : "hover:bg-black/5 dark:hover:bg-white/10"}`}
+                    className={`flex items-center gap-3 px-3 py-2 ${
+                      selectedRow
+                        ? "bg-black/5 dark:bg-white/10"
+                        : "hover:bg-black/5 dark:hover:bg-white/10"
+                    }`}
                   >
-                    {/* 체크박스 */}
                     <input
                       type="checkbox"
                       className="h-4 w-4 accent-zinc-900 dark:accent-white"
@@ -277,38 +341,40 @@ export default function PlaylistModal({
                       onClick={(e) => e.stopPropagation()}
                       aria-label="선택"
                     />
-
-                    {/* 커버(클릭 시 해당 곡부터 전체 큐로 재생 + 닫기) */}
                     <button
                       className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-zinc-200 dark:bg-zinc-800"
                       onClick={() => {
                         setIndex(i);
                         playQueueAndClose(tracks, i);
                       }}
-                      title="이 곡부터 재생"
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      {t.coverUrl && <img src={t.coverUrl} alt={t.title} className="h-full w-full object-cover" draggable={false} />}
+                      {t.coverUrl && (
+                        <img
+                          src={t.coverUrl}
+                          alt={t.title}
+                          className="h-full w-full object-cover"
+                          draggable={false}
+                        />
+                      )}
                     </button>
-
-                    {/* 타이틀/아티스트 (텍스트 클릭도 재생) */}
                     <button
                       className="min-w-0 flex-1 text-left"
                       onClick={() => {
                         setIndex(i);
                         playQueueAndClose(tracks, i);
                       }}
-                      title="이 곡부터 재생"
                     >
-                      <div className="truncate text-sm font-medium text-zinc-900 dark:text-white">{t.title}</div>
-                      <div className="truncate text-xs text-zinc-600 dark:text-zinc-300">{t.artist}</div>
+                      <div className="truncate text-sm font-medium text-zinc-900 dark:text-white">
+                        {t.title}
+                      </div>
+                      <div className="truncate text-xs text-zinc-600 dark:text-zinc-300">
+                        {t.artist}
+                      </div>
                     </button>
-
-                    {/* 오른쪽 타임/액션 */}
                     <div className="ml-auto flex items-center gap-3 text-xs text-zinc-600 dark:text-zinc-300">
-                      {typeof t.durationSec === "number" ? <span>{fmt(t.durationSec)}</span> : null}
-
-                      {/* 개별 재생 버튼 */}
+                      {typeof t.durationSec === "number" ? (
+                        <span>{fmt(t.durationSec)}</span>
+                      ) : null}
                       <button
                         className="rounded-md border border-zinc-200 px-2 py-1 text-[11px] hover:bg-zinc-50 dark:border-white/10 dark:bg-transparent dark:hover:bg-white/10"
                         onClick={() => {
@@ -325,24 +391,6 @@ export default function PlaylistModal({
             </ul>
           </div>
         </div>
-
-        {/* 하단 액션바(모바일 접근성 위해 한 번 더) */}
-        {/* <div className="mt-4 flex items-center justify-end gap-2">
-          <button
-            onClick={handlePlaySelectedAndClose}
-            disabled={!someChecked}
-            className="h-9 rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white enabled:hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:enabled:hover:bg-zinc-100"
-          >
-            선택 재생 (닫고 재생)
-          </button>
-          <button
-            onClick={handleUseSelected}
-            disabled={!someChecked}
-            className="h-9 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white enabled:hover:bg-blue-500 disabled:opacity-50"
-          >
-            선택 사용하기
-          </button>
-        </div> */}
       </div>
     </div>
   );

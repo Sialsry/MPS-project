@@ -47,4 +47,50 @@ export type MeOverview = {
   usingList: any[];
 };
 
+export type MeRewardsItem = {
+  musicId: number;
+  title: string | null;
+  coverImageUrl: string | null;
+  playEndpoint: string;    // 예: /music/{id}/play
+  lyricsEndpoint: string;  // 예: /lyric/{id}/download
+  startDate: string | null; // ISO string
+  rewardPerPlay: number | null;
+  monthBudget: number;
+  monthSpent: number;
+  monthRemaining: number;
+  remainingByPlanCount: number | null;
+  remainingByPlanAmount: number | null;
+  lifetimeExtracted: number;
+  lastUsedAt: string | null; // ISO string
+  daily: { date: string; amount: number }[];
+};
 
+export type MeRewardsResponse = {
+  month: string; // 'YYYY-MM'
+  days: number;
+  items: MeRewardsItem[];
+  totals: {
+    monthBudget: number;
+    monthSpent: number;
+    monthRemaining: number;
+    lifetimeExtracted: number;
+  };
+};
+
+export type MePlaysItem = {
+  playId: number;
+  playedAt: string; // ISO
+  isValid: boolean;
+  meta: any | null;
+  rewardId: number | null;
+  rewardCode: '0' | '1' | '2' | '3' | null;
+  amount: number | null;
+  status: 'pending' | 'successed' | null;
+};
+
+export type MePlaysResponse = {
+  page: number;
+  limit: number;
+  total: number;
+  items: MePlaysItem[];
+};

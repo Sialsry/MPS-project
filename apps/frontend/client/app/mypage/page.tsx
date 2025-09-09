@@ -11,11 +11,15 @@ import ProfileEditModal, { ProfileEditValues } from "../components/sections/Prof
 import UsingRow, { UsingTrackApi } from "../components/using/UsingRow";
 
 // ★ JSON/PATCH + 파일(FormData) 모두 처리하는 함수
-import { updateMeProfileFormData } from "@/lib/api/me";
+import { updateMeProfileFormData, removeUsingTrack } from "@/lib/api/me";
 
 import { useMeOverview } from "@/hooks/useMeOverview";
+import { useMeRewards } from "@/hooks/useMeRewards";
 import useHistory from "@/hooks/useHestory";
+import { useMePlays } from "@/hooks/useMePlays";
 
+import { usePlaylistsList, usePlaylistTracks, usePlaylistActions } from "@/hooks/usePlaylists";
+import type { PlaylistCard } from "@/lib/api/playlist";
 /* ---------------- UI Utils ---------------- */
 function maskKey(last4: string | null | undefined) {
   if (!last4) return "****-****-****-****";
@@ -71,7 +75,6 @@ function resolveImageUrl(absOrRel?: string | null) {
 
 /* ---------------- Types ---------------- */
 type TabKey = "using" | "playlist";
-type Playlist = { id: number; name: string; cover: string; count: number };
 
 /* ---------------- Page ---------------- */
 export default function MyPage() {
@@ -79,33 +82,56 @@ export default function MyPage() {
 
   // 모달들
   const [playlistOpen, setPlaylistOpen] = useState(false);
-  const [playlistTracks, setPlaylistTracks] = useState<Track[]>([]);
   const [playlistIndex, setPlaylistIndex] = useState(0);
   const [subsOpen, setSubsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
+  // 선택된 플레이리스트
+  const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistCard | null>(null);
+
   // ======== /me/overview ========
   const { data, loading, error, refresh, setData } = useMeOverview();
 
-  // ⬇️ /me/history (구매/마일리지 이력)
-  const { data: hist, loading: histLoading, error: histError } = useHistory();
+  // ======== /me/rewards ======== (최근 7일 기본)
+  const {
+    data: rewards,
+    loading: rewardsLoading,
+    error: rewardsError,
+    refresh: refreshRewards,
+  } = useMeRewards(7);
 
-  // UsingRow 매핑
+  const { data: hist } = useHistory();
+
+  // UsingRow 매핑 (overview의 usingList ⊗ rewards.items 머지)
   const usingData: UsingTrackApi[] = useMemo(() => {
-    if (!Array.isArray(data?.usingList)) return [];
-    return data.usingList.map((r: any) => ({
-      id: r.id,
-      title: r.title,
-      artist: r.artist ?? "",
-      category: "",
-      cover: r.cover ?? "https://picsum.photos/seed/cover/600/600",
-      leadersEarned: r.leadersEarned ?? 0,
-      lastUsedAt: r.lastUsedAt ?? "",
-      startedAt: "",
-      monthReward: 0,
-      monthlyRewards: [],
-    }));
-  }, [data]);
+    const baseList = Array.isArray(data?.usingList) ? data!.usingList : [];
+    const rewardMap = new Map<number, any>();
+    (rewards?.items ?? []).forEach((it) => rewardMap.set(Number(it.musicId), it));
+
+    return baseList.map((r: any) => {
+      const rid = Number(r.id);
+      const m = rewardMap.get(rid);
+      const row: UsingTrackApi = {
+        id: r.id,
+        title: r.title,
+        artist: r.artist ?? "",
+        category: "",
+        cover: r.cover ?? m?.coverImageUrl ?? "https://picsum.photos/seed/cover/600/600",
+        leadersEarned: r.leadersEarned ?? 0,
+        lastUsedAt: m?.lastUsedAt ?? r.lastUsedAt ?? "",
+        startedAt: m?.startDate ?? "",
+        monthBudget: m?.monthBudget,
+        monthSpent: m?.monthSpent,
+        monthRemaining: m?.monthRemaining,
+        daily: m?.daily,
+        playEndpoint: m?.playEndpoint,
+        lyricsEndpoint: m?.lyricsEndpoint,
+        monthReward: undefined,
+        monthlyRewards: [],
+      };
+      return row;
+    });
+  }, [data, rewards]);
 
   /* ---------- API 키: 프리뷰/재발급 ---------- */
   const [apiKeyLast4, setApiKeyLast4] = useState<string | null>(null);
@@ -121,22 +147,20 @@ export default function MyPage() {
     if (!data) return;
     setApiKeyLast4(data.apiKey?.last4 ?? null);
   }, [data]);
-
   useEffect(() => {
     setFetchingKey(!!loading);
   }, [loading]);
 
   // ---------------- 사용 기록 모달 상태/핸들러 ----------------
   const [usageOpen, setUsageOpen] = useState(false);
-  const [usageTrackId, setUsageTrackId] = useState<string | number | null>(null);
-  const [usageEndpoint, setUsageEndpoint] = useState<string | null>(null);
+  const [usageTrackId, setUsageTrackId] = useState<number | null>(null);
   const [usageTitle, setUsageTitle] = useState<string | undefined>(undefined);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const plays = useMePlays(usageOpen && usageTrackId != null ? usageTrackId : undefined, 1, 20);
 
   function openUsage(t: UsingTrackApi) {
-    const USING_API = "/api/using-tracks";
-    const endpoint = `${USING_API}/${t.id}/logs?days=7`;
-    setUsageTrackId(t.id);
-    setUsageEndpoint(endpoint);
+    setUsageTrackId(Number(t.id));
     setUsageTitle(`${t.title} · 사용 기록`);
     setUsageOpen(true);
   }
@@ -168,11 +192,10 @@ export default function MyPage() {
     [data]
   );
 
-  // ★ 모달에서 (values, file?) 넘겨주면 이 함수가 서버에 PATCH (FormData) 호출
+  // ★ 모달에서 (values, file?) 넘겨주면 이 함수가 서버에 PATCH(FormData) 호출
   async function handleSaveProfile(v: ProfileEditValues, file?: File) {
     const prev = data;
-
-    // 1) 낙관적 업데이트 (파일 있으면 즉시 로컬 미리보기 표시)
+    // 낙관적 업데이트
     setData?.((p: any) =>
       p
         ? {
@@ -190,10 +213,8 @@ export default function MyPage() {
         : p
     );
     setProfileOpen(false);
-
     try {
       setSavingProfile(true);
-      // 2) 서버 저장 (파일 있으면 multipart, 없으면 JSON)
       const saved = await updateMeProfileFormData(
         {
           ceo_name: v.ceo_name?.trim() || undefined,
@@ -203,10 +224,8 @@ export default function MyPage() {
         },
         file
       );
-      // 3) 서버에서 최신 overview 형태로 응답 시 그대로 반영
       setData?.(saved);
     } catch (e: any) {
-      // 4) 실패 시 롤백
       setData?.(prev as any);
       alert(e?.message || "프로필 저장 실패");
     } finally {
@@ -214,14 +233,34 @@ export default function MyPage() {
     }
   }
 
-  const playlists: Playlist[] = [
-    { id: 1, name: "출근용 하이텐션", cover: "https://picsum.photos/seed/pl-1/800/600", count: 10 },
-    { id: 2, name: "카페 감성 팝", cover: "https://picsum.photos/seed/pl-2/800/600", count: 8 },
-    { id: 3, name: "야근용 Lo-Fi", cover: "https://picsum.photos/seed/pl-3/800/600", count: 12 },
-  ];
+  // ======== 플레이리스트(목록/트랙/액션) ========
+  const plList = usePlaylistsList(); // { data, loading, error, reload }
+  const selectedPlaylistId = selectedPlaylist?.id ?? null;
+  const plTracks = usePlaylistTracks(selectedPlaylistId); // { data, loading, error, reload }
+  const plActions = usePlaylistActions(selectedPlaylistId); // { useSelected, removeSelected, replaceTracks, deletePlaylist, pending, error }
 
-  if (loading) return <main className="p-6">로딩중…</main>;
+  // 사용중인 음원 삭제 (기존 기능)
+  async function handleRemove(musicId: number) {
+    if (!confirm("이 음원을 사용 목록에서 삭제할까요? 과거 사용 기록은 보존됩니다.")) return;
+    const prev = data;
+    setData?.((p: any) => {
+      if (!p) return p;
+      const nextUsing = (p.usingList ?? []).filter((x: any) => Number(x.id) !== Number(musicId));
+      const nextCount = Math.max(0, (p.usingSummary?.usingCount ?? nextUsing.length) - 1);
+      return { ...p, usingList: nextUsing, usingSummary: { ...(p.usingSummary ?? {}), usingCount: nextCount } };
+    });
+    try {
+      const updated = await removeUsingTrack(musicId);
+      setData?.(updated);
+    } catch (e: any) {
+      setData?.(prev as any);
+      alert(e?.message || "삭제에 실패했습니다.");
+    }
+  }
+
+  // if (loading || rewardsLoading) return <main className="p-6">로딩중…</main>;
   if (error) return <main className="p-6 text-red-500">에러: {error}</main>;
+  if (rewardsError) console.warn("[/me/rewards] error:", rewardsError);
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 md:px-8">
@@ -274,6 +313,16 @@ export default function MyPage() {
               >
                 구독 남은 기간 {data?.subscription?.remainingDays ?? 0}일
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  refresh();
+                  refreshRewards();
+                }}
+                className="inline-flex items-center rounded-full bg-zinc-900/90 px-3 py-1 text-[12px] font-medium text-white hover:bg-zinc-900 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100"
+              >
+                새로고침
+              </button>
             </div>
 
             {/* API 키 프리뷰 + 재발급/복사 */}
@@ -306,19 +355,15 @@ export default function MyPage() {
                   if (rotating) return;
                   setRotating(true);
                   try {
-                    // === 백엔드 재발급 호출 ===
                     const base = (process.env.NEXT_PUBLIC_API_BASE ?? "").replace(/\/+$/, "");
                     const companyId = (data as any)?.company?.id ?? (data as any)?.id;
                     if (!companyId) throw new Error("회사 ID를 찾을 수 없습니다.");
-
                     const url = `${base}/companies/${companyId}/regenerate-api-key`;
                     const res = await fetch(url, { method: "POST", credentials: "include" });
                     const j = await res.json().catch(() => ({} as any));
                     if (!res.ok) throw new Error(j?.message || `HTTP ${res.status}`);
                     const key: string = j?.api_key ?? j?.apiKey ?? "";
                     if (!key) throw new Error("서버가 새 API 키를 반환하지 않았습니다.");
-
-                    // 모달 1회 노출 + last4 UI 반영
                     const last4 = key.slice(-4);
                     setIssuedKey(key);
                     setKeyVisible(false);
@@ -328,7 +373,6 @@ export default function MyPage() {
                     setData?.((prev: any) => (prev ? { ...prev, apiKey: { ...(prev.apiKey ?? {}), last4 } } : prev));
                   } catch (e) {
                     console.error(e);
-                    // 안전망(모의키) — 실제 운영에선 제거 권장
                     const key = genMockKey();
                     const last4 = key.slice(-4);
                     setIssuedKey(key);
@@ -347,7 +391,6 @@ export default function MyPage() {
               >
                 {rotating ? "재발급 중…" : "API 키 재발급"}
               </button>
-              <button onClick={refresh} className="rounded-lg border px-3 py-2 text-sm">새로고침</button>
             </div>
           </div>
 
@@ -356,7 +399,7 @@ export default function MyPage() {
               onClick={() => setProfileOpen(true)}
               disabled={savingProfile}
               className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50
-                        disabled:opacity-60 dark:border-white/10 dark:bg:white/5 dark:text-zinc-100 dark:hover:bg-white/10"
+                        disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:hover:bg-white/10"
             >
               {savingProfile ? "저장 중…" : "프로필 편집"}
             </button>
@@ -375,11 +418,9 @@ export default function MyPage() {
             aria-current={tab === "using" ? "page" : undefined}
           >
             사용중인 음원
-            <span
-              className={`pointer-events-none absolute inset-x-0 -bottom-[1px] h-[2px] rounded-full transition-opacity ${
-                tab === "using" ? "opacity-100 bg-red-500" : "opacity-0"
-              }`}
-            />
+            <span className={`pointer-events-none absolute inset-x-0 -bottom-[1px] h-[2px] rounded-full transition-opacity ${
+              tab === "using" ? "opacity-100 bg-red-500" : "opacity-0"
+            }`} />
           </button>
           <button
             onClick={() => setTab("playlist")}
@@ -389,11 +430,9 @@ export default function MyPage() {
             aria-current={tab === "playlist" ? "page" : undefined}
           >
             플레이리스트
-            <span
-              className={`pointer-events-none absolute inset-x-0 -bottom-[1px] h-[2px] rounded-full transition-opacity ${
-                tab === "playlist" ? "opacity-100 bg-red-500" : "opacity-0"
-              }`}
-            />
+            <span className={`pointer-events-none absolute inset-x-0 -bottom-[1px] h-[2px] rounded-full transition-opacity ${
+              tab === "playlist" ? "opacity-100 bg-red-500" : "opacity-0"
+            }`} />
           </button>
         </div>
       </div>
@@ -404,13 +443,13 @@ export default function MyPage() {
           <section className="space-y-3">
             <div className="divide-y divide-zinc-200 overflow-hidden rounded-xl border border-zinc-200 bg-white/70 dark:divide-white/10 dark:border-white/10 dark:bg-zinc-900/60">
               {usingData.map((t) => (
-                <UsingRow key={t.id} t={t} USING_API={"/api/using-tracks"} openUsage={(tt) => openUsage(tt)} />
+                <UsingRow key={t.id} t={t} USING_API={"/music"} openUsage={(tt) => openUsage(tt)} />
               ))}
             </div>
           </section>
         ) : (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
-            {playlists.map((p) => (
+            {(plList.data ?? []).map((p) => (
               <div
                 key={p.id}
                 className="relative overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-zinc-900"
@@ -419,23 +458,16 @@ export default function MyPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      const SAMPLE_MP3 = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
-                      const tracks: Track[] = Array.from({ length: p.count }).map((_, i) => ({
-                        id: i + 1,
-                        title: `${p.name} - Track ${i + 1}`,
-                        artist: "Various",
-                        coverUrl: `https://picsum.photos/seed/${p.id}-${i}/600/600`,
-                        audioUrl: SAMPLE_MP3,
-                      }));
-                      setPlaylistTracks(tracks);
+                      setSelectedPlaylist(p);
                       setPlaylistIndex(0);
+                      plTracks.reload(); // 열기 직전 최신화
                       setPlaylistOpen(true);
                     }}
                     className="h-full w-full"
                     aria-label={`${p.name} 상세 보기`}
                   >
                     <img
-                      src={p.cover}
+                      src={p.cover || "https://picsum.photos/seed/cover-fallback/800/600"}
                       alt={p.name}
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                     />
@@ -447,25 +479,48 @@ export default function MyPage() {
                 </div>
               </div>
             ))}
+
+            {plList.loading && <div className="col-span-full text-sm text-zinc-500">플레이리스트 로딩중…</div>}
+            {plList.error && <div className="col-span-full text-sm text-red-500">에러: {plList.error}</div>}
+            {plList.data?.length === 0 && !plList.loading && (
+              <div className="col-span-full text-sm text-zinc-500">플레이리스트가 없습니다.</div>
+            )}
           </div>
         )}
       </div>
 
-      {/* 모달들 */}
+      {/* 모달: 플레이리스트 상세/재생/사용/삭제 */}
       <PlaylistModal
         isOpen={playlistOpen}
         onClose={() => setPlaylistOpen(false)}
-        tracks={playlistTracks}
+        tracks={(plTracks.data ?? []) as unknown as Track[]}
         initialIndex={playlistIndex}
+        title={selectedPlaylist?.name || "플레이리스트"}
+        onUseSelected={async (ids) => {
+          if (!selectedPlaylist?.id) return;
+          try {
+            await plActions.useSelected(ids);
+            alert("선택한 음원을 사용 처리했습니다.");
+            await refresh?.();
+            await refreshRewards?.();
+          } catch (e: any) {
+            alert(e?.message || "사용 처리에 실패했습니다.");
+          }
+        }}
+        onRemoveSelected={async (ids) => {
+          if (!selectedPlaylist?.id) return;
+          if (!confirm("선택한 곡을 이 플레이리스트에서 삭제할까요?")) return;
+          try {
+            await plActions.removeSelected(ids);
+            await plTracks.reload();
+            alert("삭제되었습니다.");
+          } catch (e: any) {
+            alert(e?.message || "삭제에 실패했습니다.");
+          }
+        }}
       />
 
-      {/* ★ uploadEndpoint prop 제거! (모달은 업로드 안 함) */}
-      <ProfileEditModal
-        open={profileOpen}
-        onClose={() => setProfileOpen(false)}
-        initial={profileInitial}
-        onSave={handleSaveProfile}
-      />
+      <ProfileEditModal open={profileOpen} onClose={() => setProfileOpen(false)} initial={profileInitial} onSave={handleSaveProfile} />
 
       <SubscriptionModal
         open={subsOpen}
@@ -488,12 +543,17 @@ export default function MyPage() {
       <UsageLogModal
         isOpen={usageOpen}
         onClose={() => setUsageOpen(false)}
-        trackId={usageTrackId}
-        endpoint={usageEndpoint}
         title={usageTitle}
+        trackId={usageTrackId}
+        data={plays.data}
+        loading={plays.loading}
+        error={plays.error}
+        page={plays.page}
+        setPage={plays.setPage}
+        totalPages={plays.totalPages}
+        refresh={plays.refresh}
       />
 
-      {/* 안내 문구 */}
       <p className="mt-8 text-center text-xs text-zinc-500 dark:text-zinc-400">리워드 초기화는 매월 1일입니다.</p>
 
       {/* === API 키 재발급 모달 === */}
@@ -504,14 +564,14 @@ export default function MyPage() {
             role="dialog"
             aria-modal="true"
             className="relative z-[1001] w-[min(560px,92vw)] rounded-2xl bg-white text-zinc-900 shadow-xl
-                      dark:bg-zinc-900 dark:text:white border border-zinc-200 dark:border-white/10 p-5"
+                      dark:bg-zinc-900 dark:text-white border border-zinc-200 dark:border-white/10 p-5"
           >
             <h2 className="text-lg font-semibold">새 API 키가 발급되었습니다</h2>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
               아래 키는 보안상 <b>지금 한 번만</b> 표시됩니다. 안전한 곳에 보관하세요.
             </p>
 
-            <div className="mt-4 rounded-lg border border-zinc-200 dark:border:white/10 bg-zinc-50 dark:bg:white/5 p-3">
+            <div className="mt-4 rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 p-3">
               <div className="mb-1 text-[11px] text-zinc-500 dark:text-zinc-400">API Key</div>
               <div className="flex items-center gap-2">
                 <code className="flex-1 break-all text-sm">{keyVisible ? issuedKey : "•".repeat(Math.max(issuedKey.length, 8))}</code>
@@ -541,7 +601,7 @@ export default function MyPage() {
             <div className="mt-5 flex justify-end">
               <button
                 onClick={() => setKeyModalOpen(false)}
-                className="h-10 rounded-md bg-zinc-900 text-white px-4 text-sm font-medium hover:bg-zinc-800 dark:bg:white dark:text-zinc-900 dark:hover:bg-zinc-100"
+                className="h-10 rounded-md bg-zinc-900 text-white px-4 text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100"
               >
                 확인
               </button>
