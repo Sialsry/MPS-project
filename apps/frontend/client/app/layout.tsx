@@ -2,12 +2,14 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import ThemeProvider from "./components/ThemeProvider";     
+import ThemeProvider from "./components/ThemeProvider";
 import Header from "./components/common/Header";
 import LayoutClient from "./components/sections/LayoutClient";
-// 만약 Providers가 필요하면 그대로 쓰되, 그 안에는 next-themes가 없어야 함
-import Providers from "./providers";                        // (있다면 유지)
+import Providers from "./providers";
 import { AudioPlayerProvider } from "./providers/AudioPlayerProvider";
+
+// 👇 추가
+import RouteLoader from "./components/common/RouteLoader";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -23,14 +25,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased
                     min-h-screen bg-white text-zinc-900
-                    dark:bg-zinc-900 dark:text-zinc-100`}  
+                    dark:bg-zinc-900 dark:text-zinc-100`}
       >
         <Providers>
           <ThemeProvider>
             <Header />
             <AudioPlayerProvider>
-            {children}
-            <LayoutClient />
+              {children}
+              <LayoutClient />
+
+              <RouteLoader />
             </AudioPlayerProvider>
           </ThemeProvider>
         </Providers>
