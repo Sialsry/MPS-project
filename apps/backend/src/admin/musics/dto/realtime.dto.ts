@@ -5,6 +5,8 @@ export class RealtimeApiStatusQueryDto {
 export interface RealtimeApiStatusItemDto {
   status: 'success' | 'error'
   endpoint: string
+  callType: string
+  validity: string
   company: string
   timestamp: string
 }

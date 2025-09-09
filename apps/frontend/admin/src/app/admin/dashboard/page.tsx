@@ -11,20 +11,42 @@ import RenewalRateCard from '@/components/cards/RenewalRateCard'
 import Card from '@/components/ui/Card'
 import Title from '@/components/ui/Title'
 import SimpleLineChart from '@/components/charts/SimpleLineChart'
+import DetailedLineChart from '@/components/charts/DetailedLineChart'
 import BarCategoryTop5 from '@/components/charts/BarCategoryTop5'
 import PieTierDistribution from '@/components/charts/PieTierDistribution'
 
+type HourlyData = {
+  hour: string
+  free: { total: number; valid: number; lyrics: number }
+  standard: { total: number; valid: number; lyrics: number }
+  business: { total: number; valid: number; lyrics: number }
+  prevAvg: number
+}
+
 export default function DashboardPage() {
-  const [hourlyData, setHourlyData] = useState<any[]>([])
+  const [hourlyData, setHourlyData] = useState<HourlyData[]>([])
   const [hourlyLoading, setHourlyLoading] = useState(false)
   const [hourlyError, setHourlyError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<string>('')
   const [topTracks, setTopTracks] = useState<Array<{ rank: number; validPlays: number; totalPlays: number }>>(
     Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, validPlays: 0, totalPlays: 0 }))
   )
-  const [realtimeApiStatus, setRealtimeApiStatus] = useState<Array<{ status: string; endpoint: string; company: string; timestamp: string }>>([])
+  const [realtimeApiStatus, setRealtimeApiStatus] = useState<Array<{ 
+    status: string; 
+    endpoint: string; 
+    callType: string;
+    validity: string;
+    company: string; 
+    timestamp: string 
+  }>>([
+    { status: 'success', endpoint: '/api/music/play', callType: '음원 호출', validity: '유효재생', company: 'Digital Media Inc', timestamp: '17:44:40' },
+    { status: 'success', endpoint: '/api/lyrics/get', callType: '가사 호출', validity: '유효재생', company: 'TechCorp Solutions', timestamp: '17:36:07' },
+    { status: 'error', endpoint: '/api/music/play', callType: '음원 호출', validity: '무효재생', company: 'Startup Ventures', timestamp: '17:28:42' },
+    { status: 'success', endpoint: '/api/lyrics/get', callType: '가사 호출', validity: '유효재생', company: 'Creative Agency', timestamp: '17:10:28' },
+    { status: 'success', endpoint: '/api/music/play', callType: '음원 호출', validity: '유효재생', company: 'Media Corp', timestamp: '17:08:44' }
+  ])
+  const [apiStatusFilter, setApiStatusFilter] = useState<'all' | 'music' | 'lyrics'>('all')
   const [realtimeTopTracks, setRealtimeTopTracks] = useState<Array<{ rank: number; title: string; validPlays: number; totalPlays: number; validRate: number }>>([])
-  const [realtimeTransactions, setRealtimeTransactions] = useState<Array<{ timestamp: string; status: string; processedCount: string; gasFee: string; hash: string }>>([])
 
   useEffect(() => {
     // 마지막 업데이트 시간
@@ -48,9 +70,9 @@ export default function DashboardPage() {
         const j = await res.json()
         const data = (j.labels || []).map((label: string, i: number) => ({
           hour: label,
-          free: { valid: j.free?.[i] ?? 0, total: j.free?.[i] ?? 0 },
-          standard: { valid: j.standard?.[i] ?? 0, total: j.standard?.[i] ?? 0 },
-          business: { valid: j.business?.[i] ?? 0, total: j.business?.[i] ?? 0 },
+          free: j.free?.[i] ?? { total: 0, valid: 0, lyrics: 0 },
+          standard: j.standard?.[i] ?? { total: 0, valid: 0, lyrics: 0 },
+          business: j.business?.[i] ?? { total: 0, valid: 0, lyrics: 0 },
           prevAvg: j.prevAvg?.[i] ?? 0,
         }))
         setHourlyData(data)
@@ -62,22 +84,21 @@ export default function DashboardPage() {
       }
     }
 
+
     const fetchRealtimeData = async () => {
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
         console.log('Base URL:', baseUrl)
         
         console.log('Fetching realtime data...')
-        const [apiRes, tracksRes, txRes] = await Promise.all([
+        const [apiRes, tracksRes] = await Promise.all([
           fetch(`${baseUrl}/admin/musics/realtime/api-status`),
-          fetch(`${baseUrl}/admin/musics/realtime/top-tracks`),
-          fetch(`${baseUrl}/admin/musics/realtime/transactions`)
+          fetch(`${baseUrl}/admin/musics/realtime/top-tracks`)
         ])
         
         console.log('API responses:', {
           apiStatus: apiRes.status,
-          topTracks: tracksRes.status,
-          transactions: txRes.status
+          topTracks: tracksRes.status
         })
         
         if (apiRes.ok) {
@@ -96,13 +117,6 @@ export default function DashboardPage() {
           console.error('Top Tracks failed:', tracksRes.status)
         }
         
-        if (txRes.ok) {
-          const txData = await txRes.json()
-          console.log('Transactions Data:', txData)
-          setRealtimeTransactions(txData.items || [])
-        } else {
-          console.error('Transactions failed:', txRes.status)
-        }
       } catch (e) {
         console.error('실시간 데이터 조회 실패:', e)
       }
@@ -124,8 +138,8 @@ export default function DashboardPage() {
   return (
     <div className="w-full px-6 py-6">
       <DashboardHeader 
-        title="B2B Music Licensing Platform" 
-        subtitle="관리자 대시보드 · 유효재생 모니터링"
+        title="MPS - Music Performance Statistics" 
+        subtitle="메인 대시보드"
         lastUpdated={lastUpdated}
       />
 
@@ -144,16 +158,11 @@ export default function DashboardPage() {
         <Title variant="section" className="mb-4">차트 분석</Title>
         <div className="grid gap-5 [grid-template-columns:1.5fr_1fr_0.8fr] max-[1200px]:grid-cols-2 max-md:grid-cols-1">
           <Card>
-            <Title variant="card" className="mb-4">24시간 유효재생 (요금제별 + 전일 평균)</Title>
+            <Title variant="card" className="mb-4">24시간 API 호출 현황 (전체 재생+가사 호출)</Title>
             <div className="h-80">
-              <SimpleLineChart 
-                labels={hourlyData.map(d => d.hour)}
-                series={[
-                  { label: 'Free (유효재생)', data: hourlyData.map(d => d.free?.valid || 0) },
-                  { label: 'Standard (유효재생)', data: hourlyData.map(d => d.standard?.valid || 0) },
-                  { label: 'Business (유효재생)', data: hourlyData.map(d => d.business?.valid || 0) },
-                  { label: '전일 평균 (유효재생)', data: hourlyData.map(d => d.prevAvg ?? 0) }
-                ]}
+              <DetailedLineChart 
+                data={hourlyData}
+                colors={['#10b981', '#8b5cf6', '#3b82f6']}
               />
             </div>
           </Card>
@@ -177,12 +186,48 @@ export default function DashboardPage() {
         <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(380px,1fr))]">
           {/* 실시간 API 호출 */}
           <Card>
-            <Title variant="card" className="mb-4">실시간 API 호출</Title>
+            <div className="mb-4 flex items-center justify-between">
+              <Title variant="card">실시간 API 호출</Title>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setApiStatusFilter('all')}
+                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                    apiStatusFilter === 'all' 
+                      ? 'bg-teal-500 text-white' 
+                      : 'bg-white/10 text-white/60 hover:bg-white/20'
+                  }`}
+                >
+                  전체
+                </button>
+                <button
+                  onClick={() => setApiStatusFilter('music')}
+                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                    apiStatusFilter === 'music' 
+                      ? 'bg-teal-500 text-white' 
+                      : 'bg-white/10 text-white/60 hover:bg-white/20'
+                  }`}
+                >
+                  음원 호출
+                </button>
+                <button
+                  onClick={() => setApiStatusFilter('lyrics')}
+                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                    apiStatusFilter === 'lyrics' 
+                      ? 'bg-teal-500 text-white' 
+                      : 'bg-white/10 text-white/60 hover:bg-white/20'
+                  }`}
+                >
+                  가사 호출
+                </button>
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-white/10">
-                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">상태</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">성공여부</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">유형</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">유효재생</th>
                     <th className="text-left py-2 px-3 text-xs font-medium text-white/60">엔드포인트</th>
                     <th className="text-left py-2 px-3 text-xs font-medium text-white/60">기업</th>
                     <th className="text-left py-2 px-3 text-xs font-medium text-white/60">시간</th>
@@ -190,19 +235,53 @@ export default function DashboardPage() {
                 </thead>
                 <tbody className="text-sm">
                   {realtimeApiStatus.length > 0 ? (
-                    realtimeApiStatus.map((item, idx) => (
+                    realtimeApiStatus
+                      .filter(item => {
+                        if (apiStatusFilter === 'all') return true
+                        if (apiStatusFilter === 'music') return item.callType === '음원 호출'
+                        if (apiStatusFilter === 'lyrics') return item.callType === '가사 호출'
+                        return true
+                      })
+                      .map((item, idx) => (
                       <tr key={idx} className="border-b border-white/5">
                         <td className="py-2 px-3">
-                          <div className={`h-2 w-2 rounded-full ${item.status === 'success' ? 'bg-green-400' : 'bg-red-400'}`} />
+                          <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                            item.status === 'success' 
+                              ? 'bg-green-500/20 text-green-400' 
+                              : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            <div className={`h-1.5 w-1.5 rounded-full ${
+                              item.status === 'success' ? 'bg-green-400' : 'bg-red-400'
+                            }`} />
+                            {item.status === 'success' ? '성공' : '실패'}
+                          </div>
                         </td>
-                        <td className="py-2 px-3 text-white/80">{item.endpoint}</td>
+                        <td className="py-2 px-3 text-white/80">
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            item.callType === '음원 호출' 
+                              ? 'bg-blue-500/20 text-blue-400' 
+                              : 'bg-purple-500/20 text-purple-400'
+                          }`}>
+                            {item.callType}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-white/80">
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            item.validity === '유효재생' 
+                              ? 'bg-teal-500/20 text-teal-400' 
+                              : 'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {item.validity}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-white/60 font-mono text-xs">{item.endpoint}</td>
                         <td className="py-2 px-3 text-white/60">{item.company}</td>
                         <td className="py-2 px-3 text-white/40">{item.timestamp}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={4} className="py-4 px-3 text-center text-white/40">데이터를 불러오는 중...</td>
+                      <td colSpan={6} className="py-4 px-3 text-center text-white/40">데이터를 불러오는 중...</td>
                     </tr>
                   )}
                 </tbody>
@@ -247,45 +326,6 @@ export default function DashboardPage() {
             </div>
           </Card>
 
-          {/* 트랜잭션 현황 */}
-          <Card>
-            <Title variant="card" className="mb-4">트랜잭션 현황</Title>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-white/10">
-                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">시간</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">상태</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">처리 건수</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">가스비</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">해시</th>
-                  </tr>
-                </thead>
-                <tbody className="text-sm">
-                  {realtimeTransactions.length > 0 ? (
-                    realtimeTransactions.map((item, idx) => (
-                      <tr key={idx} className="border-b border-white/5">
-                        <td className="py-2 px-3 text-white/40">{item.timestamp}</td>
-                        <td className="py-2 px-3">
-                          <div className={`h-2 w-2 rounded-full ${
-                            item.status === 'success' ? 'bg-green-400' : 
-                            item.status === 'pending' ? 'bg-yellow-400' : 'bg-red-400'
-                          }`} />
-                        </td>
-                        <td className="py-2 px-3 text-white/80">{item.processedCount}건</td>
-                        <td className="py-2 px-3 text-white/60">{item.gasFee}</td>
-                        <td className="py-2 px-3 text-white/40">{item.hash}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="py-4 px-3 text-center text-white/40">데이터를 불러오는 중...</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
         </div>
       </section>
 

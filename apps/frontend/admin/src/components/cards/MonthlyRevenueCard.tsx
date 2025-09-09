@@ -52,7 +52,7 @@ export default function MonthlyRevenueCard() {
   const pct = prevMtd > 0 ? Math.round(((mtd - prevMtd) / prevMtd) * 100) : null
   const sign = (mtd - prevMtd) > 0 ? '+' : (mtd - prevMtd) < 0 ? '' : ''
 
-  const fmt = (n: number) => `₩${n.toLocaleString()}`
+  const fmt = (n: number) => `₩${Math.floor(n).toLocaleString()}`
 
   return (
     <Card>
@@ -65,7 +65,7 @@ export default function MonthlyRevenueCard() {
           </div>
           <div className="mt-2 space-y-0.5">
             <div className="text-xs text-white/60">전월 누적: {loading || error ? '-' : fmt(prevMtd)}</div>
-            <div className="text-xs text-white/60">기준일: {loading || error ? '-' : cur?.asOf || '-'}</div>
+            <div className="text-xs text-white/60">기준일: {loading || error ? '-' : new Date().toLocaleDateString('ko-KR')}</div>
           </div>
         </div>
       </div>

@@ -38,20 +38,27 @@ export const buildHourlyValidPlaysQuery = (y: number, m: number, d: number, tz: 
       SELECT 
         EXTRACT(HOUR FROM (mp.created_at AT TIME ZONE ${tz}))::int AS h,
         c.grade,
-        COUNT(*) AS cnt
+        COUNT(*) AS total_cnt,
+        COUNT(*) FILTER (WHERE mp.is_valid_play = true) AS valid_cnt,
+        COUNT(*) FILTER (WHERE mp.use_case = '2') AS lyrics_cnt
       FROM music_plays mp
       JOIN companies c ON c.id = mp.using_company_id
-      WHERE mp.is_valid_play = true
-        AND mp.created_at >= (SELECT day_start FROM day_range)
+      WHERE mp.created_at >= (SELECT day_start FROM day_range)
         AND mp.created_at <  (SELECT day_end FROM day_range)
       GROUP BY 1, c.grade
     ),
     today_pivot AS (
       SELECT 
         h.h,
-        COALESCE(SUM(t.cnt) FILTER (WHERE t.grade = 'free'), 0) AS free,
-        COALESCE(SUM(t.cnt) FILTER (WHERE t.grade = 'standard'), 0) AS standard,
-        COALESCE(SUM(t.cnt) FILTER (WHERE t.grade = 'business'), 0) AS business
+        COALESCE(SUM(t.total_cnt) FILTER (WHERE t.grade = 'free'), 0) AS free_total,
+        COALESCE(SUM(t.valid_cnt) FILTER (WHERE t.grade = 'free'), 0) AS free_valid,
+        COALESCE(SUM(t.lyrics_cnt) FILTER (WHERE t.grade = 'free'), 0) AS free_lyrics,
+        COALESCE(SUM(t.total_cnt) FILTER (WHERE t.grade = 'standard'), 0) AS standard_total,
+        COALESCE(SUM(t.valid_cnt) FILTER (WHERE t.grade = 'standard'), 0) AS standard_valid,
+        COALESCE(SUM(t.lyrics_cnt) FILTER (WHERE t.grade = 'standard'), 0) AS standard_lyrics,
+        COALESCE(SUM(t.total_cnt) FILTER (WHERE t.grade = 'business'), 0) AS business_total,
+        COALESCE(SUM(t.valid_cnt) FILTER (WHERE t.grade = 'business'), 0) AS business_valid,
+        COALESCE(SUM(t.lyrics_cnt) FILTER (WHERE t.grade = 'business'), 0) AS business_lyrics
       FROM hours h
       LEFT JOIN today t ON t.h = h.h
       GROUP BY h.h
@@ -60,30 +67,43 @@ export const buildHourlyValidPlaysQuery = (y: number, m: number, d: number, tz: 
       SELECT 
         EXTRACT(HOUR FROM (mp.created_at AT TIME ZONE ${tz}))::int AS h,
         c.grade,
-        COUNT(*) AS cnt
+        COUNT(*) AS total_cnt,
+        COUNT(*) FILTER (WHERE mp.is_valid_play = true) AS valid_cnt,
+        COUNT(*) FILTER (WHERE mp.use_case = '2') AS lyrics_cnt
       FROM music_plays mp
       JOIN companies c ON c.id = mp.using_company_id
-      WHERE mp.is_valid_play = true
-        AND mp.created_at >= ((SELECT day_start FROM day_range) - interval '1 day')
+      WHERE mp.created_at >= ((SELECT day_start FROM day_range) - interval '1 day')
         AND mp.created_at <  (SELECT day_start FROM day_range)
       GROUP BY 1, c.grade
     ),
     yday_pivot AS (
       SELECT 
         h.h,
-        COALESCE(SUM(t.cnt) FILTER (WHERE t.grade = 'free'), 0) AS free,
-        COALESCE(SUM(t.cnt) FILTER (WHERE t.grade = 'standard'), 0) AS standard,
-        COALESCE(SUM(t.cnt) FILTER (WHERE t.grade = 'business'), 0) AS business
+        COALESCE(SUM(t.total_cnt) FILTER (WHERE t.grade = 'free'), 0) AS free_total,
+        COALESCE(SUM(t.valid_cnt) FILTER (WHERE t.grade = 'free'), 0) AS free_valid,
+        COALESCE(SUM(t.lyrics_cnt) FILTER (WHERE t.grade = 'free'), 0) AS free_lyrics,
+        COALESCE(SUM(t.total_cnt) FILTER (WHERE t.grade = 'standard'), 0) AS standard_total,
+        COALESCE(SUM(t.valid_cnt) FILTER (WHERE t.grade = 'standard'), 0) AS standard_valid,
+        COALESCE(SUM(t.lyrics_cnt) FILTER (WHERE t.grade = 'standard'), 0) AS standard_lyrics,
+        COALESCE(SUM(t.total_cnt) FILTER (WHERE t.grade = 'business'), 0) AS business_total,
+        COALESCE(SUM(t.valid_cnt) FILTER (WHERE t.grade = 'business'), 0) AS business_valid,
+        COALESCE(SUM(t.lyrics_cnt) FILTER (WHERE t.grade = 'business'), 0) AS business_lyrics
       FROM hours h
       LEFT JOIN yday t ON t.h = h.h
       GROUP BY h.h
     )
     SELECT 
       tp.h,
-      tp.free,
-      tp.standard,
-      tp.business,
-      ROUND(((yp.free + yp.standard + yp.business)::numeric / 3))::int AS prev_avg
+      tp.free_total,
+      tp.free_valid,
+      tp.free_lyrics,
+      tp.standard_total,
+      tp.standard_valid,
+      tp.standard_lyrics,
+      tp.business_total,
+      tp.business_valid,
+      tp.business_lyrics,
+      ROUND(((yp.free_total + yp.standard_total + yp.business_total)::numeric / 3))::int AS prev_avg
     FROM today_pivot tp
     JOIN yday_pivot yp ON yp.h = tp.h
     ORDER BY tp.h ASC

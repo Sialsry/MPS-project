@@ -9,5 +9,7 @@ export class PlaysValidStatsQueryDto {
 export class PlaysValidStatsResponseDto {
   validPlays!: number
   totalPlays!: number
+  rewardedPlays!: number
+  rewardRate!: number
   asOf!: string
 } 

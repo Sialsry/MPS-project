@@ -4,13 +4,20 @@ import { Chart, LineController, LineElement, PointElement, LinearScale, Category
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Legend, Tooltip)
 
-type Props = { 
-  labels?: string[]; 
-  series?: { label: string; data: number[] }[];
-  colors?: string[];
+type HourlyData = {
+  hour: string
+  free: { total: number; valid: number; lyrics: number }
+  standard: { total: number; valid: number; lyrics: number }
+  business: { total: number; valid: number; lyrics: number }
+  prevAvg: number
 }
 
-export default function SimpleLineChart({ labels, series, colors }: Props) {
+type Props = { 
+  data: HourlyData[]
+  colors?: string[]
+}
+
+export default function DetailedLineChart({ data, colors }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const chartRef = useRef<Chart | null>(null)
@@ -20,18 +27,24 @@ export default function SimpleLineChart({ labels, series, colors }: Props) {
     const canvas = canvasRef.current
     if (!container || !canvas) return
 
-    console.log('SimpleLineChart - labels:', labels)
-    console.log('SimpleLineChart - series:', series)
-    console.log('SimpleLineChart - colors:', colors)
-
-    const defaultLabels = labels ?? ['1','2','3','4','5','6','7']
-    const defaultSeries = series ?? [
-      { label: 'A', data: [12, 19, 7, 15, 12, 18, 14] },
-      { label: 'B', data: [8, 11, 13, 9, 10, 12, 9] },
+    const labels = data.map(d => d.hour)
+    const series = [
+      { 
+        label: 'Free (총 호출)', 
+        data: data.map(d => (d.free?.total || 0) + (d.free?.lyrics || 0)),
+        rawData: data.map(d => d.free)
+      },
+      { 
+        label: 'Standard (총 호출)', 
+        data: data.map(d => (d.standard?.total || 0) + (d.standard?.lyrics || 0)),
+        rawData: data.map(d => d.standard)
+      },
+      { 
+        label: 'Business (총 호출)', 
+        data: data.map(d => (d.business?.total || 0) + (d.business?.lyrics || 0)),
+        rawData: data.map(d => d.business)
+      }
     ]
-
-    console.log('SimpleLineChart - defaultLabels:', defaultLabels)
-    console.log('SimpleLineChart - defaultSeries:', defaultSeries)
 
     function destroy(){ chartRef.current?.destroy(); chartRef.current = null }
     function create(width:number, height:number){
@@ -43,18 +56,17 @@ export default function SimpleLineChart({ labels, series, colors }: Props) {
       chartRef.current = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: defaultLabels,
-          datasets: defaultSeries.map((s, i) => {
+          labels: labels,
+          datasets: series.map((s, i) => {
             const defaultColors = ['#10b981', '#8b5cf6', '#3b82f6', '#9ca3af']
             const chartColors = colors || defaultColors
-            const isDashed = s.label === '전일' || s.label === '지난주'
             return {
               label: s.label,
               data: s.data,
+              rawData: s.rawData, // 원본 데이터 저장
               borderColor: chartColors[i] || defaultColors[i] || '#9ca3af',
               backgroundColor: 'rgba(255,255,255,0.04)',
               borderWidth: 2,
-              borderDash: isDashed ? [5, 5] : [],
               pointRadius: 0,
               tension: 0.3,
             }
@@ -74,24 +86,40 @@ export default function SimpleLineChart({ labels, series, colors }: Props) {
             }, 
             tooltip: { 
               enabled: true,
-              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              backgroundColor: 'rgba(0, 0, 0, 0.9)',
               titleColor: '#ffffff',
               bodyColor: '#ffffff',
               borderColor: 'rgba(255, 255, 255, 0.2)',
               borderWidth: 1,
               cornerRadius: 8,
               displayColors: true,
+              padding: 12,
               callbacks: {
                 title: function(context) {
                   return `${context[0].label}`
                 },
                 label: function(context) {
-                  const label = context.dataset.label || ''
-                  const value = context.parsed.y
-                  return `${label}: ${value.toLocaleString()}회`
+                  const dataset = context.dataset
+                  const dataIndex = context.dataIndex
+                  const rawData = dataset.rawData?.[dataIndex]
+                  
+                  if (!rawData) {
+                    return `${dataset.label}: ${context.parsed.y.toLocaleString()}회`
+                  }
+                  
+                  const total = rawData.total || 0
+                  const valid = rawData.valid || 0
+                  const lyrics = rawData.lyrics || 0
+                  const totalCalls = total + lyrics
+                  
+                  return [
+                    `${dataset.label}: ${totalCalls.toLocaleString()}회`,
+                    `  전체 재생: ${total.toLocaleString()}회`,
+                    `  가사 호출: ${lyrics.toLocaleString()}회`,
+                    `  유효재생: ${valid.toLocaleString()}회`
+                  ]
                 },
                 afterBody: function(context) {
-                  // 추가 정보가 있는 경우 여기에 표시
                   return ''
                 }
               }
@@ -126,11 +154,11 @@ export default function SimpleLineChart({ labels, series, colors }: Props) {
     measure()
     const ro = new ResizeObserver(measure); ro.observe(container)
     return () => { ro.disconnect(); destroy() }
-  }, [labels, series, colors])
+  }, [data, colors])
 
   return (
     <div ref={containerRef} className="relative h-full min-w-0 overflow-hidden">
       <canvas ref={canvasRef} className="absolute inset-0 block" />
     </div>
   )
-} 
+}

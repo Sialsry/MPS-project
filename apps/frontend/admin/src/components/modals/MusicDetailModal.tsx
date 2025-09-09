@@ -259,11 +259,11 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
       `}</style>
 
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-        <div className="w-full max-w-6xl h-[90vh] flex flex-col rounded-2xl bg-neutral-900 border border-white/10">
+        <div className="w-full max-w-6xl h-[90vh] flex flex-col rounded-xl bg-neutral-900 border border-white/10 shadow-2xl">
           {/* 헤더 */}
           <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0">
             <div>
-              <h2 className="text-xl font-semibold text-white">
+              <h2 className="text-lg font-semibold text-white">
                 {music.title}
                 <span className="text-white/50 font-normal"> · </span>
                 <span className="text-white/70 font-medium">{music.artist}</span>
@@ -271,9 +271,9 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
             </div>
             <button
               onClick={onClose}
-              className="rounded-lg bg-white/10 p-2 text-white/60 hover:bg-white/20 hover:text-white transition-all duration-200"
+              className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -311,7 +311,7 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                   <div className="rounded-xl border border-white/10 p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-white flex items-center gap-3">
-                        <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
+                        <div className="w-1 h-6 bg-teal-400 rounded-full"></div>
                         음악 호출 추이
                       </h3>
                       <div className="flex items-center gap-2">
@@ -361,7 +361,7 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                 <div className="rounded-xl border border-white/10 p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-white flex items-center gap-3">
-                    <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
+                    <div className="w-1 h-6 bg-teal-400 rounded-full"></div>
                         가사 호출 추이
                   </h3>
                       <div className="flex items-center gap-2">
@@ -413,7 +413,7 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                 {/* 월별 사용 상세 현황 */}
                 <div className="rounded-xl border border-white/10 p-6">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
-                    <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
+                    <div className="w-1 h-6 bg-teal-400 rounded-full"></div>
                     월별 리워드 발생 현황
                   </h3>
                   <div className="overflow-x-auto">
@@ -425,12 +425,12 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                       <table className="w-full text-sm">
                         <thead className="text-center">
                           <tr className="border-b border-white/10">
-                            <th className="px-4 py-3 text-white/80 font-medium">월</th>
-                            <th className="px-4 py-3 text-white/80 font-medium">유효재생수</th>
-                            <th className="px-4 py-3 text-white/80 font-medium">사용 기업</th>
-                            <th className="px-4 py-3 text-white/80 font-medium">월 한도</th>
-                            <th className="px-4 py-3 text-white/80 font-medium">사용률</th>
-                            <th className="px-4 py-3 text-white/80 font-medium">월 리워드 지급액</th>
+                            <th className="px-6 py-4 text-white/80 font-medium text-center">월</th>
+                            <th className="px-6 py-4 text-white/80 font-medium text-center">유효재생수</th>
+                            <th className="px-6 py-4 text-white/80 font-medium text-center">사용 기업</th>
+                            <th className="px-6 py-4 text-white/80 font-medium text-center">월 한도</th>
+                            <th className="px-6 py-4 text-white/80 font-medium text-center">사용률</th>
+                            <th className="px-6 py-4 text-white/80 font-medium text-center">월 리워드 지급액</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -440,11 +440,11 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                             const earned = typeof it.earned === 'number' && isFinite(it.earned) ? it.earned : 0
                             return (
                               <tr key={it.label} className="border-b border-white/5">
-                                <td className="px-4 py-3 font-medium text-white text-center">{it.label}</td>
-                                <td className="px-4 py-3 text-teal-400 font-medium text-center">{it.validPlays.toLocaleString()}</td>
-                                <td className="px-4 py-3 text-white/80 text-center">{it.companiesUsing.toLocaleString()}개</td>
-                                <td className="px-4 py-3 text-white/80 text-center">{monthlyLimit !== null ? monthlyLimit.toLocaleString() : '-'}</td>
-                                <td className="px-4 py-3 text-white/80 text-center">
+                                <td className="px-6 py-4 font-medium text-white text-center">{it.label}</td>
+                                <td className="px-6 py-4 text-teal-400 font-medium text-center">{it.validPlays.toLocaleString()}</td>
+                                <td className="px-6 py-4 text-white/80 text-center">{it.companiesUsing.toLocaleString()}개</td>
+                                <td className="px-6 py-4 text-white/80 text-center">{monthlyLimit !== null ? monthlyLimit.toLocaleString() : '-'}</td>
+                                <td className="px-6 py-4 text-white/80 text-center">
                                   {monthlyLimit !== null && usageRate !== null ? (
                                     <div className="flex items-center justify-center gap-3">
                                       <div className="w-20 bg-white/10 rounded-full h-1.5">
@@ -461,7 +461,7 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                                     <span className="text-white/40 text-xs">-</span>
                                   )}
                                 </td>
-                                <td className="px-4 py-3 text-teal-400 font-medium text-center">{earned.toLocaleString()} 토큰</td>
+                                <td className="px-6 py-4 text-teal-400 font-medium text-center">{earned.toLocaleString()} 토큰</td>
                               </tr>
                             )
                           })}
@@ -482,7 +482,7 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                 <div className="rounded-xl border border-white/10 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-white flex items-center gap-3">
-                      <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
+                      <div className="w-1 h-6 bg-teal-400 rounded-full"></div>
                       월별 사용 기업 현황
                     </h3>
                     <div className="flex items-center gap-2">
@@ -500,21 +500,21 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                       <table className="w-full text-sm">
                         <thead className="text-center">
                           <tr className="border-b border-white/10">
-                            <th className="px-4 py-3 text-white/80 font-medium text-center">순위</th>
-                            <th className="px-4 py-3 text-white/80 font-medium text-center">기업명</th>
-                            <th className="px-4 py-3 text-white/80 font-medium text-center">등급</th>
-                            <th className="px-4 py-3 text-white/80 font-medium text-center">월 리워드 적립</th>
-                            <th className="px-4 py-3 text-white/80 font-medium text-center">유효 재생수</th>
+                            <th className="px-6 py-4 text-white/80 font-medium text-center">순위</th>
+                            <th className="px-6 py-4 text-white/80 font-medium text-center">기업명</th>
+                            <th className="px-6 py-4 text-white/80 font-medium text-center">등급</th>
+                            <th className="px-6 py-4 text-white/80 font-medium text-center">월 리워드 적립</th>
+                            <th className="px-6 py-4 text-white/80 font-medium text-center">유효 재생수</th>
                           </tr>
                         </thead>
                         <tbody>
                           {companyItems.map((item) => (
                             <tr key={`${item.companyId}`} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                              <td className="px-4 py-3 text-center">
+                              <td className="px-6 py-4 text-center">
                                 <span className={`text-sm font-bold ${item.rank <= 3 ? 'text-teal-400' : 'text-white'}`}>{item.rank}</span>
                               </td>
-                              <td className="px-4 py-3 font-medium text-white text-center">{item.companyName}</td>
-                              <td className="px-4 py-3 text-center">
+                              <td className="px-6 py-4 font-medium text-white text-center">{item.companyName}</td>
+                              <td className="px-6 py-4 text-center">
                                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                                   item.tier === 'Business' ? 'bg-gradient-to-r from-purple-400/15 to-purple-500/15 text-purple-300 border border-purple-400/25' :
                                   item.tier === 'Standard' ? 'bg-gradient-to-r from-blue-400/15 to-blue-500/15 text-blue-300 border border-blue-400/25' :
@@ -523,8 +523,8 @@ export default function MusicDetailModal({ open, onClose, music }: Props) {
                                   {item.tier}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-teal-400 font-medium text-center">{item.monthlyEarned.toLocaleString()} 토큰</td>
-                              <td className="px-4 py-3 text-white/80 font-medium text-center">{item.monthlyPlays.toLocaleString()}</td>
+                              <td className="px-6 py-4 text-teal-400 font-medium text-center">{item.monthlyEarned.toLocaleString()} 토큰</td>
+                              <td className="px-6 py-4 text-white/80 font-medium text-center">{item.monthlyPlays.toLocaleString()}</td>
                             </tr>
                           ))}
                         </tbody>

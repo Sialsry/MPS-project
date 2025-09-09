@@ -523,7 +523,10 @@ export default function RewardsTokensPage() {
               {/* 기본 정보 카드 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <h3 className="text-white font-medium mb-4">트랜잭션 정보</h3>
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
+                    <span className="h-4 w-1.5 rounded bg-teal-300"></span>
+                    트랜잭션 정보
+                  </h3>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-white/60 text-sm">상태:</span>
@@ -551,7 +554,10 @@ export default function RewardsTokensPage() {
                 </div>
 
                 <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <h3 className="text-white font-medium mb-4">해시 정보</h3>
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
+                    <span className="h-4 w-1.5 rounded bg-teal-300"></span>
+                    해시 정보
+                  </h3>
                   <div className="space-y-3">
                     <div>
                       <span className="text-white/60 text-sm block mb-2">Tx Hash:</span>
@@ -566,7 +572,10 @@ export default function RewardsTokensPage() {
               {/* 토큰 분배 상세 */}
               {transactionDetail.type === 'token-distribution' && transactionDetail.tokenDistribution && (
                 <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-                  <h3 className="text-white font-medium mb-6">토큰 분배 내역</h3>
+                  <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
+                    <span className="h-4 w-1.5 rounded bg-teal-300"></span>
+                    토큰 분배 내역
+                  </h3>
                   
                   {/* 요약 정보 */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -598,7 +607,10 @@ export default function RewardsTokensPage() {
               {/* API 호출 기록 상세 */}
               {transactionDetail.type === 'api-recording' && transactionDetail.apiRecording && (
                 <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-                  <h3 className="text-white font-medium mb-6">API 호출 기록</h3>
+                  <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
+                    <span className="h-4 w-1.5 rounded bg-teal-300"></span>
+                    API 호출 기록
+                  </h3>
                   
                   {/* 요약 정보 */}
                   <div className="bg-black/20 rounded-lg p-4 border border-white/10 mb-6">

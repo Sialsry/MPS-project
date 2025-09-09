@@ -20,8 +20,8 @@ function getDaysInMonthKST(date = new Date()) {
 }
 
 export default function MonthlyPlaysCard() {
-  const [cur, setCur] = useState<{ valid: number; total: number } | null>(null)
-  const [prev, setPrev] = useState<{ valid: number; total: number } | null>(null)
+  const [cur, setCur] = useState<{ valid: number; total: number; rewarded: number; rewardRate: number } | null>(null)
+  const [prev, setPrev] = useState<{ valid: number; total: number; rewarded: number; rewardRate: number } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const prevYM = useMemo(() => getPrevYearMonth(), [])
@@ -39,8 +39,18 @@ export default function MonthlyPlaysCard() {
         if (!prevRes.ok) throw new Error(`HTTP ${prevRes.status}`)
         const prv = await prevRes.json()
         if (aborted) return
-        setCur({ valid: Number(cur.validPlays ?? 0), total: Number(cur.totalPlays ?? 0) })
-        setPrev({ valid: Number(prv.validPlays ?? 0), total: Number(prv.totalPlays ?? 0) })
+        setCur({ 
+          valid: Number(cur.validPlays ?? 0), 
+          total: Number(cur.totalPlays ?? 0),
+          rewarded: Number(cur.rewardedPlays ?? 0),
+          rewardRate: Number(cur.rewardRate ?? 0)
+        })
+        setPrev({ 
+          valid: Number(prv.validPlays ?? 0), 
+          total: Number(prv.totalPlays ?? 0),
+          rewarded: Number(prv.rewardedPlays ?? 0),
+          rewardRate: Number(prv.rewardRate ?? 0)
+        })
       } catch (e: any) {
         if (aborted) return
         setError(e.message || '조회 실패')
@@ -56,6 +66,8 @@ export default function MonthlyPlaysCard() {
 
   const validPlays = cur?.valid ?? 0
   const totalPlays = cur?.total ?? 0
+  const rewardedPlays = cur?.rewarded ?? 0
+  const rewardRate = cur?.rewardRate ?? 0
   const validRate = totalPlays > 0 ? Math.round((validPlays / totalPlays) * 100) : 0
   const lastMonthChange = prev && prev.valid > 0 ? Math.round(((validPlays - prev.valid) / prev.valid) * 100) : null
   const dailyAverage = Math.floor(validPlays / getDaysInMonthKST())
@@ -71,13 +83,10 @@ export default function MonthlyPlaysCard() {
           </div>
           <div className="mt-2 space-y-1">
             <div className="text-xs text-white/60">
-              유효재생률: <span className="text-teal-300 font-medium">{loading || error ? '-' : `${validRate}%`}</span>
-            </div>
-            <div className="text-xs text-white/40">
-              총재생: {loading || error ? '-' : totalPlays.toLocaleString()}회
+              유효재생률: <span className="text-teal-300 font-medium">{loading || error ? '-' : `${validRate}%`}</span> ({loading || error ? '-' : `${validPlays.toLocaleString()}회`})
             </div>
             <div className="text-xs text-white/60">
-              일평균: {loading || error ? '-' : dailyAverage.toLocaleString()}회
+              리워드 발생률: <span className="text-yellow-400 font-medium">{loading || error ? '-' : `${rewardRate}%`}</span> ({loading || error ? '-' : `${rewardedPlays.toLocaleString()}회`})
             </div>
           </div>
         </div>

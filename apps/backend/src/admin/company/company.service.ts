@@ -196,9 +196,21 @@ export class CompanyService {
     const res = await this.db.execute(q as any)
     const rows = (res as any).rows || []
     const labels = rows.map((r: any) => `${Number(r.h)}시`)
-    const free = rows.map((r: any) => Number(r.free || 0))
-    const standard = rows.map((r: any) => Number(r.standard || 0))
-    const business = rows.map((r: any) => Number(r.business || 0))
+    const free = rows.map((r: any) => ({
+      total: Number(r.free_total || 0),
+      valid: Number(r.free_valid || 0),
+      lyrics: Number(r.free_lyrics || 0)
+    }))
+    const standard = rows.map((r: any) => ({
+      total: Number(r.standard_total || 0),
+      valid: Number(r.standard_valid || 0),
+      lyrics: Number(r.standard_lyrics || 0)
+    }))
+    const business = rows.map((r: any) => ({
+      total: Number(r.business_total || 0),
+      valid: Number(r.business_valid || 0),
+      lyrics: Number(r.business_lyrics || 0)
+    }))
     const prevAvg = rows.map((r: any) => Number(r.prev_avg || 0))
     return { date, labels, free, standard, business, prevAvg }
   }

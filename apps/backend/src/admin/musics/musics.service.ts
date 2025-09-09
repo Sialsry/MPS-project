@@ -563,18 +563,26 @@ export class MusicsService implements OnModuleInit {
       ${cte}
       SELECT
         COUNT(*) FILTER (WHERE mp.is_valid_play = true)::bigint AS valid_plays,
-        COUNT(*)::bigint AS total_plays
+        COUNT(*)::bigint AS total_plays,
+        COUNT(*) FILTER (WHERE mp.is_valid_play = true AND mp.reward_code = '1')::bigint AS rewarded_plays
       FROM music_plays mp, month_range mr
       WHERE mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
     `
     const res = await this.db.execute(q)
     const row = (res.rows?.[0] as any) || {}
+    const validPlays = Number(row.valid_plays ?? 0)
+    const rewardedPlays = Number(row.rewarded_plays ?? 0)
+    const rewardRate = validPlays > 0 ? Math.round((rewardedPlays / validPlays) * 100) : 0
+    
     return {
-      validPlays: Number(row.valid_plays ?? 0),
+      validPlays,
       totalPlays: Number(row.total_plays ?? 0),
+      rewardedPlays,
+      rewardRate,
       asOf: ym,
     }
   }
+
 
   async getRevenueForecast(query: RevenueForecastQueryDto): Promise<RevenueForecastResponseDto> {
     const ym = query.yearMonth ?? getDefaultYearMonthKST()
@@ -668,11 +676,12 @@ export class MusicsService implements OnModuleInit {
     const cte = buildMonthRangeCTE(y, m)
     const q = sql`
       ${cte}
-      , plays AS (
+        , plays AS (
         SELECT 
           mp.music_id,
           COUNT(*) FILTER (WHERE mp.is_valid_play = true) AS valid_plays,
-          COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned
+          COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned,
+          COUNT(*) FILTER (WHERE mp.is_valid_play = true AND mp.reward_code IN ('2', '3')) AS limit_exhausted_plays
         FROM music_plays mp, month_range mr
         WHERE mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
         GROUP BY mp.music_id
@@ -680,17 +689,7 @@ export class MusicsService implements OnModuleInit {
       SELECT
         COUNT(*) FILTER (WHERE mmr.total_reward_count > 0)::bigint AS eligible,
         COUNT(*) FILTER (
-          WHERE mmr.total_reward_count > 0 AND (
-            mmr.remaining_reward_count <= 0 OR (
-              COALESCE(
-                CASE 
-                  WHEN mmr.reward_per_play IS NOT NULL AND mmr.reward_per_play > 0 THEN 
-                    FLOOR(COALESCE(p.earned, 0) / NULLIF(mmr.reward_per_play, 0))
-                  ELSE COALESCE(p.valid_plays, 0)
-                END, 0
-              ) >= mmr.total_reward_count
-            )
-          )
+          WHERE mmr.total_reward_count > 0 AND COALESCE(p.limit_exhausted_plays, 0) > 0
         )::bigint AS filled
       FROM monthly_music_rewards mmr
       LEFT JOIN plays p ON p.music_id = mmr.music_id
@@ -703,6 +702,7 @@ export class MusicsService implements OnModuleInit {
     const ratio = eligible > 0 ? Math.round((filled / eligible) * 100) : null
     return { eligible, filled, ratio, asOf: ym }
   }
+
 
   async getCategoryTop5(query: CategoryTop5QueryDto): Promise<CategoryTop5ResponseDto> {
     const ym = resolveYM(query.yearMonth)
@@ -725,13 +725,89 @@ export class MusicsService implements OnModuleInit {
 
   async getRealtimeApiStatus(query: RealtimeApiStatusQueryDto): Promise<RealtimeApiStatusResponseDto> {
     const limit = Math.min(Math.max(query.limit ?? 5, 1), 20)
-    const q = buildRealtimeApiStatusQuery(limit)
+    
+    // music_plays 테이블에서 직접 데이터 조회
+    const q = sql`
+      SELECT 
+        mp.created_at,
+        CASE WHEN mp.is_valid_play THEN 'success' ELSE 'error' END AS status,
+        CASE 
+          WHEN mp.use_case = '0' THEN '/api/music/play'
+          WHEN mp.use_case = '1' THEN '/api/music/play'
+          WHEN mp.use_case = '2' THEN '/api/lyrics/get'
+          ELSE '/api/unknown'
+        END AS endpoint,
+        CASE 
+          WHEN mp.use_case = '0' THEN '음원 호출'
+          WHEN mp.use_case = '1' THEN '음원 호출'
+          WHEN mp.use_case = '2' THEN '가사 호출'
+          ELSE '알 수 없음'
+        END AS call_type,
+        CASE 
+          WHEN mp.is_valid_play THEN '유효재생'
+          ELSE '무효재생'
+        END AS validity,
+        c.name AS company
+      FROM music_plays mp
+      JOIN companies c ON c.id = mp.using_company_id
+      ORDER BY mp.created_at DESC
+      LIMIT ${limit}
+    `
+    
     const res = await this.db.execute(q)
     const rows = (res.rows || []) as any[]
     
     const items: RealtimeApiStatusItemDto[] = rows.map((r: any) => ({
       status: r.status === 'success' ? 'success' : 'error',
       endpoint: r.endpoint || '/api/unknown',
+      callType: r.call_type || '알 수 없음',
+      validity: r.validity || '무효재생',
+      company: r.company || 'Unknown',
+      timestamp: r.timestamp || '00:00:00',
+    }))
+
+    return { items }
+  }
+
+  async getRealtimeApiCalls(query: RealtimeApiStatusQueryDto): Promise<RealtimeApiStatusResponseDto> {
+    const limit = Math.min(Math.max(query.limit ?? 5, 1), 20)
+    
+    // music_plays 테이블에서 직접 데이터 조회
+    const q = sql`
+      SELECT 
+        mp.created_at,
+        CASE WHEN mp.is_valid_play THEN 'success' ELSE 'error' END AS status,
+        CASE 
+          WHEN mp.use_case = '0' THEN '/api/music/play'
+          WHEN mp.use_case = '1' THEN '/api/music/play'
+          WHEN mp.use_case = '2' THEN '/api/lyrics/get'
+          ELSE '/api/unknown'
+        END AS endpoint,
+        CASE 
+          WHEN mp.use_case = '0' THEN '음원 호출'
+          WHEN mp.use_case = '1' THEN '음원 호출'
+          WHEN mp.use_case = '2' THEN '가사 호출'
+          ELSE '알 수 없음'
+        END AS call_type,
+        CASE 
+          WHEN mp.is_valid_play THEN '유효재생'
+          ELSE '무효재생'
+        END AS validity,
+        c.name AS company
+      FROM music_plays mp
+      JOIN companies c ON c.id = mp.using_company_id
+      ORDER BY mp.created_at DESC
+      LIMIT ${limit}
+    `
+    
+    const res = await this.db.execute(q)
+    const rows = (res.rows || []) as any[]
+    
+    const items: RealtimeApiStatusItemDto[] = rows.map((r: any) => ({
+      status: r.status === 'success' ? 'success' : 'error',
+      endpoint: r.endpoint || '/api/unknown',
+      callType: r.call_type || '알 수 없음',
+      validity: r.validity || '무효재생',
       company: r.company || 'Unknown',
       timestamp: r.timestamp || '00:00:00',
     }))

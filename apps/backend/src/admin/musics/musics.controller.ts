@@ -75,6 +75,7 @@ export class MusicsController {
     return this.musicsService.getValidPlaysStats(query);
   }
 
+
   @Get('stats/revenue/forecast')
   async getRevenueForecast(@Query(new ValidationPipe({ transform: true })) query: RevenueForecastQueryDto) {
     return this.musicsService.getRevenueForecast(query);
@@ -93,6 +94,11 @@ export class MusicsController {
   @Get('realtime/api-status')
   async getRealtimeApiStatus(@Query(new ValidationPipe({ transform: true })) query: RealtimeApiStatusQueryDto) {
     return this.musicsService.getRealtimeApiStatus(query);
+  }
+
+  @Get('realtime/api-calls')
+  async getRealtimeApiCalls(@Query(new ValidationPipe({ transform: true })) query: RealtimeApiStatusQueryDto) {
+    return this.musicsService.getRealtimeApiCalls(query);
   }
 
   @Get('realtime/top-tracks')

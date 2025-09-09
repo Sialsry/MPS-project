@@ -72,11 +72,15 @@ export function buildApiChartQuery(period: '24h' | '7d' | '30d') {
         SELECT 
           EXTRACT(HOUR FROM mp.created_at) as hour,
           TO_CHAR(mp.created_at, 'HH24시') as label,
+          COUNT(*) as total_calls,
           COUNT(CASE WHEN mp.use_case IN ('0', '1') THEN 1 END) as music_calls,
-          COUNT(CASE WHEN mp.use_case = '2' THEN 1 END) as lyrics_calls
+          COUNT(CASE WHEN mp.use_case = '2' THEN 1 END) as lyrics_calls,
+          COUNT(CASE WHEN c.grade = 'free' THEN 1 END) as free_calls,
+          COUNT(CASE WHEN c.grade = 'standard' THEN 1 END) as standard_calls,
+          COUNT(CASE WHEN c.grade = 'business' THEN 1 END) as business_calls
         FROM music_plays mp
+        LEFT JOIN companies c ON c.id = mp.using_company_id
         WHERE mp.created_at >= NOW() - INTERVAL '24 hours'
-          AND mp.is_valid_play = true
         GROUP BY EXTRACT(HOUR FROM mp.created_at), TO_CHAR(mp.created_at, 'HH24시')
         ORDER BY hour
       `

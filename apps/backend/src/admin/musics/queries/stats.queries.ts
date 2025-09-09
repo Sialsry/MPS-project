@@ -43,6 +43,16 @@ export const buildRealtimeApiStatusQuery = (limit: number = 5) => sql`
         WHEN mp.use_case = '2' THEN '/api/lyrics/get'
         ELSE '/api/unknown'
       END AS endpoint,
+      CASE 
+        WHEN mp.use_case = '0' THEN '음원 호출'
+        WHEN mp.use_case = '1' THEN '음원 호출'
+        WHEN mp.use_case = '2' THEN '가사 호출'
+        ELSE '알 수 없음'
+      END AS call_type,
+      CASE 
+        WHEN mp.is_valid_play THEN '유효재생'
+        ELSE '무효재생'
+      END AS validity,
       c.name AS company
     FROM music_plays mp
     JOIN companies c ON c.id = mp.using_company_id
@@ -52,6 +62,8 @@ export const buildRealtimeApiStatusQuery = (limit: number = 5) => sql`
   SELECT 
     status,
     endpoint,
+    call_type,
+    validity,
     company,
     to_char(created_at AT TIME ZONE 'Asia/Seoul', 'HH24:MI:SS') AS timestamp
   FROM recent_plays

@@ -31,6 +31,9 @@ export class SystemService {
     
     return {
       labels: data.map(row => row.label),
+      freeCalls: data.map(row => Number(row.free_calls || 0)),
+      standardCalls: data.map(row => Number(row.standard_calls || 0)),
+      businessCalls: data.map(row => Number(row.business_calls || 0)),
       musicCalls: data.map(row => Number(row.music_calls || 0)),
       lyricsCalls: data.map(row => Number(row.lyrics_calls || 0))
     }

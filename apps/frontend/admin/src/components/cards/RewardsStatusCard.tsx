@@ -57,7 +57,7 @@ export default function RewardsStatusCard() {
   return (
     <Card>
       <div className="space-y-1">
-        <Title variant="card">이번 달 한도 소진 음원 비율</Title>
+        <Title variant="card">리워드 한도 소진 비율</Title>
         <div className="text-3xl font-bold text-white">{loading ? '...' : (error ? '-' : (ratio === null ? '-' : `${ratio}%`))}</div>
         <div className="space-y-0.5">
           <div className="text-sm text-teal-300">
@@ -67,6 +67,7 @@ export default function RewardsStatusCard() {
             <div className="h-full rounded bg-teal-300" style={{ width: `${Math.min(Math.max(ratio ?? 0, 0), 100)}%` }} />
           </div>
           <div className="text-xs text-white/60">소진: {loading || error ? '-' : `${filled.toLocaleString()}개`} · 대상: {loading || error ? '-' : `${eligible.toLocaleString()}개`}</div>
+          <div className="text-xs text-white/50">*이번 달 리워드 지급 한도를 소진한 음원의 비율</div>
         </div>
       </div>
     </Card>
