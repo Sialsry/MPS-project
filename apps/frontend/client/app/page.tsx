@@ -8,7 +8,7 @@ export default function HomePage() {
 
       <HeroVideo />
       <section className="relative z-10">
-      {/* <Hero/> */}
+      <Hero/>
       <div id="modal-root" />
       </section>
     </>
