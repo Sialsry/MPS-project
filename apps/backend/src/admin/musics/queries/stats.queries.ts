@@ -72,30 +72,30 @@ export const buildRealtimeApiStatusQuery = (limit: number = 5) => sql`
 `
 
 export const buildRealtimeTopTracksQuery = (limit: number = 10) => sql`
-  WITH recent_plays AS (
+  WITH last_24h_plays AS (
     SELECT 
       m.id,
       m.title,
-      COUNT(*) FILTER (WHERE mp.is_valid_play = true) AS valid_plays,
-      COUNT(*) AS total_plays
+      COUNT(*) FILTER (WHERE mp.is_valid_play = true) AS valid_plays_24h,
+      COUNT(*) AS total_plays_24h
     FROM music_plays mp
     JOIN musics m ON m.id = mp.music_id
     WHERE mp.created_at >= NOW() - interval '24 hours'
     GROUP BY m.id, m.title
-    ORDER BY valid_plays DESC
-    LIMIT ${limit}
+    HAVING COUNT(*) FILTER (WHERE mp.is_valid_play = true) > 0
   )
   SELECT 
-    ROW_NUMBER() OVER (ORDER BY valid_plays DESC) AS rank,
+    ROW_NUMBER() OVER (ORDER BY valid_plays_24h DESC) AS rank,
     title,
-    valid_plays,
-    total_plays,
+    valid_plays_24h AS valid_plays,
+    total_plays_24h AS total_plays,
     CASE 
-      WHEN total_plays > 0 THEN ROUND((valid_plays::numeric / total_plays::numeric) * 100)
+      WHEN total_plays_24h > 0 THEN ROUND((valid_plays_24h::numeric / total_plays_24h::numeric) * 100)
       ELSE 0
     END AS valid_rate
-  FROM recent_plays
-  ORDER BY valid_plays DESC
+  FROM last_24h_plays
+  ORDER BY valid_plays_24h DESC
+  LIMIT ${limit}
 `
 
 export const buildRealtimeTransactionsQuery = (limit: number = 3) => sql`

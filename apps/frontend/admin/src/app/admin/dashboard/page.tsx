@@ -46,7 +46,22 @@ export default function DashboardPage() {
     { status: 'success', endpoint: '/api/music/play', callType: '음원 호출', validity: '유효재생', company: 'Media Corp', timestamp: '17:08:44' }
   ])
   const [apiStatusFilter, setApiStatusFilter] = useState<'all' | 'music' | 'lyrics'>('all')
-  const [realtimeTopTracks, setRealtimeTopTracks] = useState<Array<{ rank: number; title: string; validPlays: number; totalPlays: number; validRate: number }>>([])
+  const [realtimeTopTracks, setRealtimeTopTracks] = useState<Array<{ 
+    rank: number; 
+    title: string; 
+    validPlays: number; 
+  }>>([
+    { rank: 1, title: 'Love Story', validPlays: 1250 },
+    { rank: 2, title: 'Summer Nights', validPlays: 980 },
+    { rank: 3, title: 'City Lights', validPlays: 850 },
+    { rank: 4, title: 'Ocean Waves', validPlays: 720 },
+    { rank: 5, title: 'Mountain Peak', validPlays: 650 },
+    { rank: 6, title: 'Forest Path', validPlays: 580 },
+    { rank: 7, title: 'River Flow', validPlays: 520 },
+    { rank: 8, title: 'Sky High', validPlays: 480 },
+    { rank: 9, title: 'Deep Blue', validPlays: 420 },
+    { rank: 10, title: 'Golden Hour', validPlays: 380 }
+  ])
 
   useEffect(() => {
     // 마지막 업데이트 시간
@@ -104,7 +119,13 @@ export default function DashboardPage() {
         if (apiRes.ok) {
           const apiData = await apiRes.json()
           console.log('API Status Data:', apiData)
-          setRealtimeApiStatus(apiData.items || [])
+          // 백엔드에서 callType과 validity가 없을 때 기본값 설정
+          const items = (apiData.items || []).map((item: any) => ({
+            ...item,
+            callType: item.callType || (item.endpoint?.includes('lyrics') ? '가사 호출' : '음원 호출'),
+            validity: item.validity || '유효재생'
+          }))
+          setRealtimeApiStatus(items)
         } else {
           console.error('API Status failed:', apiRes.status)
         }
@@ -183,7 +204,7 @@ export default function DashboardPage() {
 
       <section className="mb-8">
         <Title variant="section" className="mb-4">실시간 모니터링</Title>
-        <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(380px,1fr))]">
+        <div className="grid gap-5 [grid-template-columns:2fr_1fr] max-[1200px]:grid-cols-1">
           {/* 실시간 API 호출 */}
           <Card>
             <div className="mb-4 flex items-center justify-between">
@@ -257,7 +278,7 @@ export default function DashboardPage() {
                           </div>
                         </td>
                         <td className="py-2 px-3 text-white/80">
-                          <span className={`px-2 py-1 rounded text-xs ${
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
                             item.callType === '음원 호출' 
                               ? 'bg-blue-500/20 text-blue-400' 
                               : 'bg-purple-500/20 text-purple-400'
@@ -266,7 +287,7 @@ export default function DashboardPage() {
                           </span>
                         </td>
                         <td className="py-2 px-3 text-white/80">
-                          <span className={`px-2 py-1 rounded text-xs ${
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
                             item.validity === '유효재생' 
                               ? 'bg-teal-500/20 text-teal-400' 
                               : 'bg-gray-500/20 text-gray-400'
@@ -291,29 +312,25 @@ export default function DashboardPage() {
 
           {/* 인기 음원 TOP 10 */}
           <Card>
-            <Title variant="card" className="mb-4">인기 음원 TOP 10 (유효재생)</Title>
+            <div className="mb-4">
+              <Title variant="card">인기 음원 TOP 10</Title>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-white/10">
                     <th className="text-left py-2 px-3 text-xs font-medium text-white/60">순위</th>
                     <th className="text-left py-2 px-3 text-xs font-medium text-white/60">음원명</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">24시간 유효재생</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">24시 유효재생</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm">
                   {realtimeTopTracks.length > 0 ? (
-                    realtimeTopTracks.map(({ rank, title, validPlays, totalPlays, validRate }) => (
+                    realtimeTopTracks.map(({ rank, title, validPlays }) => (
                       <tr key={rank} className="border-b border-white/5">
                         <td className={`py-2 px-3 font-medium ${rank <= 3 ? 'text-teal-300' : 'text-white/60'}`}>{rank}</td>
                         <td className="py-2 px-3 text-white/80">{title}</td>
-                        <td className="py-2 px-3 text-white/60">
-                          <div className="flex items-center gap-2">
-                            <span>{validPlays.toLocaleString()}회</span>
-                            <span className="text-xs text-white/50">({validRate}%)</span>
-                          </div>
-                          <div className="text-xs text-white/40">총 {totalPlays.toLocaleString()}회</div>
-                        </td>
+                        <td className="py-2 px-3 text-white/60">{validPlays.toLocaleString()}</td>
                       </tr>
                     ))
                   ) : (
