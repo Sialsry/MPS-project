@@ -107,7 +107,7 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
         {/* 내용 */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
           {/* 음원 정보 카드 */}
-          <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+          <div className="p-4 rounded-lg border border-white/10">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
               <span className="h-4 w-1.5 rounded bg-teal-300"></span>
               음원 정보
@@ -154,16 +154,24 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                   </div>
                   <div>
                     <span className="text-white/60">카테고리</span>
-                    <div className="text-white font-medium">{musicData?.genre || '-'}</div>
+                    <div className="mt-1">
+                      {musicData?.genre ? (
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400">
+                          {musicData.genre}
+                        </span>
+                      ) : (
+                        <span className="text-white/40">-</span>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <span className="text-white/60">음원 유형</span>
                     <div className="mt-1">
                       {musicData?.musicType ? (
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                          musicData.musicType === '일반' ? 'bg-blue-400/10 text-blue-300 border border-blue-400/25' :
-                          musicData.musicType === 'Inst' ? 'bg-purple-400/10 text-purple-300 border border-purple-400/25' :
-                          'bg-gray-400/10 text-gray-300 border border-gray-400/25'
+                          musicData.musicType === '일반' ? 'bg-purple-500/20 text-purple-400' :
+                          musicData.musicType === 'Inst' ? 'bg-blue-500/20 text-blue-400' :
+                          'bg-gray-500/20 text-gray-400'
                         }`}>
                           {musicData.musicType}
                         </span>
@@ -180,13 +188,17 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                     <span className="text-white/60">재생시간</span>
                     <div className="text-white font-medium">{formatDuration(musicData?.durationSec)}</div>
                   </div>
+                  <div>
+                    <span className="text-white/60">ISRC</span>
+                    <div className="text-white font-medium">{musicData?.isrc || '-'}</div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* 가격 정보 카드 */}
-          <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+          <div className="p-4 rounded-lg border border-white/10">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
               <span className="h-4 w-1.5 rounded bg-teal-300"></span>
               가격 정보
@@ -194,24 +206,24 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
             <div className={`grid grid-cols-1 gap-4 ${musicData?.musicType === 'Inst' ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
               {musicData?.musicType === 'Inst' ? (
                 // Inst 음원: 음악만 가격만 표시
-                <div className="text-center p-4 bg-white/5 rounded-lg border border-white/10">
+                <div className="text-center p-4 rounded-lg border border-white/10">
                   <div className="text-white/60 text-sm mb-1">음악 가격</div>
-                  <div className="text-teal-400 font-semibold text-lg">
+                  <div className="text-teal-400 font-medium text-sm">
                     {musicData?.priceMusicOnly ? `${musicData.priceMusicOnly} 토큰` : '-'}
                   </div>
                 </div>
               ) : (
                 // 일반 음원: 음악 가격과 가사 가격 표시
                 <>
-                  <div className="text-center p-4 bg-white/5 rounded-lg border border-white/10">
+                  <div className="text-center p-4 rounded-lg border border-white/10">
                     <div className="text-white/60 text-sm mb-1">음악 가격</div>
-                    <div className="text-teal-400 font-semibold text-lg">
+                    <div className="text-teal-400 font-medium text-sm">
                       {musicData?.priceMusicOnly ? `${musicData.priceMusicOnly} 토큰` : '-'}
                     </div>
                   </div>
-                  <div className="text-center p-4 bg-white/5 rounded-lg border border-white/10">
+                  <div className="text-center p-4 rounded-lg border border-white/10">
                     <div className="text-white/60 text-sm mb-1">가사 가격</div>
-                    <div className="text-teal-400 font-semibold text-lg">
+                    <div className="text-teal-400 font-medium text-sm">
                       {musicData?.priceLyricsOnly ? `${musicData.priceLyricsOnly} 토큰` : '-'}
                     </div>
                   </div>
@@ -221,7 +233,7 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
           </div>
 
           {/* 리워드 정보 카드 */}
-          <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+          <div className="p-4 rounded-lg border border-white/10">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
               <span className="h-4 w-1.5 rounded bg-teal-300"></span>
               리워드 정보
@@ -229,19 +241,19 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <span className="text-white/60 text-sm">재생당 리워드</span>
-                <div className="text-teal-400 font-semibold text-lg">
+                <div className="text-teal-400 font-medium text-sm">
                   {musicData?.rewardPerPlay ? `${musicData.rewardPerPlay} 토큰` : '-'}
                 </div>
               </div>
               <div>
-                <span className="text-white/60 text-sm">최대 재생 수</span>
-                <div className="text-white font-semibold text-lg">
-                  {musicData?.maxPlayCount ? musicData.maxPlayCount.toLocaleString() : '무제한'}
+                <span className="text-white/60 text-sm">리워드 발생 최대 재생 수</span>
+                <div className="text-white font-medium text-sm">
+                  {musicData?.maxPlayCount ? musicData.maxPlayCount.toLocaleString() : '-'}
                 </div>
               </div>
               <div>
                 <span className="text-white/60 text-sm">최대 리워드</span>
-                <div className="text-teal-400 font-semibold text-lg">
+                <div className="text-teal-400 font-medium text-sm">
                   {musicData?.rewardPerPlay && musicData?.maxPlayCount 
                     ? `${(musicData.rewardPerPlay * musicData.maxPlayCount).toLocaleString()} 토큰`
                     : musicData?.rewardPerPlay && !musicData?.maxPlayCount
@@ -254,40 +266,40 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
           </div>
 
           {/* 제작 정보 카드 */}
-          <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+          <div className="p-4 rounded-lg border border-white/10">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
               <span className="h-4 w-1.5 rounded bg-teal-300"></span>
               제작 정보
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <span className="text-white/60 text-sm">작사:</span>
+                <span className="text-white/60 text-sm">작사</span>
                 <div className="text-white font-medium">{musicData?.lyricist || '-'}</div>
               </div>
               <div>
-                <span className="text-white/60 text-sm">작곡:</span>
+                <span className="text-white/60 text-sm">작곡</span>
                 <div className="text-white font-medium">{musicData?.composer || '-'}</div>
               </div>
               <div>
-                <span className="text-white/60 text-sm">편곡:</span>
+                <span className="text-white/60 text-sm">편곡</span>
                 <div className="text-white font-medium">{musicData?.arranger || '-'}</div>
               </div>
             </div>
           </div>
 
           {/* 태그 정보 카드 */}
-          <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+          <div className="p-4 rounded-lg border border-white/10">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
               <span className="h-4 w-1.5 rounded bg-teal-300"></span>
               태그
             </h3>
             <div className="space-y-4">
               <div>
-                <div className="text-white/60 text-sm mb-2">일반 태그:</div>
+                <div className="text-white/60 text-sm mb-2">일반 태그</div>
                 <div className="flex flex-wrap gap-2">
                   {(musicData?.tags || '').split(',').map(t => t.trim()).filter(Boolean).length > 0 ? (
                     (musicData?.tags || '').split(',').map(t => t.trim()).filter(Boolean).map((t, i) => (
-                      <span key={`tag-${i}`} className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-teal-400/10 text-teal-300 border border-teal-400/25">
+                      <span key={`tag-${i}`} className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-teal-400/20 text-teal-300">
                         {t}
                       </span>
                     ))
@@ -297,11 +309,11 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
                 </div>
               </div>
               <div>
-                <div className="text-white/60 text-sm mb-2">정규화 태그:</div>
+                <div className="text-white/60 text-sm mb-2">정규화 태그</div>
                 <div className="flex flex-wrap gap-2">
                   {(musicData?.normalizedTags || '').split(',').map(t => t.trim()).filter(Boolean).length > 0 ? (
                     (musicData?.normalizedTags || '').split(',').map(t => t.trim()).filter(Boolean).map((t, i) => (
-                      <span key={`ntag-${i}`} className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-blue-400/10 text-blue-300 border border-blue-400/25">
+                      <span key={`ntag-${i}`} className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-blue-400/20 text-blue-300">
                         {t}
                       </span>
                     ))
@@ -315,7 +327,7 @@ export default function MusicStatsModal({ open, onClose, title = '음원 상세'
 
           {/* 가사 정보 카드 */}
           {musicData?.musicType !== 'Inst' && (
-            <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+            <div className="p-4 rounded-lg border border-white/10">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-white flex items-center gap-3">
                   <span className="h-4 w-1.5 rounded bg-teal-300"></span>

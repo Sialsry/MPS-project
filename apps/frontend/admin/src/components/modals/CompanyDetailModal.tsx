@@ -296,7 +296,7 @@ export default function CompanyDetailModal({ open, onClose, company, detail, loa
                           const ymNow = `${kst.getUTCFullYear()}-${String(kst.getUTCMonth()+1).padStart(2,'0')}`
                           const isCurrentMonth = detail.summary.yearMonth === ymNow
                           const elapsedDays = isCurrentMonth ? Math.min(kst.getUTCDate(), (detail.daily || []).length || 30) : ((detail.daily || []).length || 30)
-                          const avgEarned = elapsedDays > 0 ? (sumEarned / elapsedDays) : 0
+                          const avgEarned = elapsedDays > 0 ? (monthEarned / elapsedDays) : 0
                           return (
                             <>
                               <div>
@@ -304,7 +304,7 @@ export default function CompanyDetailModal({ open, onClose, company, detail, loa
                                 <div className="text-teal-400 font-medium">{totalTokens.toLocaleString()}</div>
                               </div>
                               <div>
-                                <div className="text-white/60 mb-1">전체 사용률</div>
+                                <div className="text-white/60 mb-1">누적 사용률</div>
                                 <div className="text-white font-medium">{totalRate}%</div>
                               </div>
                               <div>
@@ -344,7 +344,7 @@ export default function CompanyDetailModal({ open, onClose, company, detail, loa
                 <div className="rounded-xl border border-white/10 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-white flex items-center gap-3">
-                      <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
+                      <span className="h-4 w-1.5 rounded bg-teal-300"></span>
                       리워드 적립 추이
                     </h3>
                     <div className="flex items-center gap-2">
@@ -414,7 +414,7 @@ export default function CompanyDetailModal({ open, onClose, company, detail, loa
                 <div className="rounded-xl border border-white/10 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-white flex items-center gap-3">
-                      <div className="w-1.5 h-6 bg-teal-400 rounded-full"></div>
+                      <span className="h-4 w-1.5 rounded bg-teal-300"></span>
                       전체 음원 사용 현황
                     </h3>
                     <select 
@@ -444,9 +444,9 @@ export default function CompanyDetailModal({ open, onClose, company, detail, loa
                         <tr className="border-b border-white/10">
                           <th className="px-4 py-3 text-white/80 font-medium text-center">순위</th>
                           <th className="px-4 py-3 text-white/80 font-medium text-center">음원명</th>
-                          <th className="px-4 py-3 text-white/80 font-medium text-center">아티스트</th>
                           <th className="px-4 py-3 text-white/80 font-medium text-center">카테고리</th>
-                          <th className="px-4 py-3 text-white/80 font-medium text-center">리워드 발생 횟수(유효재생)</th>
+                          <th className="px-4 py-3 text-white/80 font-medium text-center">리워드 발생 음원 호출</th>
+                          <th className="px-4 py-3 text-white/80 font-medium text-center">리워드 발생 가사 호출</th>
                           <th className="px-4 py-3 text-white/80 font-medium text-center">적립 리워드</th>
                           <th className="px-4 py-3 text-white/80 font-medium text-center">최근 사용</th>
                         </tr>
@@ -459,14 +459,17 @@ export default function CompanyDetailModal({ open, onClose, company, detail, loa
                                 index === 0 ? 'text-teal-400' : index === 1 ? 'text-teal-400' : index === 2 ? 'text-teal-400' : 'text-white'
                               }`}>{index + 1}</span>
                             </td>
-                            <td className="px-4 py-3 font-medium text-white truncate max-w-[220px] text-center" title={row.title}>{row.title}</td>
-                            <td className="px-4 py-3 text-white/80 truncate max-w-[180px] text-center" title={row.artist}>{row.artist}</td>
+                            <td className="px-4 py-3 text-center">
+                              <div className="font-medium text-white truncate max-w-[200px]" title={row.title}>{row.title}</div>
+                              <div className="text-white/60 text-xs truncate max-w-[200px]" title={row.artist}>· {row.artist}</div>
+                            </td>
                             <td className="px-4 py-3 text-center">
                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white/10 text-white/80">
                                 {row.category ?? '-'}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-teal-400 font-medium text-center">{row.validPlays.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-teal-400 font-medium text-center">{(row as any).musicCalls || 0}</td>
+                            <td className="px-4 py-3 text-teal-400 font-medium text-center">{(row as any).lyricsCalls || 0}</td>
                             <td className="px-4 py-3 text-teal-400 font-medium text-center">{row.earned.toLocaleString()}</td>
                             <td className="px-4 py-3 text-white/60 text-xs text-center">{(row as any).lastUsedAt || '-'}</td>
                           </tr>

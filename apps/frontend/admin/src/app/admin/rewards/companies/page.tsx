@@ -590,7 +590,7 @@ export default function CompanyRewardsPage() {
                           usageRateFilter !== '전체' ? 'text-teal-400' : 'text-white/70'
                         }`}
                     >
-                      <span>사용률</span>
+                      <span>누적 사용률</span>
                         <span className={`${
                           usageRateFilter !== '전체' ? 'text-teal-400' : 'text-white/50'
                         }`}>▼</span>

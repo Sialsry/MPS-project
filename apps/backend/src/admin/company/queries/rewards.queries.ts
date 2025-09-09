@@ -10,7 +10,7 @@ export const buildSummaryQuery = (companyId: number, ymYear: number, ymMonth: nu
     SELECT 
       COUNT(*) FILTER (WHERE mp.is_valid_play = true) AS valid_play_count,
       COUNT(DISTINCT CASE WHEN mp.is_valid_play = true THEN mp.music_id END) AS active_tracks,
-      COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS monthly_earned
+      COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS monthly_earned
     FROM music_plays mp, month_range mr
     WHERE mp.using_company_id = ${companyId}
       AND mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
@@ -47,8 +47,8 @@ export const buildSummaryQuery = (companyId: number, ymYear: number, ymMonth: nu
     COALESCE(p.monthly_earned, 0) AS monthly_earned,
     COALESCE(s.monthly_used, 0) AS monthly_used,
     CASE 
-      WHEN (c.total_rewards_earned::numeric - c.total_rewards_used::numeric) > 0 
-        THEN ROUND((COALESCE(s.monthly_used, 0) / (c.total_rewards_earned::numeric - c.total_rewards_used::numeric)) * 100, 2)
+      WHEN c.total_rewards_earned::numeric > 0 
+        THEN ROUND((c.total_rewards_used::numeric / c.total_rewards_earned::numeric) * 100, 2)
       ELSE 0
     END AS usage_rate,
     COALESCE(p.active_tracks, 0) AS active_tracks,
@@ -76,7 +76,7 @@ export const buildDailyQuery = (companyId: number, ymYear: number, ymMonth: numb
   ),
   earned AS (
     SELECT DATE(mp.created_at AT TIME ZONE ${tz}) AS d,
-           COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned
+           COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned
     FROM music_plays mp, month_range mr
     WHERE mp.using_company_id = ${companyId}
       AND mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
@@ -116,7 +116,7 @@ export const buildDailyIndustryAvgQuery = (ymYear: number, ymMonth: number, tz: 
   earned_by_company AS (
     SELECT DATE(mp.created_at AT TIME ZONE ${tz}) AS d,
            mp.using_company_id,
-           COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned
+           COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned
     FROM music_plays mp, month_range mr
     WHERE mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
     GROUP BY 1, mp.using_company_id
@@ -145,8 +145,9 @@ export const buildByMusicQuery = (companyId: number, ymYear: number, ymMonth: nu
     m.title,
     m.artist,
     COALESCE(mc.name, '') AS category,
-    COUNT(*) FILTER (WHERE mp.is_valid_play = true) AS valid_plays,
-    COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned,
+    COUNT(*) FILTER (WHERE mp.is_valid_play = true AND mp.reward_code = '1' AND mp.use_case IN ('0', '1')) AS music_calls,
+    COUNT(*) FILTER (WHERE mp.is_valid_play = true AND mp.reward_code = '1' AND mp.use_case = '2') AS lyrics_calls,
+    COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned,
     to_char(MAX(mp.created_at AT TIME ZONE ${tz}), 'YYYY-MM-DD') AS last_used_at
   FROM music_plays mp
   JOIN musics m ON m.id = mp.music_id
@@ -155,7 +156,7 @@ export const buildByMusicQuery = (companyId: number, ymYear: number, ymMonth: nu
   WHERE mp.using_company_id = ${companyId}
     AND mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
   GROUP BY m.id, m.title, m.artist, mc.name
-  ORDER BY earned DESC, valid_plays DESC
+  ORDER BY earned DESC, (music_calls + lyrics_calls) DESC
   LIMIT 100;
 `
 
@@ -170,7 +171,7 @@ export const buildMonthlyCompanyQuery = (companyId: number, ymYear: number, ymMo
   ),
   earned_company AS (
     SELECT DATE_TRUNC('month', mp.created_at AT TIME ZONE ${tz}) AS m,
-           COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned
+           COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned
     FROM music_plays mp
     WHERE mp.using_company_id = ${companyId}
     GROUP BY 1
@@ -195,7 +196,7 @@ export const buildMonthlyIndustryAvgQuery = (ymYear: number, ymMonth: number, mo
   earned_by_company AS (
     SELECT DATE_TRUNC('month', mp.created_at AT TIME ZONE ${tz}) AS m,
            mp.using_company_id,
-           COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned
+           COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned
     FROM music_plays mp
     GROUP BY 1, mp.using_company_id
   ),
@@ -221,7 +222,7 @@ export const buildSummaryListBaseQuery = (ymYear: number, ymMonth: number, tz: s
     SELECT mp.using_company_id AS company_id,
       COUNT(*) FILTER (WHERE mp.is_valid_play = true) AS valid_play_count,
       COUNT(DISTINCT CASE WHEN mp.is_valid_play = true THEN mp.music_id END) AS active_tracks,
-      COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS monthly_earned
+      COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS monthly_earned
     FROM music_plays mp, month_range mr
     WHERE mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
     GROUP BY mp.using_company_id
@@ -241,8 +242,8 @@ export const buildSummaryListBaseQuery = (ymYear: number, ymMonth: number, tz: s
     COALESCE(p.monthly_earned, 0) AS monthly_earned,
     COALESCE(s.monthly_used, 0) AS monthly_used,
     CASE 
-      WHEN (c.total_rewards_earned::numeric - c.total_rewards_used::numeric) > 0 
-        THEN ROUND((COALESCE(s.monthly_used, 0) / (c.total_rewards_earned::numeric - c.total_rewards_used::numeric)) * 100, 2)
+      WHEN c.total_rewards_earned::numeric > 0 
+        THEN ROUND((c.total_rewards_used::numeric / c.total_rewards_earned::numeric) * 100, 2)
       ELSE 0
     END AS usage_rate,
     COALESCE(p.active_tracks, 0) AS active_tracks

@@ -662,19 +662,25 @@ export default function MusicsPage() {
                     <div className="text-white/90 font-medium">{item.artist}</div>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gradient-to-r from-purple-400/15 to-purple-400/15 text-purple-300 border border-purple-400/25">
+                    <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
+                      item.musicType === 'Inst' 
+                        ? 'bg-blue-500/20 text-blue-400' 
+                        : 'bg-purple-500/20 text-purple-400'
+                    }`}>
                       {item.musicType}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gradient-to-r from-teal-400/15 to-blue-400/15 text-teal-300 border border-teal-400/25">
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400">
                       {item.genre}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-white/90 font-medium text-center">{item.tags}</td>
                   <td className="px-6 py-4 text-white/90 font-medium text-center">{item.releaseDate}</td>
-                  <td className="px-6 py-4 text-white/90 font-medium text-center">
-                    {item.maxRewardLimit}
+                  <td className="px-6 py-4 text-center">
+                    <span className="text-teal-400 font-medium">
+                      {item.maxRewardLimit}
+                    </span>
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex gap-2 justify-center">
@@ -783,8 +789,8 @@ export default function MusicsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-neutral-900/90 p-6 text-white shadow-2xl backdrop-blur-md">
             <div className="mb-6 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20">
-                <svg className="h-8 w-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-teal-500/20">
+                <svg className="h-8 w-8 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
               </div>
@@ -792,7 +798,7 @@ export default function MusicsPage() {
               <p className="text-sm text-white/90 font-medium">
                 <span className="font-medium text-white">"{deleteTarget}"</span> 음원을 삭제하시겠습니까?
               </p>
-              <p className="mt-2 text-xs text-red-400">이 작업은 되돌릴 수 없습니다.</p>
+              <p className="mt-2 text-xs text-teal-400">이 작업은 되돌릴 수 없습니다.</p>
             </div>
             
             <div className="flex gap-3">
@@ -804,7 +810,7 @@ export default function MusicsPage() {
               </button>
               <button 
                 onClick={confirmDelete}
-                className="flex-1 rounded-lg bg-gradient-to-r from-red-500 to-red-600 px-4 py-2.5 text-sm text-white font-medium hover:from-red-600 hover:to-red-700 transition-all duration-200"
+                className="flex-1 rounded-lg bg-gradient-to-r from-teal-500 to-teal-600 px-4 py-2.5 text-sm text-white font-medium hover:from-teal-600 hover:to-teal-700 transition-all duration-200"
               >
                 삭제
               </button>

@@ -123,7 +123,7 @@ export class CompanyService {
       dailyIndustryAvg: ((dailyIndustryRes as any).rows || []).map((r: any) => ({ date: r.date, earned: Number(r.earned || 0) })),
       monthly: ((monthlyCompanyRes as any).rows || []).map((r: any) => ({ yearMonth: r.year_month, earned: Number(r.earned || 0) })),
       monthlyIndustryAvg: ((monthlyIndustryRes as any).rows || []).map((r: any) => ({ yearMonth: r.year_month, earned: Number(r.earned || 0) })),
-      byMusic: ((byMusicRes as any).rows || []).map((r: any) => ({ musicId: Number(r.music_id), title: r.title, artist: r.artist, category: r.category ?? null, validPlays: Number(r.valid_plays || 0), earned: Number(r.earned || 0), lastUsedAt: r.last_used_at || null })),
+      byMusic: ((byMusicRes as any).rows || []).map((r: any) => ({ musicId: Number(r.music_id), title: r.title, artist: r.artist, category: r.category ?? null, musicCalls: Number(r.music_calls || 0), lyricsCalls: Number(r.lyrics_calls || 0), earned: Number(r.earned || 0), lastUsedAt: r.last_used_at || null })),
     }
   }
 
