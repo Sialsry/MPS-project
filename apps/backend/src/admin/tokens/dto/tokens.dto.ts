@@ -22,3 +22,18 @@ export class BatchDetailDto {
   @IsString()
   date: string // YYYY-MM-DD 형식
 }
+
+export class TransactionsDto {
+  @IsOptional()
+  @IsString()
+  limit?: string = '20'
+
+  @IsOptional()
+  @IsString()
+  offset?: string = '0'
+}
+
+export class TransactionDetailDto {
+  @IsString()
+  id: string // 트랜잭션 ID
+}

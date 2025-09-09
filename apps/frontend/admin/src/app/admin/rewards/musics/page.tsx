@@ -465,7 +465,7 @@ export default function RewardsMusicsPage() {
                   <tr
                     key={music.musicId}
                     className={`border-b border-white/5 transition-all duration-200 ${
-                      index % 2 === 0 ? 'bg-white/2' : 'bg-white/1'
+                    index % 2 === 0 ? 'bg-white/2' : 'bg-white/1'
                     } hover:bg-white/8 cursor-pointer`}
                     onClick={() => { setSelectedMusic(music); setModalOpen(true) }}
                   >
@@ -604,7 +604,7 @@ export default function RewardsMusicsPage() {
         />
       )}
 
-      
+
       {/* 일괄 수정 모달 */}
       <BulkRewardEditModal
         open={bulkEditModalOpen}

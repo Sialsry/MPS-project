@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { TokenInfoDto, WalletInfoDto, DailyBatchesDto, BatchDetailDto } from './dto/tokens.dto'
+import { TokenInfoDto, WalletInfoDto, DailyBatchesDto, BatchDetailDto, TransactionsDto, TransactionDetailDto } from './dto/tokens.dto'
 import { Web3Service } from './web3.service'
 import { TokensQueries } from './queries/tokens.queries'
 import { db } from '../../db/client'
@@ -90,6 +90,27 @@ export class TokensService {
     } catch (error) {
       console.error('배치 상세 조회 실패:', error)
       throw new Error('배치 상세 데이터를 가져올 수 없습니다')
+    }
+  }
+
+  async getTransactions(dto: TransactionsDto) {
+    try {
+      const limit = parseInt(dto.limit || '20')
+      const offset = parseInt(dto.offset || '0')
+      
+      return await this.tokensQueries.getTransactions(limit, offset)
+    } catch (error) {
+      console.error('트랜잭션 조회 실패:', error)
+      throw new Error('트랜잭션 데이터를 가져올 수 없습니다')
+    }
+  }
+
+  async getTransactionDetail(id: string) {
+    try {
+      return await this.tokensQueries.getTransactionDetail(id)
+    } catch (error) {
+      console.error('트랜잭션 상세 조회 실패:', error)
+      throw new Error('트랜잭션 상세 데이터를 가져올 수 없습니다')
     }
   }
 }

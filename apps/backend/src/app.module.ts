@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DbModule } from './db/db.module';
@@ -9,7 +10,17 @@ import { SystemModule } from './admin/system/system.module';
 import { TokensModule } from './admin/tokens/tokens.module';
 
 @Module({
-  imports: [DbModule, AuthModule, MusicsModule, CompanyModule, SystemModule, TokensModule],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+    DbModule, 
+    AuthModule, 
+    MusicsModule, 
+    CompanyModule, 
+    SystemModule, 
+    TokensModule
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

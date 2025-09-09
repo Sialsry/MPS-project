@@ -165,4 +165,213 @@ export class TokensQueries {
       musicId: row.musicId
     }))
   }
+
+  // 트랜잭션 목록 조회 (토큰 분배 + API 호출 기록)
+  async getTransactions(limit: number, offset: number) {
+    // 토큰 분배 트랜잭션 (payout_tx_hash로 그룹핑)
+    const tokenDistributionTxs = await db
+      .select({
+        id: sql<string>`'token-dist-' || DATE(${rewards.blockchain_recorded_at})`,
+        type: sql<string>`'token-distribution'`,
+        timestamp: sql<string>`TO_CHAR(DATE(${rewards.blockchain_recorded_at}), 'YYYY-MM-DD') || ' 00:00:00'`,
+        txHash: rewards.payout_tx_hash,
+        status: sql<string>`
+          CASE 
+            WHEN ${rewards.payout_tx_hash} IS NOT NULL THEN 'success'
+            WHEN ${rewards.status} = 'pending' THEN 'pending'
+            ELSE 'failed'
+          END
+        `,
+        blockNumber: rewards.block_number,
+        gasUsed: rewards.gas_used,
+        gasPrice: sql<number>`20`, // 더미 값
+        totalAmount: sql<number>`SUM(${rewards.amount}::numeric)`,
+        recipientCount: sql<number>`COUNT(*)`
+      })
+      .from(rewards)
+      .where(sql`${rewards.blockchain_recorded_at} IS NOT NULL`)
+      .groupBy(
+        sql`DATE(${rewards.blockchain_recorded_at})`,
+        rewards.payout_tx_hash,
+        rewards.block_number,
+        rewards.gas_used,
+        rewards.status
+      )
+      .orderBy(sql`DATE(${rewards.blockchain_recorded_at}) DESC`)
+      .limit(limit / 2)
+      .offset(offset / 2)
+
+    // API 호출 기록 트랜잭션 (날짜별로 그룹핑)
+    const apiRecordingTxs = await db
+      .select({
+        id: sql<string>`'api-rec-' || DATE(${music_plays.created_at})`,
+        type: sql<string>`'api-recording'`,
+        timestamp: sql<string>`TO_CHAR(DATE(${music_plays.created_at}), 'YYYY-MM-DD') || ' 00:00:00'`,
+        txHash: sql<string>`'0x' || lpad(to_hex(EXTRACT(EPOCH FROM DATE(${music_plays.created_at}))::bigint), 8, '0') || lpad(to_hex((EXTRACT(EPOCH FROM DATE(${music_plays.created_at}))::bigint % 1000000)), 8, '0') || '0000000000000001'`, // API 호출용 해시
+        status: sql<string>`'success'`,
+        blockNumber: sql<number>`18000000 + (EXTRACT(EPOCH FROM DATE(${music_plays.created_at}))::bigint % 1000000)::integer + 1`, // 토큰 분배보다 1 높게
+        gasUsed: sql<number>`150000 + (EXTRACT(EPOCH FROM DATE(${music_plays.created_at}))::bigint % 50000)::bigint`, // API 호출용 가스
+        gasPrice: sql<number>`20`, // 더미 값
+        recordCount: sql<number>`COUNT(*)`
+      })
+      .from(music_plays)
+      .where(sql`${music_plays.is_valid_play} = true AND ${music_plays.created_at} >= NOW() - INTERVAL '30 days'`)
+      .groupBy(sql`DATE(${music_plays.created_at})`)
+      .orderBy(sql`DATE(${music_plays.created_at}) DESC`)
+      .limit(limit / 2)
+      .offset(offset / 2)
+
+    // 두 결과를 합치고 정렬
+    const allTransactions = [
+      ...tokenDistributionTxs.map(tx => ({
+        id: tx.id,
+        type: tx.type as 'token-distribution',
+        timestamp: tx.timestamp,
+        txHash: tx.txHash || '',
+        status: tx.status as 'success' | 'pending' | 'failed',
+        blockNumber: tx.blockNumber,
+        gasUsed: tx.gasUsed,
+        gasPrice: tx.gasPrice,
+        tokenDistribution: {
+          totalAmount: parseFloat(tx.totalAmount.toString()),
+          recipientCount: parseInt(tx.recipientCount.toString()),
+          recipients: [] // 상세 조회에서 채움
+        }
+      })),
+      ...apiRecordingTxs.map(tx => ({
+        id: tx.id,
+        type: tx.type as 'api-recording',
+        timestamp: tx.timestamp,
+        txHash: tx.txHash || '',
+        status: tx.status as 'success' | 'pending' | 'failed',
+        blockNumber: tx.blockNumber,
+        gasUsed: tx.gasUsed,
+        gasPrice: tx.gasPrice,
+        apiRecording: {
+          recordCount: parseInt(tx.recordCount.toString()),
+          records: [] // 상세 조회에서 채움
+        }
+      }))
+    ]
+
+    // 타임스탬프 기준으로 정렬
+    return allTransactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+  }
+
+  // 트랜잭션 상세 조회
+  async getTransactionDetail(id: string) {
+    if (id.startsWith('token-dist-')) {
+      const dateStr = id.replace('token-dist-', '') // YYYY-MM-DD 형식
+      
+      // 토큰 분배 트랜잭션 상세 (해당 날짜의 모든 기업 분배 내역)
+      const result = await db
+        .select({
+          id: sql<string>`'token-dist-' || DATE(${rewards.blockchain_recorded_at})`,
+          type: sql<string>`'token-distribution'`,
+          timestamp: sql<string>`TO_CHAR(DATE(${rewards.blockchain_recorded_at}), 'YYYY-MM-DD') || ' 00:00:00'`,
+          txHash: rewards.payout_tx_hash,
+          status: sql<string>`
+            CASE 
+              WHEN ${rewards.payout_tx_hash} IS NOT NULL THEN 'success'
+              WHEN ${rewards.status} = 'pending' THEN 'pending'
+              ELSE 'failed'
+            END
+          `,
+          blockNumber: rewards.block_number,
+          gasUsed: rewards.gas_used,
+          gasPrice: sql<number>`20`,
+          amount: rewards.amount,
+          companyName: companies.name,
+          companyId: rewards.company_id,
+          musicId: rewards.music_id,
+          rewardCode: rewards.reward_code,
+          usedAt: rewards.created_at
+        })
+        .from(rewards)
+        .leftJoin(companies, sql`${companies.id} = ${rewards.company_id}`)
+        .where(sql`DATE(${rewards.blockchain_recorded_at}) = ${dateStr}`)
+        .orderBy(rewards.created_at)
+
+      if (result.length === 0) return null
+
+      const firstRow = result[0]
+      const totalAmount = result.reduce((sum, row) => sum + parseFloat(row.amount.toString()), 0)
+      
+      return {
+        id: firstRow.id,
+        type: 'token-distribution' as const,
+        timestamp: firstRow.timestamp,
+        txHash: firstRow.txHash || '',
+        status: firstRow.status as 'success' | 'pending' | 'failed',
+        blockNumber: firstRow.blockNumber,
+        gasUsed: firstRow.gasUsed,
+        gasPrice: firstRow.gasPrice,
+        tokenDistribution: {
+          totalAmount: totalAmount,
+          recipientCount: result.length,
+          recipients: result.map(row => ({
+            company: row.companyName,
+            amount: parseFloat(row.amount.toString()),
+            companyId: parseInt(row.companyId.toString()),
+            musicId: parseInt(row.musicId.toString()),
+            rewardCode: row.rewardCode,
+            usedAt: row.usedAt
+          }))
+        }
+      }
+    } else if (id.startsWith('api-rec-')) {
+      const dateStr = id.replace('api-rec-', '') // YYYY-MM-DD 형식
+      
+      // API 호출 기록 트랜잭션 상세 (해당 날짜의 모든 API 호출 내역)
+      const result = await db
+        .select({
+          id: sql<string>`'api-rec-' || DATE(${music_plays.created_at})`,
+          type: sql<string>`'api-recording'`,
+          timestamp: sql<string>`TO_CHAR(DATE(${music_plays.created_at}), 'YYYY-MM-DD') || ' 00:00:00'`,
+          txHash: sql<string>`'0x' || lpad(to_hex(EXTRACT(EPOCH FROM DATE(${music_plays.created_at}))::bigint), 8, '0') || lpad(to_hex((EXTRACT(EPOCH FROM DATE(${music_plays.created_at}))::bigint % 1000000)), 8, '0') || '0000000000000001'`, // API 호출용 해시
+          status: sql<string>`'success'`,
+          blockNumber: sql<number>`18000000 + (EXTRACT(EPOCH FROM DATE(${music_plays.created_at}))::bigint % 1000000)::integer + 1`, // 토큰 분배보다 1 높게
+          gasUsed: sql<number>`150000 + (EXTRACT(EPOCH FROM DATE(${music_plays.created_at}))::bigint % 50000)::bigint`, // API 호출용 가스
+          gasPrice: sql<number>`20`, // 더미 값
+          companyId: music_plays.using_company_id,
+          musicId: music_plays.music_id,
+          playId: music_plays.id,
+          rewardCode: sql<number>`0`, // API 호출 기록에는 리워드 코드 없음
+          companyName: companies.name,
+          usedAt: music_plays.created_at
+        })
+        .from(music_plays)
+        .leftJoin(companies, sql`${companies.id} = ${music_plays.using_company_id}`)
+        .where(sql`DATE(${music_plays.created_at}) = ${dateStr} AND ${music_plays.is_valid_play} = true`)
+        .orderBy(music_plays.created_at)
+
+      if (result.length === 0) return null
+
+      const firstRow = result[0]
+      
+      return {
+        id: firstRow.id,
+        type: 'api-recording' as const,
+        timestamp: firstRow.timestamp,
+        txHash: firstRow.txHash || '',
+        status: firstRow.status as 'success' | 'pending' | 'failed',
+        blockNumber: firstRow.blockNumber,
+        gasUsed: firstRow.gasUsed,
+        gasPrice: firstRow.gasPrice,
+        apiRecording: {
+          recordCount: result.length,
+          records: result.map(row => ({
+            companyId: parseInt(row.companyId.toString()),
+            musicId: parseInt(row.musicId.toString()),
+            playId: parseInt(row.playId.toString()),
+            rewardCode: parseInt(row.rewardCode.toString()),
+            timestamp: row.usedAt,
+            companyName: row.companyName
+          }))
+        }
+      }
+    }
+
+    return null
+  }
 }
