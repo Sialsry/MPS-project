@@ -1,7 +1,7 @@
-// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { JwtModule } from '@nestjs/jwt';                 
 import { join } from 'path';
 
 import biznoConfig from '../bizno.config';
@@ -12,15 +12,16 @@ import { AppService } from './app.service';
 import { ClientModule } from './client/client.module';
 import { MeModule } from './client/me/me.module';
 import { DbModule } from './db/db.module';
+import { ExploreModule } from './client/explore/explore.module'; 
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: [
-        join(process.cwd(), 'apps/backend/.env'),        // ts-node/dev
-        join(__dirname, '../../.env'),                   // dist/apps/backend/.env (빌드 실행)
-        '.env',                                          // 루트 .env가 있을 수도
+        join(process.cwd(), 'apps/backend/.env'),
+        join(__dirname, '../../.env'),
+        '.env',
       ],
       load: [biznoConfig],
     }),
@@ -30,11 +31,20 @@ import { DbModule } from './db/db.module';
       serveRoot: '/uploads',
     }),
 
+    // JWT를 전역으로 사용(ExploreController에서 JwtService 주입)
+    JwtModule.register({
+      global: true,                                 
+      secret: process.env.JWT_SECRET!,             
+      signOptions: { expiresIn: '30d' },
+    }),
+
     // AdminModule,
     ClientModule,
     MeModule,
     DbModule,
-    
+
+    // Explore 모듈 등록
+    ExploreModule,                                 
   ],
   controllers: [AppController],
   providers: [AppService],
