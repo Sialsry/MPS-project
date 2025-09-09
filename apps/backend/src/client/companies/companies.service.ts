@@ -6,6 +6,7 @@ import { CreateCompanyDto } from './dto/create-companie.dto';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes, createHash } from 'node:crypto';
 import { ApiKeyUtil } from '../common/utils/api-key.util';
+import { BlockchainService } from './blockchain.service';
 // 🔹 레포 타입과의 의존성 최소화를 위해 로컬 최소 타입 정의
 type MinimalSubscriptionRow = {
   start_date: Date | string;
@@ -32,6 +33,7 @@ export class CompaniesService {
     private readonly odcloud: OdcloudClient,
     private readonly config: ConfigService,
     private readonly apiKeyUtil: ApiKeyUtil,
+    private readonly blockchainService: BlockchainService,
   ) {}
 
   /* -------------------- 유틸 -------------------- */
@@ -125,7 +127,24 @@ export class CompaniesService {
     const rawApiKey = randomBytes(32).toString('hex'); // 필요 시 prefix 붙이려면 여기서 처리
     const api_key_hash = createHash('sha256').update(rawApiKey).digest('hex');
 
-    // 3) INSERT 시 해시 저장
+    // 3) 스마트 계정 생성
+    let smartAccountInfo: {
+      eoaAddress: string;
+      smartAccountAddress: string;
+      transactionHash?: string;
+    } | null = null;
+
+    try {
+      this.logger.log(`스마트 계정 생성 시작 - 이메일: ${dto.email}, 사업자번호: ${bizno}`);
+      smartAccountInfo = await this.blockchainService.createSmartAccount(dto.email, bizno);
+      this.logger.log(`스마트 계정 생성 완료 - EOA: ${smartAccountInfo.eoaAddress}, SmartAccount: ${smartAccountInfo.smartAccountAddress}`);
+    } catch (error) {
+      this.logger.error(`스마트 계정 생성 실패: ${error.message}`);
+      // 스마트 계정 생성 실패 시에도 회원가입은 진행 (소프트 실패)
+      // 실제 운영 환경에서는 정책에 따라 하드 실패로 처리할 수도 있음
+    }
+
+    // 4) INSERT 시 해시와 블록체인 정보 저장
     const [row] = await this.repo.insert({
       name: dto.name,
       business_number: bizno,
@@ -136,9 +155,11 @@ export class CompaniesService {
       profile_image_url: dto.profile_image_url ?? null,
       homepage_url: dto.homepage_url ?? null,
       api_key_hash,
+      // 스마트 계정 주소만 저장 (EOA 주소는 필요 시 역산 가능)
+      smart_account_address: smartAccountInfo?.smartAccountAddress ?? null,
     });
 
-    // 4) 응답에서 평문 1회 노출
+    // 5) 응답에서 평문 1회 노출 + 스마트 계정 정보 포함
     return {
       id: row.id,
       name: row.name,
@@ -147,6 +168,11 @@ export class CompaniesService {
       created_at: row.created_at,
       api_key: rawApiKey,
       api_key_hint: `${rawApiKey.slice(0, 4)}...${rawApiKey.slice(-4)}`,
+      blockchain: smartAccountInfo ? {
+        eoaAddress: smartAccountInfo.eoaAddress,
+        smartAccountAddress: smartAccountInfo.smartAccountAddress,
+        transactionHash: smartAccountInfo.transactionHash,
+      } : null,
     };
   }
 
@@ -270,5 +296,45 @@ export class CompaniesService {
   });
   
   return { api_key: key, last4 }; // 평문 1회 노출
+  }
+
+  /**
+   * 스마트 계정 생성 또는 조회
+   */
+  async createOrGetSmartAccount(companyId: number) {
+    const company = await this.repo.findById(companyId);
+    if (!company) {
+      throw new BadRequestException('회사 정보를 찾을 수 없습니다.');
+    }
+
+    // 이미 스마트 계정이 있으면 반환
+    if (company.smart_account_address) {
+      return {
+        eoaAddress: null, // EOA 주소는 별도 저장하지 않음
+        smartAccountAddress: company.smart_account_address,
+        isExisting: true,
+      };
+    }
+
+    try {
+      // 새 스마트 계정 생성
+      const smartAccountInfo = await this.blockchainService.createSmartAccount(
+        company.email,
+        company.business_number
+      );
+
+      // DB 업데이트
+      await this.repo.updateSmartAccountAddress(companyId, smartAccountInfo.smartAccountAddress);
+
+      return {
+        eoaAddress: smartAccountInfo.eoaAddress,
+        smartAccountAddress: smartAccountInfo.smartAccountAddress,
+        transactionHash: smartAccountInfo.transactionHash,
+        isExisting: false,
+      };
+    } catch (error) {
+      this.logger.error(`스마트 계정 생성 실패 (Company ID: ${companyId}): ${error.message}`);
+      throw new BadRequestException(`스마트 계정 생성에 실패했습니다: ${error.message}`);
+    }
   }
 }

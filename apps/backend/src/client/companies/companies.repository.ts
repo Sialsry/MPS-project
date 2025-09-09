@@ -75,4 +75,15 @@ export class CompaniesRepository {
       })
       .where(eq(companies.id, id));      
   }
+
+  // 스마트 계정 주소 업데이트
+  async updateSmartAccountAddress(companyId: number, smartAccountAddress: string) {
+    await this.db
+      .update(companies)
+      .set({
+        smart_account_address: smartAccountAddress,
+        updated_at: sql`now()`,
+      })
+      .where(eq(companies.id, companyId));
+  }
 }
