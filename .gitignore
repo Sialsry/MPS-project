@@ -1,3 +1,56 @@
+node_modules/
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+apps/backend/dist/
+
+# ---------------------------- hardhat에서 자동으로 생성 --------------------------------------------------------------
+
+# Hardhat Ignition default folder for deployments against a local node
+ignition/deployments/chain-31337
+ignition/deployments/chain-11155111
+
+# Hardhat files
+/cache
+/artifacts
+
+# TypeChain files
+/typechain
+/typechain-types
+
+# solidity-coverage files
+/coverage
+/coverage.json
+
+# Hardhat Ignition default folder for deployments against a local node
+ignition/deployments/chain-31337
+
+node_modules
+.env
+
+# Hardhat files
+/cache
+/artifacts
+
+# TypeChain files
+/typechain
+/typechain-types
+
+# solidity-coverage files
+/coverage
+/coverage.json
+
+# Hardhat Ignition default folder for deployments against a local node
+ignition/deployments/chain-31337
+
+# ---------------------------- hardhat에서 자동으로 생성 --------------------------------------------------------------
 # compiled output
 /dist
 /node_modules

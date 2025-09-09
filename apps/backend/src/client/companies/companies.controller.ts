@@ -86,4 +86,14 @@ export class CompaniesController {
     console.log("들어온다")
     return this.companiesService.regenerateApiKey(id);
   }
+
+  /**
+   * 스마트 계정 생성 또는 조회
+   * - 회원가입 후 스마트 계정을 별도로 생성하고 싶은 경우
+   * - 기존에 생성된 스마트 계정 주소를 조회하고 싶은 경우
+   */
+  @Post(':id/smart-account')
+  async createOrGetSmartAccount(@Param('id', ParseIntPipe) id: number) {
+    return this.companiesService.createOrGetSmartAccount(id);
+  }
 }
