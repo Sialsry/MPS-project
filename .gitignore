@@ -1,12 +1,12 @@
 node_modules/
 .env.local
-copilot_tests/
-mps-api/
-
+contract_jsfile/
+apps/frontend/client/.next/
+ 
 # IDE
 .vscode/
 .idea/
-
+ 
 # OS
 .DS_Store
 Thumbs.db
