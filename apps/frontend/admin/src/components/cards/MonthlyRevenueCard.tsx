@@ -14,7 +14,7 @@ function getPrevYearMonth(now = new Date()) {
 
 export default function MonthlyRevenueCard() {
   const [cur, setCur] = useState<{ mtd: number; forecast: number } | null>(null)
-  const [prev, setPrev] = useState<{ forecast: number } | null>(null)
+  const [prev, setPrev] = useState<{ mtd: number; forecast: number } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const prevYM = useMemo(() => getPrevYearMonth(), [])
@@ -33,7 +33,7 @@ export default function MonthlyRevenueCard() {
         const prv = await prevRes.json()
         if (aborted) return
         setCur({ mtd: Number(cur.mtd ?? 0), forecast: Number(cur.forecast ?? 0) })
-        setPrev({ forecast: Number(prv.forecast ?? 0) })
+        setPrev({ mtd: Number(prv.mtd ?? 0), forecast: Number(prv.forecast ?? 0) })
       } catch (e: any) {
         if (aborted) return
         setError(e.message || '조회 실패')
@@ -48,7 +48,7 @@ export default function MonthlyRevenueCard() {
   }, [prevYM])
 
   const mtd = cur?.mtd ?? 0
-  const prevMtd = prev?.forecast ?? 0
+  const prevMtd = prev?.mtd ?? 0
   const pct = prevMtd > 0 ? Math.round(((mtd - prevMtd) / prevMtd) * 100) : null
   const sign = (mtd - prevMtd) > 0 ? '+' : (mtd - prevMtd) < 0 ? '' : ''
 

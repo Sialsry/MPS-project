@@ -15,9 +15,9 @@ type MusicRow = {
   earned: number
   companiesUsing: number
   lastUsedAt: string | null
-  usageRate : number
-  monthlyLimit : string
-  rewardPerPlay : string
+  usageRate?: number
+  monthlyLimit?: number
+  rewardPerPlay?: number
 }
 
 // 카테고리별 일관된 색상 생성 함수
@@ -58,7 +58,7 @@ export default function RewardsMusicsPage() {
   const [companyFilter, setCompanyFilter] = useState('전체')
   const [rewardFilter, setRewardFilter] = useState('전체')
   const [idFilter, setIdFilter] = useState('전체')
-  const [sortBy, setSortBy] = useState<'music_id'|'title'|'artist'|'category'|'grade'|'validPlays'|'earned'|'companiesUsing'|'lastUsedAt'| 'monthlyLimit' | 'rewardPerPlay'|'usageRate'>('earned')
+  const [sortBy, setSortBy] = useState<'music_id'|'title'|'artist'|'category'|'grade'|'validPlays'|'earned'|'companiesUsing'|'lastUsedAt'|'monthlyLimit'|'rewardPerPlay'|'usageRate'>('earned')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedMusic, setSelectedMusic] = useState<MusicRow | null>(null)
@@ -458,7 +458,7 @@ export default function RewardsMusicsPage() {
             </thead>
             <tbody>
               {currentMusics.map((music, index) => {
-                const usageRate = music.usageRate
+                const usageRate = music.usageRate || 0
                 
                 // 유효재생률 계산 (예시 데이터)
                 const totalPlays = Math.floor(music.validPlays * (1 + Math.random() * 0.3 + 0.1)) // 10-40% 추가
@@ -487,7 +487,7 @@ export default function RewardsMusicsPage() {
                       <div className="text-xs text-white/60">{music.artist}</div>
                     </td>
                     <td className="px-8 py-5 text-white/80 text-center">{(music as any).musicType || '-'}</td>
-                    <td className="px-8 py-5 text-white/80 text-center">{music.monthlyLimit !== null ? music.monthlyLimit.toLocaleString() : '-'}</td>
+                    <td className="px-8 py-5 text-white/80 text-center">{music.monthlyLimit ? music.monthlyLimit.toLocaleString() : '-'}</td>
                     <td className="px-8 py-5 text-white/80 text-center">{music.rewardPerPlay != null ? Number(music.rewardPerPlay).toLocaleString() : '-'}</td>
                     <td className="px-8 py-5 text-center">
                       {usageRate !== null ? (
