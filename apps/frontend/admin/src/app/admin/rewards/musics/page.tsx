@@ -15,6 +15,9 @@ type MusicRow = {
   earned: number
   companiesUsing: number
   lastUsedAt: string | null
+  usageRate : number
+  monthlyLimit : string
+  rewardPerPlay : string
 }
 
 // 카테고리별 일관된 색상 생성 함수
@@ -55,7 +58,7 @@ export default function RewardsMusicsPage() {
   const [companyFilter, setCompanyFilter] = useState('전체')
   const [rewardFilter, setRewardFilter] = useState('전체')
   const [idFilter, setIdFilter] = useState('전체')
-  const [sortBy, setSortBy] = useState<'music_id'|'title'|'artist'|'category'|'grade'|'validPlays'|'earned'|'companiesUsing'|'lastUsedAt'>('earned')
+  const [sortBy, setSortBy] = useState<'music_id'|'title'|'artist'|'category'|'grade'|'validPlays'|'earned'|'companiesUsing'|'lastUsedAt'| 'monthlyLimit' | 'rewardPerPlay'|'usageRate'>('earned')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedMusic, setSelectedMusic] = useState<MusicRow | null>(null)

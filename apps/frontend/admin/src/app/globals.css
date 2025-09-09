@@ -1,8 +1,13 @@
 @import "tailwindcss";
 
+@theme {
+  --color-background: #ffffff;
+  --color-foreground: #171717;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: var(--color-background);
+  --foreground: var(--color-foreground);
 }
 
 .scrollbar-thin {

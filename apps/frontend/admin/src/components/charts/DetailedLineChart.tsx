@@ -98,7 +98,7 @@ export default function DetailedLineChart({ data, colors }: Props) {
                 title: function(context) {
                   return `${context[0].label}`
                 },
-                label: function(context) {
+                label: function(context : any) {
                   const dataset = context.dataset
                   const dataIndex = context.dataIndex
                   const rawData = dataset.rawData?.[dataIndex]

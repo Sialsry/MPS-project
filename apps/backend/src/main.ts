@@ -13,7 +13,7 @@ async function bootstrap() {
     credentials: true,  // 쿠키/인증 헤더 허용
   });
   
-  await app.listen(process.env.PORT ?? 3001);
+  await app.listen(process.env.PORT ?? 3000);
 }
 
 void bootstrap();

@@ -48,7 +48,7 @@ export default function MonthlyRevenueCard() {
   }, [prevYM])
 
   const mtd = cur?.mtd ?? 0
-  const prevMtd = prev?.mtd ?? 0
+  const prevMtd = prev?.forecast ?? 0
   const pct = prevMtd > 0 ? Math.round(((mtd - prevMtd) / prevMtd) * 100) : null
   const sign = (mtd - prevMtd) > 0 ? '+' : (mtd - prevMtd) < 0 ? '' : ''
 

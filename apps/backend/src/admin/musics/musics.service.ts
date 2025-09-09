@@ -821,8 +821,8 @@ export class MusicsService implements OnModuleInit {
     const res = await this.db.execute(q)
     const rows = (res.rows || []) as any[]
     
-    console.log(`[TopTracks] Fetching top ${limit} tracks based on 24h valid plays`)
-    console.log(`[TopTracks] Found ${rows.length} tracks`)
+    // console.log(`[TopTracks] Fetching top ${limit} tracks based on 24h valid plays`)
+    // console.log(`[TopTracks] Found ${rows.length} tracks`)
     
     const items: RealtimeTopTracksItemDto[] = rows.map((r: any) => ({
       rank: Number(r.rank || 0),
@@ -832,7 +832,7 @@ export class MusicsService implements OnModuleInit {
       validRate: Number(r.valid_rate || 0),
     }))
 
-    console.log(`[TopTracks] Top track: ${items[0]?.title} with ${items[0]?.validPlays} valid plays`)
+    //console.log(`[TopTracks] Top track: ${items[0]?.title} with ${items[0]?.validPlays} valid plays`)
     return { items }
   }
 
