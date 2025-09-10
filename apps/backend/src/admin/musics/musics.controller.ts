@@ -27,12 +27,8 @@ export class MusicsController {
   constructor(private readonly musicsService: MusicsService) {}
 
 @Get()
-async findAll(
-  @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-  @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-  @Query() rest: any
-) {
-  return this.musicsService.findAll({ ...rest, page, limit });
+async findAll() {
+  return this.musicsService.findAll({ page :1, limit:10 });
 }
 
   @Get('categories')
