@@ -57,7 +57,7 @@ export class MusicsService implements OnModuleInit {
         await fs.mkdir(imagesBaseDir, { recursive: true });
         
       } catch (error) {
-        console.log("파일생성 실패")
+        console.log("파일생성 실패 ")
       }
     }
   async getCategories() {
