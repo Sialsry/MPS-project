@@ -1,8 +1,4 @@
-import {
-  IsOptional, IsString, IsEnum, IsDateString, IsBoolean,
-  IsInt, Min, Max, IsIn
-} from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { IsOptional, IsString, IsEnum, IsDateString, IsBoolean } from 'class-validator';
 
 export enum SortField {
   TITLE = 'title',
@@ -13,27 +9,20 @@ export enum SortField {
   VALID_RATE = 'validRate',
   REWARD = 'reward',
   CREATED_AT = 'createdAt',
-  PLAYS = 'plays'
+  PLAYS = 'plays',
 }
 
 export enum SortOrder {
   ASC = 'asc',
-  DESC = 'desc'
+  DESC = 'desc',
 }
 
 export class FindMusicsDto {
   @IsOptional()
-  @Type(() => Number)   // "1" -> 1
-  @IsInt()
-  @Min(1)
-  page: number = 1;
+  page?: number = 1;   // 가드 제거
 
   @IsOptional()
-  @Type(() => Number)   // "10" -> 10
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit: number = 10;
+  limit?: number = 10; // 가드 제거
 
   @IsOptional()
   @IsString()
@@ -65,24 +54,17 @@ export class FindMusicsDto {
 
   @IsOptional()
   @IsEnum(SortField)
-  sortBy: SortField = SortField.CREATED_AT;
+  sortBy?: SortField = SortField.CREATED_AT;
 
   @IsOptional()
   @IsEnum(SortOrder)
-  sortOrder: SortOrder = SortOrder.DESC;
+  sortOrder?: SortOrder = SortOrder.DESC;
 
   @IsOptional()
   @IsBoolean()
-  @Transform(({ value }) => ( // "true"/"false"/1/0 처리
-    value === true ||
-    value === 'true' ||
-    value === 1 ||
-    value === '1'
-  ))
-  includeStats: boolean = false;
+  includeStats?: boolean = false;
 
   @IsOptional()
-  @IsIn(['daily', 'weekly', 'monthly', 'yearly'])
   statsType?: 'daily' | 'weekly' | 'monthly' | 'yearly';
 
   @IsOptional()

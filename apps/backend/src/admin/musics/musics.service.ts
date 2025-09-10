@@ -40,21 +40,26 @@ export class MusicsService implements OnModuleInit {
     await this.ensureStorageDirs();
   }
   // 파일 저장 디렉토리 생성
-  private async ensureStorageDirs(): Promise<void> {
-    const musicBaseDir = process.env.MUSIC_BASE_DIR
-      ? path.resolve(process.env.MUSIC_BASE_DIR)
-      : path.resolve(process.cwd(), 'music');
-    const lyricsBaseDir = process.env.LYRICS_BASE_DIR
-      ? path.resolve(process.env.LYRICS_BASE_DIR)
-      : path.resolve(process.cwd(), 'lyrics');
-    const imagesBaseDir = process.env.IMAGES_BASE_DIR
-      ? path.resolve(process.env.IMAGES_BASE_DIR)
-      : path.resolve(process.cwd(), 'images');
-    await fs.mkdir(musicBaseDir, { recursive: true });
-    await fs.mkdir(lyricsBaseDir, { recursive: true });
-    await fs.mkdir(imagesBaseDir, { recursive: true });
-  }
 
+    private async ensureStorageDirs(): Promise<void> {
+      try {
+        const musicBaseDir = process.env.MUSIC_BASE_DIR
+          ? path.resolve(process.env.MUSIC_BASE_DIR)
+          : path.resolve(process.cwd(), 'music');
+        const lyricsBaseDir = process.env.LYRICS_BASE_DIR
+          ? path.resolve(process.env.LYRICS_BASE_DIR)
+          : path.resolve(process.cwd(), 'lyrics');
+        const imagesBaseDir = process.env.IMAGES_BASE_DIR
+          ? path.resolve(process.env.IMAGES_BASE_DIR)
+          : path.resolve(process.cwd(), 'images');
+        await fs.mkdir(musicBaseDir, { recursive: true });
+        await fs.mkdir(lyricsBaseDir, { recursive: true });
+        await fs.mkdir(imagesBaseDir, { recursive: true });
+        
+      } catch (error) {
+        console.log("파일생성 실패")
+      }
+    }
   async getCategories() {
     try {
       const categories = await this.db
