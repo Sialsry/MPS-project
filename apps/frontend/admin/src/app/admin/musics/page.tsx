@@ -523,7 +523,7 @@ export default function MusicsPage() {
                     artist: item.artist,                            // 아티스트
                     musicType: item.musictype ? 'Inst' : '일반',    // 음원 유형 (musictype 필드 사용)
                     genre: item.category || '미분류',               // 카테고리 (category 필드 사용)
-                    tags: item.tags || '태그 없음',                  // 태그 (tags 필드 사용)
+                    tags: item.tags || '-',                  // 태그 (tags 필드 사용)
                     releaseDate: item.releasedate ? new Date(item.releasedate).toLocaleDateString() : '미정', // 발매일 (releasedate 필드 사용)
                     maxRewardLimit: item.maxrewardlimit && item.maxrewardlimit > 0 ? `${item.maxrewardlimit}토큰` : '-',   // 월 최대 리워드 한도 (maxrewardlimit 필드 사용)
                   }
