@@ -14,11 +14,6 @@ async function bootstrap() {
     ],
     credentials: true,  // 쿠키/인증 헤더 허용
   });
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    transform: true, // 문자열 → 숫자, 날짜 등 변환 수행
-    transformOptions: { enableImplicitConversion: true }, // DTO의 타입으로 암묵 변환 허용
-  }));
   await app.listen(process.env.PORT ?? 3000);
 }
 

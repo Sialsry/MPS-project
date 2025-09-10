@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Res, UseInterceptors, UploadedFiles, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Res, UseInterceptors, UploadedFiles, BadRequestException, DefaultValuePipe, ParseIntPipe  } from '@nestjs/common';
 import { MusicsService } from './musics.service';
 import { CreateMusicDto } from './dto/create-music.dto';
 import { UpdateMusicDto } from './dto/update-music.dto';
@@ -26,10 +26,14 @@ import { RealtimeApiStatusQueryDto, RealtimeTopTracksQueryDto, RealtimeTransacti
 export class MusicsController {
   constructor(private readonly musicsService: MusicsService) {}
 
-  @Get()
-  async findAll(@Query() findMusicsDto: any) {
-    return this.musicsService.findAll(findMusicsDto);
-  }
+@Get()
+async findAll(
+  @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+  @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+  @Query() rest: any
+) {
+  return this.musicsService.findAll({ ...rest, page, limit });
+}
 
   @Get('categories')
   async getCategories() {
