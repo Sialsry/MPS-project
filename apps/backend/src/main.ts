@@ -13,6 +13,8 @@ async function bootstrap() {
       'https://admin.klk1.store',
     ],
     credentials: true,  // 쿠키/인증 헤더 허용
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   });
   await app.listen(process.env.PORT ?? 3000);
 }
