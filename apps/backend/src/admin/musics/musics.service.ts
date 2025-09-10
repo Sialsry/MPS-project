@@ -80,7 +80,7 @@ export class MusicsService implements OnModuleInit {
 
   async findAll(findMusicsDto: any): Promise<{
   musics: any[];
-  page: number;
+  page: any;
   limit: number;
   }> {
     // DTO에서 들어온 값은 문자열일 수 있으니 Number()로 강제 변환
@@ -98,10 +98,10 @@ export class MusicsService implements OnModuleInit {
     } = findMusicsDto;
 
     // 기본값 처리 + 숫자 변환
-    const p = page ? Number(page) : 1;
-    const l = limit ? Number(limit) : 10;
+    // const p = page ? Number(page) : 1;
+    // const l = limit ? Number(limit) : 10;
 
-    const { page: normPage, limit: normLimit, offset } = normalizePagination(p, l, 100);
+    // const { page: normPage, limit: normLimit, offset } = normalizePagination(p, l, 100);
     const currentMonth = getDefaultYearMonthKST();
 
     const rawQuery = buildFindAllQuery({
@@ -112,16 +112,16 @@ export class MusicsService implements OnModuleInit {
       releaseDateSortFilter: releaseDateSortFilter ?? '',
       rewardLimitFilter: rewardLimitFilter ?? '',
       currentMonth,
-      limit: normLimit,
-      offset,
+      limit: 10,
+      offset : 0,
     });
 
     const results = await this.db.execute(rawQuery);
 
     return {
       musics: results.rows,
-      page: normPage,
-      limit: normLimit,
+      page: 1,
+      limit: 10,
     };
   }
 
