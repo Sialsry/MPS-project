@@ -9,7 +9,8 @@ async function bootstrap() {
   // CORS 설정 추가
   app.enableCors({
     origin: [
-      'https://admin.klk1.store',  // 프론트엔드 개발 서버
+      'https://client.klk1.store',
+      'https://admin.klk1.store',
     ],
     credentials: true,  // 쿠키/인증 헤더 허용
   });
