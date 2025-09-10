@@ -78,15 +78,14 @@ export class MusicsService implements OnModuleInit {
     }
   }
 
-  async findAll(findMusicsDto: any): Promise<{
-  musics: any[];
-  page: number;
-  limit: number;
+  async findAll(findMusicsDto: FindMusicsDto): Promise<{
+    musics: any[];
+    page: number;
+    limit: number;
   }> {
-    // DTO에서 들어온 값은 문자열일 수 있으니 Number()로 강제 변환
     const {
-      page,
-      limit,
+      page = 1,
+      limit = 10,
       search,
       category,
       musicType,
@@ -97,34 +96,28 @@ export class MusicsService implements OnModuleInit {
       sortOrder = 'desc'
     } = findMusicsDto;
 
-    // 기본값 처리 + 숫자 변환
-    const p = page ? Number(page) : 1;
-    const l = limit ? Number(limit) : 10;
-
-    const { page: normPage, limit: normLimit, offset } = normalizePagination(p, l, 100);
+    const { page: p, limit: l, offset } = normalizePagination(page, limit, 100);
     const currentMonth = getDefaultYearMonthKST();
-
     const rawQuery = buildFindAllQuery({
       search,
       categoryLabel: category ?? null,
-      musicType: musicType ?? '',
-      idSortFilter: idSortFilter ?? '',
-      releaseDateSortFilter: releaseDateSortFilter ?? '',
-      rewardLimitFilter: rewardLimitFilter ?? '',
+      musicType: (musicType as any) ?? '',
+      idSortFilter: (idSortFilter as any) ?? '',
+      releaseDateSortFilter: (releaseDateSortFilter as any) ?? '',
+      rewardLimitFilter: (rewardLimitFilter as any) ?? '',
       currentMonth,
-      limit: normLimit,
+      limit: l,
       offset,
     });
 
     const results = await this.db.execute(rawQuery);
 
     return {
-      musics: results.rows,
-      page: normPage,
-      limit: normLimit,
+      musics: results.rows, 
+      page: p,
+      limit: l
     };
   }
-
 
   async getRewardsSummary(query: MusicRewardsSummaryQueryDto): Promise<MusicRewardsSummaryResponseDto> {
     const ym = resolveYearMonthKST(query.yearMonth)
