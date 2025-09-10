@@ -59,14 +59,13 @@ export function buildFindAllQuery(params: {
       STRING_AGG(DISTINCT music_tags.text, ', ') AS tags,
       musics.release_date AS releaseDate,
       musics.grade_required AS grade,
-      COALESCE(${monthly_music_rewards.total_reward_count} * ${monthly_music_rewards.reward_per_play}, 0) AS maxRewardLimit,
+      0 AS maxRewardLimit,
       musics.created_at AS createdAt
     FROM musics
     LEFT JOIN music_categories ON musics.category_id = music_categories.id
     LEFT JOIN music_tags ON musics.id = music_tags.music_id
-    LEFT JOIN monthly_music_rewards ON musics.id = monthly_music_rewards.music_id AND monthly_music_rewards.year_month = ${currentMonth}
     ${whereClause}
-    GROUP BY musics.id, musics.title, musics.artist, musics.inst, music_categories.name, musics.release_date, musics.grade_required, musics.created_at, monthly_music_rewards.total_reward_count, monthly_music_rewards.reward_per_play
+    GROUP BY musics.id, musics.title, musics.artist, musics.inst, music_categories.name, musics.release_date, musics.grade_required, musics.created_at
     ${orderByClause}
     LIMIT ${limit} OFFSET ${offset}
   `
