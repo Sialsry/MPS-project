@@ -27,7 +27,7 @@ export class MusicsController {
   constructor(private readonly musicsService: MusicsService) {}
 
   @Get()
-  async findAll(@Query() findMusicsDto: any) {
+  async findAll(@Query() findMusicsDto: FindMusicsDto) {
     return this.musicsService.findAll(findMusicsDto);
   }
 
