@@ -78,7 +78,7 @@ export class MusicsService implements OnModuleInit {
     }
   }
 
-  async findAll(findMusicsDto: FindMusicsDto): Promise<{
+  async findAll(findMusicsDto: any): Promise<{
   musics: any[];
   page: number;
   limit: number;
