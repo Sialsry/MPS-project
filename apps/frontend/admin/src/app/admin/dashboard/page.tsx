@@ -81,6 +81,12 @@ export default function DashboardPage() {
         setHourlyLoading(true)
         setHourlyError(null)
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+        console.log('🔍 Environment check:', {
+          NODE_ENV: process.env.NODE_ENV,
+          NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
+          baseUrl: baseUrl,
+          fullUrl: `${baseUrl}/admin/companies/stats/hourly-plays`
+        })
         const res = await fetch(`${baseUrl}/admin/companies/stats/hourly-plays`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const j = await res.json()
@@ -105,6 +111,11 @@ export default function DashboardPage() {
       try {
         console.log('Fetching realtime data...')
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+        
+        // 임시로 API 호출을 비활성화하여 에러 방지
+        console.log('Realtime data fetching temporarily disabled')
+        return
+        
         const [apiRes, tracksRes] = await Promise.all([
           fetch(`${baseUrl}/admin/musics/realtime/api-status`),
           fetch(`${baseUrl}/admin/musics/realtime/top-tracks`)
