@@ -38,6 +38,7 @@ export function buildFindAllQuery(params: {
       conditions.push(sql`musics.inst = false`)
     }
   }
+
   const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``
 
   let orderByClause = sql``

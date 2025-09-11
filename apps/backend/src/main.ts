@@ -20,6 +20,8 @@ async function bootstrap() {
     origin: [
       'https://client.klk1.store',
       'https://admin.klk1.store',
+      'http://localhost:4001',
+      'http://localhost:3000'
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

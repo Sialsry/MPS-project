@@ -105,7 +105,13 @@ export class MusicsService implements OnModuleInit {
       offset,
     });
 
+    console.log('🔍 Query parameters:', { search, category, musicType, currentMonth, limit: l, offset });
+    console.log('🔍 Raw query:', rawQuery);
+    
     const results = await this.db.execute(rawQuery);
+    
+    console.log('🔍 Query results:', results.rows.length, 'rows found');
+    console.log('🔍 First result:', results.rows[0]);
 
     return {
       musics: results.rows,

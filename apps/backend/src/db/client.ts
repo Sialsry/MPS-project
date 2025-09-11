@@ -11,7 +11,8 @@ if (!databaseUrl) {
 
 const pool = new Pool({
   connectionString: databaseUrl,
-  ssl: { rejectUnauthorized: false },
+  // ssl: { rejectUnauthorized: false }, // 배포환경에서는 켜주기
+  ssl: false, // 로컬 개발환경에서는 SSL 비활성화
 });
 export const db = drizzle(pool, { schema });
 export { pool };
