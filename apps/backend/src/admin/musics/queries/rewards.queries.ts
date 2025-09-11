@@ -57,9 +57,9 @@ WITH month_range AS (
 plays AS (
   SELECT
     mp.music_id,
-    COUNT(*) FILTER (WHERE mp.is_valid_play = true) AS valid_plays,
-    COALESCE(SUM(CASE WHEN mp.is_valid_play = true THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned,
-    COUNT(DISTINCT CASE WHEN mp.is_valid_play = true THEN mp.using_company_id END) AS companies_using,
+    COUNT(*) FILTER (WHERE mp.is_valid_play = true AND mp.reward_code = '1') AS valid_plays,
+    COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned,
+    COUNT(DISTINCT CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.using_company_id END) AS companies_using,
     MAX(mp.created_at) AS last_used_at
   FROM music_plays mp, month_range mr
   WHERE mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end

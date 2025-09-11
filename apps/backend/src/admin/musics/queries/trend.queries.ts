@@ -33,6 +33,7 @@ current_music AS (
   FROM music_plays mp, month_range mr
   WHERE mp.music_id = ${musicId}
     AND mp.is_valid_play = true
+    AND mp.reward_code = '1'
     AND ${useCaseFilter(type)}
     AND mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
   GROUP BY 1
@@ -46,6 +47,7 @@ plays_by_music AS (
   FROM music_plays mp, month_range mr
   ${segment === 'category' ? sql`JOIN musics m ON m.id = mp.music_id` : sql``}
   WHERE mp.is_valid_play = true
+    AND mp.reward_code = '1'
     AND ${useCaseFilter(type)}
     AND mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
     ${segment === 'category' ? sql`AND m.category_id = (SELECT category_id FROM base)` : sql``}
@@ -94,6 +96,7 @@ current_music AS (
   FROM series_bounds sb
   LEFT JOIN music_plays mp ON mp.music_id = ${musicId}
     AND mp.is_valid_play = true
+    AND mp.reward_code = '1'
     AND ${useCaseFilter(type)}
     AND mp.created_at >= sb.month_start AND mp.created_at <= sb.month_end
   GROUP BY sb.month_start
@@ -105,6 +108,7 @@ plays_by_music AS (
   SELECT to_char(sb.month_start, 'YYYY-MM') AS ym, mp.music_id, COUNT(mp.*) AS cnt
   FROM series_bounds sb
   LEFT JOIN music_plays mp ON mp.is_valid_play = true
+    AND mp.reward_code = '1'
     AND ${useCaseFilter(type)}
     AND mp.created_at >= sb.month_start AND mp.created_at <= sb.month_end
   ${segment === 'category' ? sql`LEFT JOIN musics m ON m.id = mp.music_id` : sql``}
