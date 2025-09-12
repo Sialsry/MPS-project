@@ -23,6 +23,7 @@ WITH month_range AS (
   FROM music_plays mp, month_range mr
   WHERE mp.music_id = ${musicId}
     AND mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
+    AND mp.is_valid_play = true AND mp.reward_code = '1'
   GROUP BY mp.using_company_id
 )
 SELECT 

@@ -9,6 +9,7 @@ import biznoConfig from '../bizno.config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 // import { AdminModule } from './admin/admin.module';
+import { DashboardModule } from './admin/dashboard/dashboard.module';
 import { ClientModule } from './client/client.module';
 import { MeModule } from './client/me/me.module';
 import { DbModule } from './db/db.module';
@@ -40,6 +41,7 @@ import { AdminModule } from './admin/admin.module';
     }),
 
     AdminModule,
+    DashboardModule,
     ClientModule,
     MeModule,
     DbModule,
