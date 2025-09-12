@@ -105,7 +105,13 @@ export class MusicsService implements OnModuleInit {
       offset,
     });
 
+    console.log('🔍 Query parameters:', { search, category, musicType, currentMonth, limit: l, offset });
+    console.log('🔍 Raw query:', rawQuery);
+    
     const results = await this.db.execute(rawQuery);
+    
+    console.log('🔍 Query results:', results.rows.length, 'rows found');
+    console.log('🔍 First result:', results.rows[0]);
 
     return {
       musics: results.rows,
@@ -219,6 +225,8 @@ export class MusicsService implements OnModuleInit {
 
     const items = rows.map((r: any) => {
       const label: string = r.label
+      const musicCalls: number = Number(r.music_calls || 0)
+      const lyricsCalls: number = Number(r.lyrics_calls || 0)
       const validPlays: number = Number(r.valid_plays || 0)
       const companiesUsing: number = Number(r.companies_using || 0)
       const monthlyLimit: number | null = r.monthly_limit !== null && r.monthly_limit !== undefined ? Number(r.monthly_limit) : null
@@ -246,6 +254,8 @@ export class MusicsService implements OnModuleInit {
 
       return {
         label,
+        musicCalls,
+        lyricsCalls,
         validPlays,
         companiesUsing,
         monthlyLimit,

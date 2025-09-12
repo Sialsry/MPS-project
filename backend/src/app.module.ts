@@ -9,11 +9,17 @@ import biznoConfig from '../bizno.config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 // import { AdminModule } from './admin/admin.module';
+import { DashboardModule } from './admin/dashboard/dashboard.module';
 import { ClientModule } from './client/client.module';
 import { MeModule } from './client/me/me.module';
 import { DbModule } from './db/db.module';
 import { ExploreModule } from './client/explore/explore.module';
 import { AdminModule } from './admin/admin.module';
+
+import { MusicModule } from './music/music.module';
+import { RecordModule } from './record/record.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
+import { TestModule } from './test/test.module';
 
 @Module({
   imports: [
@@ -40,12 +46,15 @@ import { AdminModule } from './admin/admin.module';
     }),
 
     AdminModule,
+    DashboardModule,
     ClientModule,
     MeModule,
     DbModule,
-
-    // Explore 모듈 등록
     ExploreModule,
+    MusicModule,
+    RecordModule,
+    SchedulerModule,
+    TestModule,
   ],
   controllers: [AppController],
   providers: [AppService],
