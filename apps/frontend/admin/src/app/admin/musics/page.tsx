@@ -200,6 +200,13 @@ export default function MusicsPage() {
 
   const handleEdit = async (id: number) => {
     try {
+      // ID 유효성 검사
+      if (!id || isNaN(id) || id <= 0) {
+        console.error('유효하지 않은 음원 ID:', id)
+        alert('유효하지 않은 음원 ID입니다.')
+        return
+      }
+      
       setIsCreateMode(false)
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
       const res = await fetch(`${baseUrl}/admin/musics/${id}`)
