@@ -1,0 +1,100 @@
+import { CompanyService } from './company.service';
+import { CreateCompanyDto } from './dto/create-company.dto';
+import { UpdateCompanyDto } from './dto/update-company.dto';
+import { RewardsSummaryQueryDto } from './dto/rewards-summary.query.dto';
+import { RewardsDetailQueryDto } from './dto/rewards-detail.query.dto';
+import { CompanyTotalStatsQueryDto } from './dto/company-stats.dto';
+import { RenewalStatsQueryDto } from './dto/renewal-stats.dto';
+import { HourlyPlaysQueryDto } from './dto/hourly-plays.dto';
+import { TierDistributionQueryDto } from './dto/tier-distribution.dto';
+import { RevenueCalendarQueryDto } from './dto/revenue-calendar.dto';
+import { RevenueTrendsQueryDto } from './dto/revenue-trends.dto';
+import { RevenueCompaniesQueryDto } from './dto/revenue-companies.dto';
+export declare class CompanyController {
+    private readonly companyService;
+    constructor(companyService: CompanyService);
+    create(createCompanyDto: CreateCompanyDto): string;
+    findAll(): string;
+    getRewardsSummary(query: RewardsSummaryQueryDto): Promise<{
+        items: any;
+        page: number;
+        limit: number;
+        total: number;
+        yearMonth: string;
+    }>;
+    getCompanyTotal(query: CompanyTotalStatsQueryDto): Promise<import("./dto/company-stats.dto").CompanyTotalStatsResponseDto>;
+    getRenewalStats(query: RenewalStatsQueryDto): Promise<import("./dto/renewal-stats.dto").RenewalStatsResponseDto>;
+    getHourlyPlays(query: HourlyPlaysQueryDto): Promise<import("./dto/hourly-plays.dto").HourlyPlaysResponseDto>;
+    getTierDistribution(query: TierDistributionQueryDto): Promise<import("./dto/tier-distribution.dto").TierDistributionResponseDto>;
+    getRevenueCalendar(query: RevenueCalendarQueryDto): Promise<import("./dto/revenue-calendar.dto").RevenueCalendarResponseDto>;
+    getRevenueTrends(query: RevenueTrendsQueryDto): Promise<import("./dto/revenue-trends.dto").RevenueTrendsResponseDto>;
+    getRevenueCompanies(query: RevenueCompaniesQueryDto): Promise<import("./dto/revenue-companies.dto").RevenueCompaniesResponseDto>;
+    getRewardsDetail(id: number, query: RewardsDetailQueryDto): Promise<{
+        company: {
+            id: number;
+            name: string;
+            tier: string;
+            businessNumber?: undefined;
+            contactEmail?: undefined;
+            contactPhone?: undefined;
+            homepageUrl?: undefined;
+            profileImageUrl?: undefined;
+            smartAccountAddress?: undefined;
+            ceoName?: undefined;
+            createdAt?: undefined;
+            updatedAt?: undefined;
+            subscriptionStart?: undefined;
+            subscriptionEnd?: undefined;
+        };
+        summary: {
+            totalTokens: number;
+            monthlyEarned: number;
+            monthlyUsed: number;
+            usageRate: number;
+            activeTracks: number;
+            yearMonth: string;
+            earnedTotal?: undefined;
+            usedTotal?: undefined;
+        };
+        daily: never[];
+        dailyIndustryAvg: never[];
+        monthly: never[];
+        monthlyIndustryAvg: never[];
+        byMusic: never[];
+    } | {
+        company: {
+            id: number;
+            name: any;
+            tier: string;
+            businessNumber: any;
+            contactEmail: any;
+            contactPhone: any;
+            homepageUrl: any;
+            profileImageUrl: any;
+            smartAccountAddress: any;
+            ceoName: any;
+            createdAt: string | undefined;
+            updatedAt: string | undefined;
+            subscriptionStart: string | undefined;
+            subscriptionEnd: string | undefined;
+        };
+        summary: {
+            totalTokens: number;
+            monthlyEarned: number;
+            monthlyUsed: number;
+            usageRate: number;
+            activeTracks: number;
+            yearMonth: string;
+            earnedTotal: number;
+            usedTotal: number;
+        };
+        daily: any;
+        dailyIndustryAvg: any;
+        monthly: any;
+        monthlyIndustryAvg: any;
+        byMusic: any;
+    }>;
+    findOne(id: string): string;
+    update(id: string, updateCompanyDto: UpdateCompanyDto): string;
+    remove(id: string): string;
+}
