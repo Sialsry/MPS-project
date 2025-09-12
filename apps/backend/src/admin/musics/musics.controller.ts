@@ -137,7 +137,12 @@ export class MusicsController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.musicsService.findOne(+id);
+    // ID 유효성 검사
+    const musicId = +id;
+    if (isNaN(musicId) || musicId <= 0) {
+      throw new BadRequestException('유효하지 않은 음원 ID입니다.');
+    }
+    return this.musicsService.findOne(musicId);
   }
 
   @Patch(':id/rewards')
