@@ -17,24 +17,24 @@ WITH month_range AS (
 )
 , plays AS (
   SELECT mp.using_company_id AS company_id,
-         COUNT(*) FILTER (WHERE mp.is_valid_play = true AND mp.reward_code = '1') AS monthly_plays,
-         COUNT(*) AS total_plays,
-         COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS monthly_earned
-  FROM music_plays mp, month_range mr
-  WHERE mp.music_id = ${musicId}
-    AND mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
-    AND mp.is_valid_play = true AND mp.reward_code = '1'
+         COUNT(*) AS monthly_plays,
+         COALESCE(SUM(r.amount::numeric), 0) AS monthly_earned
+  FROM rewards r
+  JOIN music_plays mp ON mp.id = r.play_id
+  , month_range mr
+  WHERE r.music_id = ${musicId}
+    AND r.created_at >= mr.month_start AND r.created_at <= mr.month_end
+    AND r.reward_code = '1'
   GROUP BY mp.using_company_id
 )
 SELECT 
-  c.id AS company_id,
-  c.name AS company_name,
-  c.grade AS grade,
+  p.company_id AS company_id,
+  COALESCE(c.name, 'Unknown') AS company_name,
+  COALESCE(c.grade, 'free') AS grade,
   COALESCE(p.monthly_plays, 0) AS monthly_plays,
-  COALESCE(p.total_plays, 0) AS total_plays,
   COALESCE(p.monthly_earned, 0) AS monthly_earned
-FROM companies c
-INNER JOIN plays p ON p.company_id = c.id
+FROM plays p
+LEFT JOIN companies c ON c.id = p.company_id
 ${search ? sql` AND (c.name ILIKE '%' || ${search} || '%' OR c.id::text ILIKE '%' || ${search} || '%')` : sql``}
 ORDER BY p.monthly_earned DESC, p.monthly_plays DESC
 OFFSET ${offset} LIMIT ${limit}
@@ -56,15 +56,17 @@ WITH month_range AS (
 )
 , plays AS (
   SELECT mp.using_company_id AS company_id
-  FROM music_plays mp, month_range mr
-  WHERE mp.music_id = ${musicId}
-    AND mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
-    AND mp.is_valid_play = true AND mp.reward_code = '1'
+  FROM rewards r
+  JOIN music_plays mp ON mp.id = r.play_id
+  , month_range mr
+  WHERE r.music_id = ${musicId}
+    AND r.created_at >= mr.month_start AND r.created_at <= mr.month_end
+    AND r.reward_code = '1'
   GROUP BY mp.using_company_id
 )
 SELECT COUNT(*) AS total
-FROM companies c
-INNER JOIN plays p ON p.company_id = c.id
+FROM plays p
+LEFT JOIN companies c ON c.id = p.company_id
 ${search ? sql` AND (c.name ILIKE '%' || ${search} || '%' OR c.id::text ILIKE '%' || ${search} || '%')` : sql``}
   `
 } 

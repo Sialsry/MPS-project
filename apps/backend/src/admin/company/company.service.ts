@@ -299,8 +299,22 @@ export class CompanyService {
     const grade = query.grade || 'standard'
     const limit = Math.min(Math.max(query.limit ?? 5, 1), 20)
 
-    // 누적 구독료만으로 랭킹
-    const q = buildRevenueCompaniesCumulativeQuery(grade, limit)
+    // yearMonth 파싱 (기본: 현재 KST 기준 월)
+    const tz = '+09' // KST 고정
+    let y: number
+    let m: number
+    if (query.yearMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(query.yearMonth)) {
+      const [yy, mm] = query.yearMonth.split('-')
+      y = Number(yy)
+      m = Number(mm)
+    } else {
+      const now = new Date()
+      y = now.getFullYear()
+      m = now.getMonth() + 1
+    }
+
+    // 월 기준 구독+사용 매출 합계 랭킹
+    const q = buildRevenueCompaniesQuery(y, m, tz, grade, limit)
     const res = await this.db.execute(q)
     const rows = (res.rows || []) as any[]
     
@@ -316,9 +330,7 @@ export class CompanyService {
       growth: '+0.0%', // TODO: 전월 대비 계산
     }))
 
-    // 누적 랭킹이므로 yearMonth는 생략 가능하지만, 프론트 호환을 위해 현재 월을 반환
-    const now = new Date()
-    const ymStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
+    const ymStr = `${y}-${String(m).padStart(2,'0')}`
     return { yearMonth: ymStr, grade, items }
   }
 }
