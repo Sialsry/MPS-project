@@ -100,7 +100,7 @@ export function buildFindOneQuery(id: number, currentMonth: string) {
       m.grade_required AS "grade",
       COALESCE(mmr.total_reward_count * mmr.reward_per_play, 0) AS "maxRewardLimit",
       mmr.reward_per_play AS "rewardPerPlay",
-      mmr.total_reward_count AS "maxPlayCount"
+      mmr.total_reward_count AS "totalRewardCount"
     FROM musics m
     LEFT JOIN music_categories mc ON m.category_id = mc.id
     LEFT JOIN music_tags mt ON m.id = mt.music_id

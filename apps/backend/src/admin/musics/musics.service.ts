@@ -421,7 +421,7 @@ export class MusicsService implements OnModuleInit {
         priceMusicOnly: row.priceMusicOnly ? Number(row.priceMusicOnly) : undefined,
         priceLyricsOnly: row.priceLyricsOnly ? Number(row.priceLyricsOnly) : undefined,
         rewardPerPlay: row.rewardPerPlay ? Number(row.rewardPerPlay) : undefined,
-        maxPlayCount: row.maxPlayCount ? Number(row.maxPlayCount) : undefined,
+        totalRewardCount: row.totalRewardCount ? Number(row.totalRewardCount) : undefined,
         maxRewardLimit: row.maxRewardLimit ? Number(row.maxRewardLimit) : 0,
         grade: row.grade
       };
@@ -461,6 +461,15 @@ export class MusicsService implements OnModuleInit {
     if (!absPath.startsWith(baseDir)) {
       throw new Error('잘못된 파일 경로입니다.');
     }
+
+    // 파일 존재 여부 확인
+    try {
+      await fs.access(absPath);
+    } catch (error) {
+      console.warn(`가사 파일을 찾을 수 없습니다: ${absPath}`);
+      return { hasText: false, hasFile: false };
+    }
+
     const filename = path.basename(relativePath) || 'lyrics.txt';
     return { hasText: false, hasFile: true, absPath, filename };
   }
@@ -734,11 +743,12 @@ export class MusicsService implements OnModuleInit {
   }
 
   async getRealtimeApiStatus(query: RealtimeApiStatusQueryDto): Promise<RealtimeApiStatusResponseDto> {
-    const limit = Math.min(Math.max(query.limit ?? 5, 1), 20)
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 20)
 
     // music_plays 테이블에서 직접 데이터 조회
     const q = sql`
       SELECT 
+        mp.id,
         mp.created_at,
         CASE WHEN mp.is_valid_play THEN 'success' ELSE 'error' END AS status,
         CASE 
@@ -754,7 +764,8 @@ export class MusicsService implements OnModuleInit {
           ELSE '알 수 없음'
         END AS call_type,
         CASE 
-          WHEN mp.is_valid_play THEN '유효재생'
+          WHEN mp.is_valid_play AND mp.reward_code = '1' THEN '리워드 발생'
+          WHEN mp.is_valid_play AND mp.reward_code != '1' THEN '유효재생 (리워드 없음)'
           ELSE '무효재생'
         END AS validity,
         c.name AS company
@@ -767,13 +778,25 @@ export class MusicsService implements OnModuleInit {
     const res = await this.db.execute(q)
     const rows = (res.rows || []) as any[]
 
+    console.log('🔍 [RealtimeApiStatus] Query executed, rows count:', rows.length)
+    console.log('🔍 [RealtimeApiStatus] Sample data:', rows.slice(0, 3))
+
     const items: RealtimeApiStatusItemDto[] = rows.map((r: any) => ({
+      id: r.id || Math.random(),
       status: r.status === 'success' ? 'success' : 'error',
       endpoint: r.endpoint || '/api/unknown',
       callType: r.call_type || '알 수 없음',
       validity: r.validity || '무효재생',
       company: r.company || 'Unknown',
-      timestamp: r.timestamp || '00:00:00',
+      timestamp: r.created_at ? new Date(r.created_at).toLocaleString('ko-KR', {
+        year: '2-digit',
+        month: '2-digit', 
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).replace(/\./g, '-').replace(/- /g, ' ').replace(/(\d{2}) (\d{2}) (\d{2})/, '$1-$2-$3').trim() : '00-00-00 00:00:00',
     }))
 
     return { items }
@@ -978,6 +1001,14 @@ export class MusicsService implements OnModuleInit {
       throw new Error('잘못된 파일 경로입니다.');
     }
 
+    // 파일 존재 여부 확인
+    try {
+      await fs.access(absPath);
+    } catch (error) {
+      console.warn(`이미지 파일을 찾을 수 없습니다: ${absPath}`);
+      throw new Error('커버 이미지 파일을 찾을 수 없습니다.');
+    }
+
     const ext = path.extname(relative).toLowerCase();
     const contentType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
     const filename = path.basename(relative);
@@ -1107,17 +1138,17 @@ export class MusicsService implements OnModuleInit {
       rows: currentData.rows
     });
 
-    // 실제 사용량 계산 (music_plays에서 유효재생들의 use_price 합계)
-    const usedCountResult = await this.db.execute(sql`
-      SELECT COALESCE(SUM(use_price), 0) as used_count
-      FROM music_plays 
-      WHERE music_id = ${musicId} 
-        AND is_valid_play = true
-        AND EXTRACT(YEAR FROM created_at) = ${parseInt(ym.split('-')[0])}
-        AND EXTRACT(MONTH FROM created_at) = ${parseInt(ym.split('-')[1])}
-    `);
-
-    const usedCount = Number((usedCountResult.rows?.[0] as any)?.used_count || 0);
+    // 실제 사용량 계산: 월 테이블의 (total - remaining) 기준
+    const mmrRes = await this.db.execute(sql`
+      SELECT total_reward_count, remaining_reward_count
+      FROM ${monthly_music_rewards}
+      WHERE music_id = ${musicId} AND year_month = ${ym}
+      LIMIT 1
+    `)
+    const mmrRow: any = (mmrRes.rows?.[0] as any) || null
+    const total = mmrRow ? Number(mmrRow.total_reward_count || 0) : 0
+    const remaining = mmrRow ? Number(mmrRow.remaining_reward_count || 0) : 0
+    const usedCount = Math.max(total - remaining, 0)
 
     let newRemainingCount = dto.totalRewardCount;
     if (dto.totalRewardCount > usedCount) {
@@ -1135,13 +1166,15 @@ export class MusicsService implements OnModuleInit {
     });
 
     try {
-      // 리워드 제거 처리
+      // 리워드 제거 처리(비활성)
       if (dto.removeReward === true) {
-        // 1. musics.grade 업데이트
-        await this.db
-          .update(musics)
-          .set({ grade: dto.grade || 0 })
-          .where(eq(musics.id, musicId));
+        // 1. musics.grade는 요청에 따라 0(모든 등급 허용) 또는 2(리워드 없음)로 설정
+        if (dto.grade !== undefined) {
+          await this.db
+            .update(musics)
+            .set({ grade: dto.grade })
+            .where(eq(musics.id, musicId));
+        }
 
         // 2. monthly_music_rewards 업데이트 (0으로 설정)
         const existingRecord = await this.db
@@ -1179,11 +1212,13 @@ export class MusicsService implements OnModuleInit {
         }
       } else {
         // 기존 리워드 추가/수정 로직
-        // 1. musics.grade를 1로 업데이트 (리워드 있음)
-        await this.db
-          .update(musics)
-          .set({ grade: 1 })
-          .where(eq(musics.id, musicId));
+        // grade는 자동 변경하지 않음. (관리자가 별도로 변경 시에만 dto.grade 사용)
+        if (dto.grade !== undefined) {
+          await this.db
+            .update(musics)
+            .set({ grade: dto.grade })
+            .where(eq(musics.id, musicId));
+        }
 
         // 2. monthly_music_rewards 업데이트
         const existingRecord = await this.db

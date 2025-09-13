@@ -152,15 +152,20 @@ export class MusicsController {
 
   @Get(':id/cover')
   async getCover(@Param('id') id: string, @Res() res: Response) {
-    const file = await this.musicsService.getCoverFile(+id);
-    if (file.isUrl && file.url) {
-      return res.redirect(file.url);
+    try {
+      const file = await this.musicsService.getCoverFile(+id);
+      if (file.isUrl && file.url) {
+        return res.redirect(file.url);
+      }
+      if (file.absPath && file.contentType) {
+        res.setHeader('Content-Type', file.contentType);
+        return fs.createReadStream(file.absPath).pipe(res);
+      }
+      return res.status(404).send('커버 이미지가 없습니다.');
+    } catch (error) {
+      console.error('커버 이미지 로드 실패:', error.message);
+      return res.status(404).send('커버 이미지를 찾을 수 없습니다.');
     }
-    if (file.absPath && file.contentType) {
-      res.setHeader('Content-Type', file.contentType);
-      return fs.createReadStream(file.absPath).pipe(res);
-    }
-    return res.status(404).send('커버 이미지가 없습니다.');
   }
 
   @Get(':id/lyrics')
@@ -169,25 +174,30 @@ export class MusicsController {
     @Query('mode') mode: 'inline' | 'download' = 'inline',
     @Res() res: Response
   ) {
-    const info = await this.musicsService.getLyricsFileInfo(+id);
+    try {
+      const info = await this.musicsService.getLyricsFileInfo(+id);
 
-    if (info.hasText && info.text) {
-      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-      if (mode === 'download') {
-        res.setHeader('Content-Disposition', `attachment; filename="lyrics.txt"`);
+      if (info.hasText && info.text) {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        if (mode === 'download') {
+          res.setHeader('Content-Disposition', `attachment; filename="lyrics.txt"`);
+        }
+        return res.send(info.text);
       }
-      return res.send(info.text);
-    }
 
-    if (info.hasFile && info.absPath && info.filename) {
-      res.setHeader('Content-Type', 'text/plain');
-      if (mode === 'download') {
-        res.setHeader('Content-Disposition', `attachment; filename="${info.filename}"`);
+      if (info.hasFile && info.absPath && info.filename) {
+        res.setHeader('Content-Type', 'text/plain');
+        if (mode === 'download') {
+          res.setHeader('Content-Disposition', `attachment; filename="${info.filename}"`);
+        }
+        return fs.createReadStream(info.absPath).pipe(res);
       }
-      return fs.createReadStream(info.absPath).pipe(res);
-    }
 
-    return res.status(404).send('가사 파일을 찾을 수 없습니다.');
+      return res.status(404).send('가사 파일을 찾을 수 없습니다.');
+    } catch (error) {
+      console.error('가사 파일 로드 실패:', error.message);
+      return res.status(404).send('가사 파일을 찾을 수 없습니다.');
+    }
   }
 
   @Patch(':id')

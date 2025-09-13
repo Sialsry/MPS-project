@@ -27,6 +27,7 @@ export class RealtimeService {
     const query = sql`
       SELECT 
         mp.id,
+        mp.created_at,
         CASE 
           WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN 'success'
           ELSE 'error'
@@ -42,11 +43,11 @@ export class RealtimeService {
           ELSE '알 수 없음'
         END as call_type,
         CASE 
-          WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN '유효재생'
+          WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN '리워드 발생'
+          WHEN mp.is_valid_play = true AND mp.reward_code != '1' THEN '유효재생 (리워드 없음)'
           ELSE '무효재생'
         END as validity,
-        c.name as company,
-        TO_CHAR(mp.created_at AT TIME ZONE 'Asia/Seoul', 'HH24:MI:SS') as timestamp
+        c.name as company
       FROM music_plays mp
       LEFT JOIN companies c ON c.id = mp.using_company_id
       WHERE mp.created_at >= NOW() - INTERVAL '5 minutes'
@@ -62,7 +63,7 @@ export class RealtimeService {
       callType: row.call_type,
       validity: row.validity,
       company: row.company || '알 수 없음',
-      timestamp: row.timestamp
+      timestamp: row.created_at ? new Date(row.created_at).toLocaleTimeString('ko-KR') : '00:00:00'
     }))
   }
 

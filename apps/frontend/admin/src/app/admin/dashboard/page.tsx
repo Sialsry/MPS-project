@@ -61,19 +61,22 @@ export default function DashboardPage() {
     })
 
     newSocket.on('connect', () => {
-      console.log('WebSocket 연결됨')
+      console.log('✅ WebSocket 연결됨')
       setIsConnected(true)
       // 연결 시 실시간 데이터 구독
       newSocket.emit('subscribe-realtime')
     })
 
     newSocket.on('disconnect', () => {
-      console.log('WebSocket 연결 해제됨')
+      console.log('❌ WebSocket 연결 해제됨')
       setIsConnected(false)
     })
 
     newSocket.on('realtime-update', (data) => {
-      console.log('실시간 데이터 업데이트:', data)
+      console.log('🔍 WebSocket 실시간 데이터 업데이트:', data)
+      console.log('🔍 WebSocket apiCalls length:', data.apiCalls?.length || 0)
+      console.log('🔍 WebSocket topTracks length:', data.topTracks?.length || 0)
+      // WebSocket 데이터 구조에 맞게 수정
       setRealtimeApiStatus(data.apiCalls || [])
       setRealtimeTopTracks(data.topTracks || [])
       
@@ -160,59 +163,76 @@ export default function DashboardPage() {
 
 
     const fetchRealtimeData = async () => {
-      try {
-        console.log('Fetching realtime data...')
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'
-        
-        // 실시간 데이터 API 호출 활성화
-        
-        const [apiRes, tracksRes] = await Promise.all([
-          fetch(`${baseUrl}/admin/musics/realtime/api-status`),
-          fetch(`${baseUrl}/admin/musics/realtime/top-tracks`)
-        ])
-        
-        console.log('API responses:', {
-          apiStatus: apiRes.status,
-          topTracks: tracksRes.status
-        })
-        
-        if (apiRes.ok) {
-          const apiData = await apiRes.json()
-          console.log('API Status Data:', apiData)
-          // 백엔드에서 callType과 validity가 없을 때 기본값 설정
-          const items = (apiData.items || []).map((item: any) => ({
-            ...item,
-            callType: item.callType || (item.endpoint?.includes('lyrics') ? '가사 호출' : '음원 호출'),
-            validity: item.validity || '유효재생'
-          }))
-          setRealtimeApiStatus(items)
-        } else {
-          console.error('API Status failed:', apiRes.status)
+      // WebSocket이 연결되지 않은 경우에만 HTTP API 사용
+      if (!isConnected) {
+        try {
+          console.log('⚠️ WebSocket 연결되지 않음, HTTP API로 실시간 데이터 조회...')
+          const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'
+          
+          const [apiRes, tracksRes] = await Promise.all([
+            fetch(`${baseUrl}/admin/musics/realtime/api-status`),
+            fetch(`${baseUrl}/admin/musics/realtime/top-tracks`)
+          ])
+          
+          console.log('API responses:', {
+            apiStatus: apiRes.status,
+            topTracks: tracksRes.status
+          })
+          
+          if (apiRes.ok) {
+            const apiData = await apiRes.json()
+            console.log('🔍 API Status Data:', apiData)
+            console.log('🔍 API Status items length:', apiData.items?.length || 0)
+            // HTTP API 응답 구조에 맞게 수정
+            const items = (apiData.items || []).map((item: any) => ({
+              id: item.id || Math.random(),
+              status: item.status || 'error',
+              endpoint: item.endpoint || '/api/unknown',
+              callType: item.callType || (item.endpoint?.includes('lyrics') ? '가사 호출' : '음원 호출'),
+              validity: item.validity || '유효재생',
+              company: item.company || 'Unknown',
+              timestamp: item.timestamp || new Date().toLocaleString('ko-KR', {
+                year: '2-digit',
+                month: '2-digit',
+                day: '2-digit', 
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+              }).replace(/\./g, '-').replace(/- /g, ' ').replace(/(\d{2}) (\d{2}) (\d{2})/, '$1-$2-$3').trim()
+            }))
+            console.log('🔍 Processed API Status items:', items)
+            setRealtimeApiStatus(items)
+          } else {
+            console.error('❌ API Status failed:', apiRes.status, await apiRes.text())
+          }
+          
+          if (tracksRes.ok) {
+            const tracksData = await tracksRes.json()
+            console.log('Top Tracks Data:', tracksData)
+            setRealtimeTopTracks(tracksData.items || [])
+          } else {
+            console.error('Top Tracks failed:', tracksRes.status)
+          }
+          
+        } catch (e) {
+          console.error('실시간 데이터 조회 실패:', e)
         }
-        
-        if (tracksRes.ok) {
-          const tracksData = await tracksRes.json()
-          console.log('Top Tracks Data:', tracksData)
-          setRealtimeTopTracks(tracksData.items || [])
-        } else {
-          console.error('Top Tracks failed:', tracksRes.status)
-        }
-        
-      } catch (e) {
-        console.error('실시간 데이터 조회 실패:', e)
       }
     }
 
     fetchHourly()
     updateTime()
+    fetchRealtimeData() // 초기 실시간 데이터 로드
 
     const interval = setInterval(() => {
       fetchHourly()
       updateTime()
+      fetchRealtimeData() // 주기적으로 실시간 데이터 업데이트
     }, 30000) // 30초마다 시간 업데이트
 
     return () => clearInterval(interval)
-  }, [])
+  }, [isConnected]) // isConnected 상태 변경 시 재실행
 
   return (
     <div className="w-full px-6 py-6">
@@ -312,26 +332,30 @@ export default function DashboardPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-white/10">
-                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">성공여부</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">유형</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">유효재생</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">엔드포인트</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">기업</th>
-                    <th className="text-left py-2 px-3 text-xs font-medium text-white/60">시간</th>
+                    <th className="text-center py-2 px-3 text-xs font-medium text-white/60">ID</th>
+                    <th className="text-center py-2 px-3 text-xs font-medium text-white/60">성공여부</th>
+                    <th className="text-center py-2 px-3 text-xs font-medium text-white/60">유형</th>
+                    <th className="text-center py-2 px-3 text-xs font-medium text-white/60">리워드</th>
+                    <th className="text-center py-2 px-3 text-xs font-medium text-white/60">기업</th>
+                    <th className="text-center py-2 px-3 text-xs font-medium text-white/60">시간</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm">
-                  {realtimeApiStatus.length > 0 ? (
-                    realtimeApiStatus
-                      .filter(item => {
-                        if (apiStatusFilter === 'all') return true
-                        if (apiStatusFilter === 'music') return item.callType === '음원 호출'
-                        if (apiStatusFilter === 'lyrics') return item.callType === '가사 호출'
-                        return true
-                      })
-                      .map((item, idx) => (
+                  {(() => {
+                    console.log('🔍 렌더링 시 realtimeApiStatus:', realtimeApiStatus)
+                    console.log('🔍 렌더링 시 realtimeApiStatus.length:', realtimeApiStatus.length)
+                    return realtimeApiStatus.length > 0 ? (
+                      realtimeApiStatus
+                        .filter(item => {
+                          if (apiStatusFilter === 'all') return true
+                          if (apiStatusFilter === 'music') return item.callType === '음원 호출'
+                          if (apiStatusFilter === 'lyrics') return item.callType === '가사 호출'
+                          return true
+                        })
+                        .map((item, idx) => (
                       <tr key={idx} className="border-b border-white/5">
-                        <td className="py-2 px-3">
+                        <td className="py-2 px-3 text-white/60 font-mono text-xs text-center">{item.id}</td>
+                        <td className="py-2 px-3 text-center">
                           <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
                             item.status === 'success' 
                               ? 'bg-green-500/20 text-green-400' 
@@ -343,34 +367,34 @@ export default function DashboardPage() {
                             {item.status === 'success' ? '성공' : '실패'}
                           </div>
                         </td>
-                        <td className="py-2 px-3 text-white/80">
+                        <td className="py-2 px-3 text-white/80 text-center">
                           <span className={`px-2 py-1 rounded text-xs font-medium ${
                             item.callType === '음원 호출' 
                               ? 'bg-blue-500/20 text-blue-400' 
                               : 'bg-purple-500/20 text-purple-400'
                           }`}>
-                            {item.callType}
+                            {item.callType === '음원 호출' ? '음원' : '가사'}
                           </span>
                         </td>
-                        <td className="py-2 px-3 text-white/80">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            item.validity === '유효재생' 
-                              ? 'bg-teal-500/20 text-teal-400' 
-                              : 'bg-gray-500/20 text-gray-400'
-                          }`}>
-                            {item.validity}
-                          </span>
+                        <td className="py-2 px-3 text-white/80 text-center">
+                          <div className="flex items-center justify-center">
+                            {item.validity === '리워드 발생' 
+                              ? '🟡' 
+                              : item.validity === '유효재생 (리워드 없음)'
+                              ? '🟡'
+                              : '🔴'}
+                          </div>
                         </td>
-                        <td className="py-2 px-3 text-white/60 font-mono text-xs">{item.endpoint}</td>
-                        <td className="py-2 px-3 text-white/60">{item.company}</td>
-                        <td className="py-2 px-3 text-white/40">{item.timestamp}</td>
+                        <td className="py-2 px-3 text-white/60 text-center">{item.company}</td>
+                        <td className="py-2 px-3 text-white/40 text-center font-mono text-xs">{item.timestamp}</td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="py-4 px-3 text-center text-white/40">데이터를 불러오는 중...</td>
-                    </tr>
-                  )}
+                        ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="py-4 px-3 text-center text-white/40">데이터를 불러오는 중...</td>
+                      </tr>
+                    )
+                  })()}
                 </tbody>
               </table>
             </div>
