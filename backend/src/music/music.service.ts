@@ -1,4 +1,4 @@
-import { Injectable, Inject, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, Inject, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, and, gte, lt, count, sql, desc } from 'drizzle-orm';
 import { companies, musics, music_plays, company_subscriptions, monthly_music_rewards, rewards } from '../db/schema';
@@ -6,12 +6,15 @@ import { ApiKeyService } from './api-key.service';
 
 @Injectable()
 export class MusicService {
+    private readonly logger = new Logger(MusicService.name);
+
     constructor(
         @Inject('DB') private db: NodePgDatabase<any>,
         private readonly apiKeyService: ApiKeyService,
     ) { }
 
     async validateApiKey(apiKey: string) {
+        this.logger.log('API Key 검증 시도:', apiKey);
         if (!apiKey) {
             console.log('API Key 없음. service단에서 에러 발생');
             throw new HttpException('API 키가 필요합니다.', HttpStatus.UNAUTHORIZED);
@@ -381,7 +384,7 @@ export class MusicService {
     private getGradeLevel(grade: string): number {
         const levels = {
             'free': 0,
-            'standard': 1,
+            'standard': 2,
             'business': 2
         };
         return levels[grade] || 0;
