@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { JwtModule } from '@nestjs/jwt';
 import { join } from 'path';
-
+import { ScheduleModule } from '@nestjs/schedule';
 import biznoConfig from '../bizno.config';
 
 import { AppController } from './app.controller';
@@ -15,6 +15,7 @@ import { MeModule } from './client/me/me.module';
 import { DbModule } from './db/db.module';
 import { ExploreModule } from './client/explore/explore.module';
 import { AdminModule } from './admin/admin.module';
+import { TagsModule } from './client/tags/tags.module';
 
 import { MusicModule } from './music/music.module';
 import { RecordModule } from './record/record.module';
@@ -45,6 +46,10 @@ import { TestModule } from './test/test.module';
       signOptions: { expiresIn: '30d' },
     }),
 
+    ScheduleModule.forRoot({
+      timezone: 'Asia/Seoul',
+    } as any),
+
     AdminModule,
     DashboardModule,
     ClientModule,
@@ -55,6 +60,7 @@ import { TestModule } from './test/test.module';
     RecordModule,
     SchedulerModule,
     TestModule,
+    TagsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
