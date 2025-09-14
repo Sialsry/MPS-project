@@ -7,7 +7,7 @@ export type TrendSegment = 'category' | 'all'
 const useCaseFilter = (type: TrendType) =>
   type === 'music' ? sql`mp.use_case IN ('0','1')` : sql`mp.use_case = '2'`
 
-// 일별 추세 그래프
+// 일별 추세 그래프 (유효재생 + 리워드 지급액 합계)
 export function buildMusicTrendDailyQuery(params: {
   musicId: number
   year: number
@@ -29,7 +29,8 @@ series AS (
 ),
 -- current music daily
 current_music AS (
-  SELECT s.d AS d, COALESCE(COUNT(mp.*), 0) AS cnt
+  SELECT s.d AS d,
+         COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS cnt
   FROM series s
   LEFT JOIN music_plays mp ON mp.music_id = ${musicId}
     AND ${useCaseFilter(type)}
@@ -43,7 +44,8 @@ base AS (
   SELECT m.category_id FROM musics m WHERE m.id = ${musicId} LIMIT 1
 ),
 plays_by_music AS (
-  SELECT s.d AS d, mp.music_id, COALESCE(COUNT(mp.*), 0) AS cnt
+  SELECT s.d AS d, mp.music_id,
+         COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS cnt
   FROM series s
   LEFT JOIN music_plays mp ON ${useCaseFilter(type)}
     AND mp.created_at >= (SELECT month_start FROM month_range)
@@ -69,7 +71,7 @@ ORDER BY s.d ASC
   `
 }
 
-// 월별 추세 그래프
+// 월별 추세 그래프 (유효재생 + 리워드 지급액 합계)
 export function buildMusicTrendMonthlyQuery(params: {
   musicId: number
   endYear: number
@@ -92,7 +94,8 @@ series_bounds AS (
   SELECT month_start, (month_start + interval '1 month' - interval '1 second') AS month_end FROM series
 ),
 current_music AS (
-  SELECT to_char(sb.month_start, 'YYYY-MM') AS ym, COUNT(mp.*) AS cnt
+  SELECT to_char(sb.month_start, 'YYYY-MM') AS ym,
+         COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS cnt
   FROM series_bounds sb
   LEFT JOIN music_plays mp ON mp.music_id = ${musicId}
     AND ${useCaseFilter(type)}
@@ -103,7 +106,8 @@ base AS (
   SELECT m.category_id FROM musics m WHERE m.id = ${musicId} LIMIT 1
 ),
 plays_by_music AS (
-  SELECT to_char(sb.month_start, 'YYYY-MM') AS ym, mp.music_id, COUNT(mp.*) AS cnt
+  SELECT to_char(sb.month_start, 'YYYY-MM') AS ym, mp.music_id,
+         COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS cnt
   FROM series_bounds sb
   LEFT JOIN music_plays mp ON ${useCaseFilter(type)}
     AND mp.created_at >= sb.month_start AND mp.created_at <= sb.month_end

@@ -22,6 +22,8 @@ async function bootstrap() {
       'https://test.klk1.store',
       'http://localhost:3000',
       'http://localhost:4001',
+      'http://localhost:3001',
+      'http://127.0.0.1:5500',
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

@@ -13,6 +13,7 @@ export class MusicService {
 
     async validateApiKey(apiKey: string) {
         if (!apiKey) {
+            console.log('API Key 없음. service단에서 에러 발생');
             throw new HttpException('API 키가 필요합니다.', HttpStatus.UNAUTHORIZED);
         }
 

@@ -37,6 +37,7 @@ export class TokensQueries {
         totalReward: sql<number>`COALESCE(SUM(${rewards.amount}::numeric), 0)`,
         dbValidPlayCount: sql<number>`COUNT(CASE WHEN ${music_plays.is_valid_play} = true THEN 1 END)`,
         onchainRecordedPlayCount: sql<number>`COUNT(CASE WHEN ${rewards.payout_tx_hash} IS NOT NULL THEN 1 END)`,
+        rewardedPlayCount: sql<number>`COUNT(CASE WHEN ${rewards.status} IN ('pending','successed') AND ${rewards.payout_tx_hash} IS NOT NULL THEN 1 END)`,
         executedAt: sql<string>`MAX(${rewards.blockchain_recorded_at})`,
         txHash: sql<string>`MAX(${rewards.payout_tx_hash})`,
         status: sql<string>`
@@ -64,6 +65,7 @@ export class TokensQueries {
       totalReward: parseFloat(row.totalReward.toString()),
       dbValidPlayCount: parseInt(row.dbValidPlayCount.toString()),
       onchainRecordedPlayCount: parseInt(row.onchainRecordedPlayCount.toString()),
+      rewardedPlayCount: parseInt(row.rewardedPlayCount.toString()),
       txHash: row.txHash,
       status: row.status as 'success' | 'pending' | 'not-executed' | 'failed',
       mismatch: row.dbValidPlayCount !== row.onchainRecordedPlayCount,
@@ -80,6 +82,7 @@ export class TokensQueries {
         totalReward: sql<number>`COALESCE(SUM(${rewards.amount}::numeric), 0)`,
         dbValidPlayCount: sql<number>`COUNT(CASE WHEN ${music_plays.is_valid_play} = true THEN 1 END)`,
         onchainRecordedPlayCount: sql<number>`COUNT(CASE WHEN ${rewards.payout_tx_hash} IS NOT NULL THEN 1 END)`,
+        rewardedPlayCount: sql<number>`COUNT(CASE WHEN ${rewards.status} IN ('pending','successed') AND ${rewards.payout_tx_hash} IS NOT NULL THEN 1 END)`,
         executedAt: sql<string>`MAX(${rewards.blockchain_recorded_at})`,
         txHash: sql<string>`MAX(${rewards.payout_tx_hash})`,
         status: sql<string>`
@@ -107,6 +110,7 @@ export class TokensQueries {
       totalReward: parseFloat(row.totalReward.toString()),
       dbValidPlayCount: parseInt(row.dbValidPlayCount.toString()),
       onchainRecordedPlayCount: parseInt(row.onchainRecordedPlayCount.toString()),
+      rewardedPlayCount: parseInt(row.rewardedPlayCount.toString()),
       txHash: row.txHash,
       status: row.status as 'success' | 'pending' | 'not-executed' | 'failed',
       mismatch: row.dbValidPlayCount !== row.onchainRecordedPlayCount,
@@ -145,23 +149,25 @@ export class TokensQueries {
     const result = await db
       .select({
         id: music_plays.id,
-        time: sql<string>`TO_CHAR(${music_plays.created_at}, 'HH24:MI:SS')`,
+        time: sql<string>`TO_CHAR(COALESCE(${rewards.created_at}, ${music_plays.created_at}), 'YYYY-MM-DD HH24:MI:SS')`,
         companyName: companies.name,
+        companyId: companies.id,
         musicTitle: sql<string>`m.title`,
         musicId: sql<string>`m.id::text`
       })
       .from(music_plays)
+      .leftJoin(rewards, sql`${rewards.play_id} = ${music_plays.id}`)
       .leftJoin(companies, sql`${companies.id} = ${music_plays.using_company_id}`)
       .leftJoin(sql`musics m`, sql`m.id = ${music_plays.music_id}`)
-      .where(sql`DATE(${music_plays.created_at}) = ${date} AND ${music_plays.is_valid_play} = true`)
-      .orderBy(music_plays.created_at)
-      .limit(50) // 최대 50개만 표시
+      .where(sql`DATE(${music_plays.created_at}) = ${date} AND ${music_plays.is_valid_play} = true AND (${rewards.status} IN ('pending','successed'))`)
+      .orderBy(sql`COALESCE(${rewards.created_at}, ${music_plays.created_at})`)
+      .limit(100)
 
     return result.map(row => ({
       id: `play-${row.id}`,
       time: row.time,
-      company: row.companyName,
-      musicTitle: row.musicTitle,
+      company: `${row.companyName} (${row.companyId})`,
+      musicTitle: `${row.musicTitle} (${row.musicId})`,
       musicId: row.musicId
     }))
   }
@@ -171,13 +177,13 @@ export class TokensQueries {
     // 토큰 분배 트랜잭션 (payout_tx_hash로 그룹핑)
     const tokenDistributionTxs = await db
       .select({
-        id: sql<string>`'token-dist-' || DATE(${rewards.blockchain_recorded_at})`,
+        id: sql<string>`'token-dist-' || DATE(COALESCE(${rewards.blockchain_recorded_at}, ${rewards.created_at}))`,
         type: sql<string>`'token-distribution'`,
-        timestamp: sql<string>`TO_CHAR(DATE(${rewards.blockchain_recorded_at}), 'YYYY-MM-DD') || ' 00:00:00'`,
+        timestamp: sql<string>`TO_CHAR(DATE(COALESCE(${rewards.blockchain_recorded_at}, ${rewards.created_at})), 'YYYY-MM-DD') || ' 00:00:00'`,
         txHash: rewards.payout_tx_hash,
         status: sql<string>`
           CASE 
-            WHEN ${rewards.payout_tx_hash} IS NOT NULL THEN 'success'
+            WHEN ${rewards.status} = 'successed' THEN 'success'
             WHEN ${rewards.status} = 'pending' THEN 'pending'
             ELSE 'failed'
           END
@@ -189,15 +195,15 @@ export class TokensQueries {
         recipientCount: sql<number>`COUNT(*)`
       })
       .from(rewards)
-      .where(sql`${rewards.blockchain_recorded_at} IS NOT NULL`)
+      .where(sql`${rewards.status} IN ('pending','successed') AND ${rewards.payout_tx_hash} IS NOT NULL AND (${rewards.status} = 'successed' OR ${rewards.payout_tx_hash} LIKE '0x%')`)
       .groupBy(
-        sql`DATE(${rewards.blockchain_recorded_at})`,
+        sql`DATE(COALESCE(${rewards.blockchain_recorded_at}, ${rewards.created_at}))`,
         rewards.payout_tx_hash,
         rewards.block_number,
         rewards.gas_used,
         rewards.status
       )
-      .orderBy(sql`DATE(${rewards.blockchain_recorded_at}) DESC`)
+      .orderBy(sql`DATE(COALESCE(${rewards.blockchain_recorded_at}, ${rewards.created_at})) DESC`)
       .limit(limit / 2)
       .offset(offset / 2)
 
@@ -266,13 +272,13 @@ export class TokensQueries {
       // 토큰 분배 트랜잭션 상세 (해당 날짜의 모든 기업 분배 내역)
       const result = await db
         .select({
-          id: sql<string>`'token-dist-' || DATE(${rewards.blockchain_recorded_at})`,
+          id: sql<string>`'token-dist-' || DATE(COALESCE(${rewards.blockchain_recorded_at}, ${rewards.created_at}))`,
           type: sql<string>`'token-distribution'`,
-          timestamp: sql<string>`TO_CHAR(DATE(${rewards.blockchain_recorded_at}), 'YYYY-MM-DD') || ' 00:00:00'`,
+          timestamp: sql<string>`TO_CHAR(COALESCE(${rewards.blockchain_recorded_at}, ${rewards.created_at}), 'YYYY-MM-DD HH24:MI:SS')`,
           txHash: rewards.payout_tx_hash,
           status: sql<string>`
             CASE 
-              WHEN ${rewards.payout_tx_hash} IS NOT NULL THEN 'success'
+              WHEN ${rewards.status} = 'successed' THEN 'success'
               WHEN ${rewards.status} = 'pending' THEN 'pending'
               ELSE 'failed'
             END
@@ -289,7 +295,7 @@ export class TokensQueries {
         })
         .from(rewards)
         .leftJoin(companies, sql`${companies.id} = ${rewards.company_id}`)
-        .where(sql`DATE(${rewards.blockchain_recorded_at}) = ${dateStr}`)
+        .where(sql`DATE(COALESCE(${rewards.blockchain_recorded_at}, ${rewards.created_at})) = ${dateStr} AND ${rewards.status} IN ('pending','successed') AND ${rewards.payout_tx_hash} IS NOT NULL`)
         .orderBy(rewards.created_at)
 
       if (result.length === 0) return null
@@ -297,6 +303,12 @@ export class TokensQueries {
       const firstRow = result[0]
       const totalAmount = result.reduce((sum, row) => sum + parseFloat(row.amount.toString()), 0)
       
+      // API 호출 기록 개수 (해당 일자의 유효재생 로그)
+      const apiRecordCountRes = await db
+        .select({ cnt: sql<number>`COUNT(*)` })
+        .from(music_plays)
+        .where(sql`DATE(${music_plays.created_at}) = ${dateStr} AND ${music_plays.is_valid_play} = true`)
+
       return {
         id: firstRow.id,
         type: 'token-distribution' as const,
@@ -306,6 +318,7 @@ export class TokensQueries {
         blockNumber: firstRow.blockNumber,
         gasUsed: firstRow.gasUsed,
         gasPrice: firstRow.gasPrice,
+        apiRecordCount: parseInt(apiRecordCountRes[0].cnt.toString()),
         tokenDistribution: {
           totalAmount: totalAmount,
           recipientCount: result.length,
@@ -338,10 +351,13 @@ export class TokensQueries {
           playId: music_plays.id,
           rewardCode: sql<number>`0`, // API 호출 기록에는 리워드 코드 없음
           companyName: companies.name,
-          usedAt: music_plays.created_at
+          musicTitle: sql<string>`m.title`,
+          timeStr: sql<string>`TO_CHAR(COALESCE(${rewards.created_at}, ${music_plays.created_at}), 'YYYY-MM-DD HH24:MI:SS')`
         })
         .from(music_plays)
         .leftJoin(companies, sql`${companies.id} = ${music_plays.using_company_id}`)
+        .leftJoin(sql`musics m`, sql`m.id = ${music_plays.music_id}`)
+        .leftJoin(rewards, sql`${rewards.play_id} = ${music_plays.id}`)
         .where(sql`DATE(${music_plays.created_at}) = ${dateStr} AND ${music_plays.is_valid_play} = true`)
         .orderBy(music_plays.created_at)
 
@@ -365,8 +381,9 @@ export class TokensQueries {
             musicId: parseInt(row.musicId.toString()),
             playId: parseInt(row.playId.toString()),
             rewardCode: parseInt(row.rewardCode.toString()),
-            timestamp: row.usedAt,
-            companyName: row.companyName
+            timestamp: row.timeStr,
+            companyName: row.companyName,
+            musicTitle: row.musicTitle
           }))
         }
       }
