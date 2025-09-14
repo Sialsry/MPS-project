@@ -19,12 +19,13 @@ export class ApiKeyService {
         if (!apiKey) return null;
 
         const apiKeyHash = this.hashApiKey(apiKey);
+        console.log('해시된 API Key:', apiKeyHash);
         const result = await this.db
             .select()
             .from(companies)
             .where(eq(companies.api_key_hash, apiKeyHash));
 
-        // console.log(result, 'api 키 검증 결과')
+        console.log(result, 'api 키 검증 결과123')
         if (result.length === 0) return null;
         return result[0];
     }

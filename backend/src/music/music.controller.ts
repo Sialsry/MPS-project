@@ -110,6 +110,7 @@ export class MusicController {
             let company: any = null;
             const apiKey = headerApiKey || apiKeyQuery;
             if (apiKey) {
+                console.log('API Key 제공됨:', apiKey);
                 company = await this.musicService.validateApiKey(apiKey);
                 if (!company) throw new HttpException('잘못된 API Key 입니다.', HttpStatus.UNAUTHORIZED);
             }
