@@ -1,35 +1,76 @@
-import { Injectable, Inject, OnModuleInit, BadRequestException } from '@nestjs/common';
-import { CreateMusicDto } from './dto/create-music.dto';
-import { UpdateMusicDto } from './dto/update-music.dto';
-import { FindMusicsDto } from './dto/find-musics.dto';
-import { musics, music_categories, music_tags, monthly_music_rewards, music_plays, raw_tags } from '../../db/schema';
-import { eq, like, desc, asc, or, sql, and, inArray } from 'drizzle-orm';
-import type { DB } from '../../db/client';
-import type { SQL } from 'drizzle-orm';
-import { throwError } from 'rxjs';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { UpdateRewardDto } from './dto/update-reward.dto';
-import { normalizePagination } from '../../common/utils/pagination.util';
-import { getDefaultYearMonthKST } from '../../common/utils/date.util';
-import { resolveYearMonthKST } from '../../common/utils/date.util';
-import { normalizeSort } from '../../common/utils/sort.util';
-import { MusicRewardsSummaryQueryDto, MusicRewardsSummaryResponseDto } from './dto/music-rewards-summary.dto';
-import { MusicRewardsTrendQueryDto, MusicRewardsTrendResponseDto } from './dto/music-rewards-trend.dto';
-import { MusicMonthlyRewardsQueryDto, MusicMonthlyRewardsResponseDto } from './dto/music-monthly-rewards.dto';
-import { buildMusicRewardsSummaryQuery, buildMusicRewardsSummaryCountQuery, buildMusicRewardsOrderSql } from './queries/rewards.queries';
-import { buildFindAllQuery, buildFindOneQuery, buildUpsertNextMonthRewardsQuery, buildCleanupOrphanCategoriesQuery } from './queries/musics.queries';
-import { buildMusicTrendDailyQuery, buildMusicTrendMonthlyQuery } from './queries/trend.queries';
-import { buildMusicMonthlyRewardsQuery } from './queries/monthly.queries';
-import { buildMusicCompanyUsageListQuery, buildMusicCompanyUsageCountQuery } from './queries/company-usage.queries';
-import { MusicTotalStatsQueryDto, MusicTotalStatsResponseDto } from './dto/music-stats.dto';
-import { PlaysValidStatsQueryDto, PlaysValidStatsResponseDto } from './dto/plays-valid-stats.dto';
-import { RevenueForecastQueryDto, RevenueForecastResponseDto } from './dto/revenue-forecast.dto';
-import { buildMonthRangeCTE, resolveYearMonthKST as resolveYM, isCurrentYM } from '../../common/utils/date.util';
-import { RewardsFilledStatsQueryDto, RewardsFilledStatsResponseDto } from './dto/rewards-filled-stats.dto';
-import { CategoryTop5QueryDto, CategoryTop5ResponseDto, CategoryTop5ItemDto } from './dto/category-top5.dto';
-import { RealtimeApiStatusQueryDto, RealtimeApiStatusResponseDto, RealtimeApiStatusItemDto, RealtimeTopTracksQueryDto, RealtimeTopTracksResponseDto, RealtimeTopTracksItemDto, RealtimeTransactionsQueryDto, RealtimeTransactionsResponseDto, RealtimeTransactionsItemDto } from './dto/realtime.dto';
-import { buildCategoryTop5Query, buildRealtimeApiStatusQuery, buildRealtimeTopTracksQuery, buildRealtimeTransactionsQuery } from './queries/stats.queries';
+import { Injectable, Inject, OnModuleInit, BadRequestException } from '@nestjs/common'
+import {
+  CreateMusicDto,
+  UpdateMusicDto,
+  FindMusicsDto,
+  DeleteMusicsDto,
+  UpdateRewardDto,
+  CreateCategoryDto,
+  MusicTotalStatsQueryDto,
+  MusicTotalStatsResponseDto,
+  PlaysValidStatsQueryDto,
+  PlaysValidStatsResponseDto,
+  RevenueForecastQueryDto,
+  RevenueForecastResponseDto,
+  RewardsFilledStatsQueryDto,
+  RewardsFilledStatsResponseDto,
+  CategoryTop5QueryDto,
+  CategoryTop5ResponseDto,
+  CategoryTop5ItemDto,
+  RealtimeApiStatusQueryDto,
+  RealtimeApiStatusResponseDto,
+  RealtimeApiStatusItemDto,
+  RealtimeTopTracksQueryDto,
+  RealtimeTopTracksResponseDto,
+  RealtimeTopTracksItemDto,
+  RealtimeTransactionsQueryDto,
+  RealtimeTransactionsResponseDto,
+  RealtimeTransactionsItemDto,
+  MusicRewardsSummaryQueryDto,
+  MusicRewardsSummaryResponseDto,
+  MusicRewardsTrendQueryDto,
+  MusicRewardsTrendResponseDto,
+  MusicMonthlyRewardsQueryDto,
+  MusicMonthlyRewardsResponseDto,
+  MusicCompanyUsageQueryDto
+} from './dto'
+
+import {
+  buildMusicRewardsSummaryQuery,
+  buildMusicRewardsSummaryCountQuery,
+  buildMusicRewardsOrderSql,
+  buildCategoryExistsQuery,
+  buildMusicStatsCountQuery,
+  buildValidPlaysStatsQuery,
+  buildRevenueForecastCurrentQuery,
+  buildRevenueForecastPastQuery,
+  buildRewardsFilledStatsQuery,
+  buildRealtimeApiStatusQuery,
+  buildRealtimeApiCallsQuery,
+  buildMusicRewardsCountQuery,
+  buildCategoryTop5Query,
+  buildRealtimeTopTracksQuery,
+  buildRealtimeTransactionsQuery,
+  buildFindAllQuery,
+  buildFindAllCountQuery,
+  buildFindOneQuery,
+  buildCleanupOrphanCategoriesQuery,
+  buildMusicTrendDailyQuery,
+  buildMusicTrendMonthlyQuery,
+  buildMusicMonthlyRewardsQuery,
+  buildMusicCompanyUsageListQuery,
+  buildMusicCompanyUsageCountQuery
+} from './queries'
+
+import { musics, music_categories, music_tags, monthly_music_rewards, music_plays, raw_tags } from '../../db/schema'
+import { eq, like, desc, asc, or, sql, and, inArray } from 'drizzle-orm'
+import type { DB } from '../../db/client'
+import type { SQL } from 'drizzle-orm'
+import * as fs from 'fs/promises'
+import * as path from 'path'
+import { normalizePagination } from '../../common/utils/pagination.util'
+import { getDefaultYearMonthKST, resolveYearMonthKST as resolveYM, buildMonthRangeCTE, isCurrentYM } from '../../common/utils/date.util'
+import { normalizeSort } from '../../common/utils/sort.util'
 
 @Injectable()
 export class MusicsService implements OnModuleInit {
@@ -43,13 +84,13 @@ export class MusicsService implements OnModuleInit {
   private async ensureStorageDirs(): Promise<void> {
     const musicBaseDir = process.env.MUSIC_BASE_DIR
       ? path.resolve(process.env.MUSIC_BASE_DIR)
-      : path.resolve(process.cwd(), 'music');
+      : path.resolve(process.cwd(), 'uploads', 'music');
     const lyricsBaseDir = process.env.LYRICS_BASE_DIR
       ? path.resolve(process.env.LYRICS_BASE_DIR)
-      : path.resolve(process.cwd(), 'lyrics');
+      : path.resolve(process.cwd(), 'uploads', 'lyrics');
     const imagesBaseDir = process.env.IMAGES_BASE_DIR
       ? path.resolve(process.env.IMAGES_BASE_DIR)
-      : path.resolve(process.cwd(), 'images');
+      : path.resolve(process.cwd(), 'uploads', 'images');
     await fs.mkdir(musicBaseDir, { recursive: true });
     await fs.mkdir(lyricsBaseDir, { recursive: true });
     await fs.mkdir(imagesBaseDir, { recursive: true });
@@ -77,6 +118,7 @@ export class MusicsService implements OnModuleInit {
     musics: any[];
     page: number;
     limit: number;
+    totalCount: number;
   }> {
     const {
       page = 1,
@@ -104,24 +146,28 @@ export class MusicsService implements OnModuleInit {
       limit: l,
       offset,
     });
-
-    console.log('🔍 Query parameters:', { search, category, musicType, currentMonth, limit: l, offset });
-    console.log('🔍 Raw query:', rawQuery);
+    const cntQuery = buildFindAllCountQuery({
+      search,
+      categoryLabel: category ?? null,
+      musicType: (musicType as any) ?? '',
+    })
     
-    const results = await this.db.execute(rawQuery);
-    
-    console.log('🔍 Query results:', results.rows.length, 'rows found');
-    console.log('🔍 First result:', results.rows[0]);
+    const [results, countRes] = await Promise.all([
+      this.db.execute(rawQuery),
+      this.db.execute(cntQuery),
+    ]);
 
+    const totalCount = Number((countRes.rows?.[0] as any)?.total ?? 0)
     return {
       musics: results.rows,
       page: p,
-      limit: l
+      limit: l,
+      totalCount,
     };
   }
 
   async getRewardsSummary(query: MusicRewardsSummaryQueryDto): Promise<MusicRewardsSummaryResponseDto> {
-    const ym = resolveYearMonthKST(query.yearMonth)
+    const ym = resolveYM(query.yearMonth)
     const [y, m] = ym.split('-').map(Number)
     const { page = 1, limit = 20 } = query
     const { offset, page: p, limit: l } = normalizePagination(page, limit, 100)
@@ -160,6 +206,7 @@ export class MusicsService implements OnModuleInit {
       this.db.execute(listSql),
       this.db.execute(countSql),
     ])
+
 
     const items = (rowsRes.rows || []).map((r: any) => ({
       musicId: Number(r.music_id),
@@ -209,7 +256,7 @@ export class MusicsService implements OnModuleInit {
   }
 
   async getMonthlyRewards(musicId: number, query: MusicMonthlyRewardsQueryDto): Promise<MusicMonthlyRewardsResponseDto> {
-    const endYM = query.endYearMonth ? resolveYearMonthKST(query.endYearMonth) : getDefaultYearMonthKST()
+    const endYM = query.endYearMonth ? resolveYM(query.endYearMonth) : getDefaultYearMonthKST()
     const [endYear, endMonth] = endYM.split('-').map(Number)
     const months = Math.min(Math.max(query.months ?? 12, 1), 24)
 
@@ -233,8 +280,6 @@ export class MusicsService implements OnModuleInit {
       const monthlyRemaining: number | null = r.monthly_remaining !== null && r.monthly_remaining !== undefined ? Number(r.monthly_remaining) : null
       const rewardPerPlay: number | null = r.reward_per_play !== null && r.reward_per_play !== undefined ? Number(r.reward_per_play) : null
       const earned: number = Number(r.earned || 0)
-
-      // usageRate 계산: 잔여 사용분이 있으면 (used/total), 아니면 지급액/호출당리워드, 아니면 유효재생수 기준
       const usageRate: number | null = (() => {
         if (monthlyLimit === null || monthlyLimit <= 0) return null
         if (monthlyRemaining !== null && monthlyRemaining >= 0) {
@@ -286,7 +331,6 @@ export class MusicsService implements OnModuleInit {
       }
 
       const categoryId = categoryExists[0].id;
-      // file path 중복 확인  
       const duplicateMusic = await this.db.select().from(musics).where(eq(musics.file_path, createMusicDto.audioFilePath)).limit(1);
       if (duplicateMusic.length > 0) { throw new Error('동일한 경로의 음원이 존재합니다.') }
 
@@ -342,7 +386,6 @@ export class MusicsService implements OnModuleInit {
         }
       }
 
-      // 성공 응답 반환
       return {
         message: '음원 등록 완료',
         music: {
@@ -371,11 +414,7 @@ export class MusicsService implements OnModuleInit {
 
   async createCategory(dto: { name: string; description?: string }) {
     const name = dto.name.trim();
-    const dup = await this.db
-      .select({ id: music_categories.id })
-      .from(music_categories)
-      .where(sql`LOWER(${music_categories.name}) = LOWER(${name})`)
-      .limit(1);
+    const dup = await this.db.execute(buildCategoryExistsQuery(name));
     if (dup.length > 0) {
       throw new BadRequestException('이미 존재하는 카테고리입니다.');
     }
@@ -454,7 +493,7 @@ export class MusicsService implements OnModuleInit {
 
     const baseDir = process.env.LYRICS_BASE_DIR
       ? path.resolve(process.env.LYRICS_BASE_DIR)
-      : path.resolve(process.cwd(), 'lyrics');
+      : path.resolve(process.cwd(), 'uploads', 'lyrics');
     let relativePath = String(lyrics_file_path).replace(/^[/\\]+/, '');
     relativePath = relativePath.replace(/^lyrics[\\/]/i, '');
     const absPath = path.resolve(baseDir, relativePath);
@@ -477,7 +516,7 @@ export class MusicsService implements OnModuleInit {
   async getRewardsTrend(musicId: number, query: MusicRewardsTrendQueryDto): Promise<MusicRewardsTrendResponseDto> {
     const segment = (query.segment ?? 'category') as 'category' | 'all'
     if (query.granularity === 'daily') {
-      const ym = resolveYearMonthKST(query.yearMonth)
+      const ym = resolveYM(query.yearMonth)
       const [y, m] = ym.split('-').map(Number)
       const sqlQ = buildMusicTrendDailyQuery({
         musicId,
@@ -538,21 +577,13 @@ export class MusicsService implements OnModuleInit {
   }
 
   async getCompanyUsage(musicId: number, query: any) {
-    const ym = resolveYearMonthKST(query.yearMonth)
+    const ym = resolveYM(query.yearMonth)
     const [y, m] = ym.split('-').map(Number)
     const { page = 1, limit = 20, search } = query
     const { offset, page: p, limit: l } = normalizePagination(page, limit, 100)
 
     const listSql = buildMusicCompanyUsageListQuery({ musicId, year: y, month: m, search, limit: l, offset })
     const countSql = buildMusicCompanyUsageCountQuery({ musicId, year: y, month: m, search })
-
-    // 디버깅 로그
-    try {
-      console.log('🔍 [CompanyUsage] params:', { musicId, year: y, month: m, page, limit: l, offset, search: search ?? null })
-      console.log('🔍 [CompanyUsage] listSql:', listSql)
-      console.log('🔍 [CompanyUsage] countSql:', countSql)
-    } catch {}
-
     const [listRes, countRes] = await Promise.all([this.db.execute(listSql), this.db.execute(countSql)])
     const items = (listRes.rows || []).map((r: any, idx: number) => ({
       rank: offset + idx + 1,
@@ -563,27 +594,13 @@ export class MusicsService implements OnModuleInit {
       monthlyPlays: Number(r.monthly_plays || 0),
     }))
     const total = Number((countRes.rows?.[0] as any)?.total || 0)
-
-    try {
-      console.log('🔍 [CompanyUsage] result: items=', items.length, 'total=', total)
-      if (items.length > 0) {
-        console.log('🔍 [CompanyUsage] sample:', items.slice(0, Math.min(3, items.length)))
-      }
-    } catch {}
     return { yearMonth: ym, total, page: p, limit: l, items }
   }
 
   async getTotalCount(query: MusicTotalStatsQueryDto): Promise<MusicTotalStatsResponseDto> {
     const ym = query.yearMonth ?? getDefaultYearMonthKST()
     const [y, m] = ym.split('-').map(Number)
-    const endTsSql = sql`
-      (make_timestamptz(${y}, ${m}, 1, 0, 0, 0, 'Asia/Seoul') + interval '1 month') - interval '1 second'
-    `
-    const q = sql`
-      SELECT COUNT(*)::int AS total
-      FROM ${musics} m
-      WHERE m.created_at <= ${endTsSql}
-    `
+    const q = buildMusicStatsCountQuery(y, m)
     const res = await this.db.execute(q)
     const total = Number((res.rows?.[0] as any)?.total ?? 0)
     return { total, asOf: ym }
@@ -592,16 +609,7 @@ export class MusicsService implements OnModuleInit {
   async getValidPlaysStats(query: PlaysValidStatsQueryDto): Promise<PlaysValidStatsResponseDto> {
     const ym = query.yearMonth ?? getDefaultYearMonthKST()
     const [y, m] = ym.split('-').map(Number)
-    const cte = buildMonthRangeCTE(y, m)
-    const q = sql`
-      ${cte}
-      SELECT
-        COUNT(*) FILTER (WHERE mp.is_valid_play = true)::bigint AS valid_plays,
-        COUNT(*)::bigint AS total_plays,
-        COUNT(*) FILTER (WHERE mp.is_valid_play = true AND mp.reward_code = '1')::bigint AS rewarded_plays
-      FROM music_plays mp, month_range mr
-      WHERE mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
-    `
+    const q = buildValidPlaysStatsQuery(y, m)
     const res = await this.db.execute(q)
     const row = (res.rows?.[0] as any) || {}
     const validPlays = Number(row.valid_plays ?? 0)
@@ -622,80 +630,9 @@ export class MusicsService implements OnModuleInit {
     const ym = query.yearMonth ?? getDefaultYearMonthKST()
     const [y, m] = ym.split('-').map(Number)
     const current = isCurrentYM(ym)
-    const cte = buildMonthRangeCTE(y, m)
-    const qCurrent = sql`
-      ${cte}
-      SELECT 
-        COALESCE(SUM(subscription_revenue), 0) - COALESCE(SUM(usage_revenue), 0) AS mtd
-      FROM (
-        -- 구독료 (결제일 기준)
-        SELECT 
-          COALESCE(SUM(cs.actual_paid_amount), 0) AS subscription_revenue,
-          0 AS usage_revenue
-        FROM company_subscriptions cs
-        JOIN companies c ON c.id = cs.company_id
-        CROSS JOIN month_range mr
-        WHERE c.grade <> 'free'
-          AND DATE(cs.start_date AT TIME ZONE 'Asia/Seoul') >= mr.month_start
-          AND DATE(cs.start_date AT TIME ZONE 'Asia/Seoul') <= NOW()
-        
-        UNION ALL
-        
-        -- 사용료 (유효재생 기준) - 차감
-        SELECT 
-          0 AS subscription_revenue,
-          COALESCE(SUM(
-            CASE 
-              WHEN mp.use_case = '0' OR mp.use_case = '1' THEN m.price_per_play::numeric
-              WHEN mp.use_case = '2' AND m.inst = false THEN m.lyrics_price::numeric
-              ELSE 0
-            END
-          ), 0) AS usage_revenue
-        FROM music_plays mp
-        JOIN musics m ON m.id = mp.music_id
-        CROSS JOIN month_range mr
-        WHERE mp.is_valid_play = true
-          AND mp.created_at >= mr.month_start
-          AND mp.created_at <= NOW()
-      ) revenue_data
-    `
-
-    const qPast = sql`
-      ${cte}
-      SELECT 
-        COALESCE(SUM(subscription_revenue), 0) - COALESCE(SUM(usage_revenue), 0) AS mtd
-      FROM (
-        -- 구독료 (결제일 기준)
-        SELECT 
-          COALESCE(SUM(cs.actual_paid_amount), 0) AS subscription_revenue,
-          0 AS usage_revenue
-        FROM company_subscriptions cs
-        JOIN companies c ON c.id = cs.company_id
-        CROSS JOIN month_range mr
-        WHERE c.grade <> 'free'
-          AND DATE(cs.start_date AT TIME ZONE 'Asia/Seoul') >= mr.month_start
-          AND DATE(cs.start_date AT TIME ZONE 'Asia/Seoul') <= mr.month_end
-        
-        UNION ALL
-        
-        -- 사용료 (유효재생 기준) - 차감
-        SELECT 
-          0 AS subscription_revenue,
-          COALESCE(SUM(
-            CASE 
-              WHEN mp.use_case = '0' OR mp.use_case = '1' THEN m.price_per_play::numeric
-              WHEN mp.use_case = '2' AND m.inst = false THEN m.lyrics_price::numeric
-              ELSE 0
-            END
-          ), 0) AS usage_revenue
-        FROM music_plays mp
-        JOIN musics m ON m.id = mp.music_id
-        CROSS JOIN month_range mr
-        WHERE mp.is_valid_play = true
-          AND mp.created_at >= mr.month_start
-          AND mp.created_at <= mr.month_end
-      ) revenue_data
-    `
+    
+    const qCurrent = buildRevenueForecastCurrentQuery(y, m)
+    const qPast = buildRevenueForecastPastQuery(y, m)
 
     const res = await this.db.execute(current ? qCurrent : qPast)
     const row = (res.rows?.[0] as any) || {}
@@ -706,29 +643,7 @@ export class MusicsService implements OnModuleInit {
 
   async getRewardsFilledStats(query: RewardsFilledStatsQueryDto): Promise<RewardsFilledStatsResponseDto> {
     const ym = resolveYM(query.yearMonth)
-    const [y, m] = ym.split('-').map(Number)
-    const cte = buildMonthRangeCTE(y, m)
-    const q = sql`
-      ${cte}
-        , plays AS (
-        SELECT 
-          mp.music_id,
-          COUNT(*) FILTER (WHERE mp.is_valid_play = true) AS valid_plays,
-          COALESCE(SUM(CASE WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN mp.reward_amount::numeric ELSE 0 END), 0) AS earned,
-          COUNT(*) FILTER (WHERE mp.is_valid_play = true AND mp.reward_code IN ('2', '3')) AS limit_exhausted_plays
-        FROM music_plays mp, month_range mr
-        WHERE mp.created_at >= mr.month_start AND mp.created_at <= mr.month_end
-        GROUP BY mp.music_id
-      )
-      SELECT
-        COUNT(*) FILTER (WHERE mmr.total_reward_count > 0)::bigint AS eligible,
-        COUNT(*) FILTER (
-          WHERE mmr.total_reward_count > 0 AND COALESCE(p.limit_exhausted_plays, 0) > 0
-        )::bigint AS filled
-      FROM monthly_music_rewards mmr
-      LEFT JOIN plays p ON p.music_id = mmr.music_id
-      WHERE mmr.year_month = ${ym}
-    `
+    const q = buildRewardsFilledStatsQuery(ym)
     const res = await this.db.execute(q)
     const row = (res.rows?.[0] as any) || {}
     const eligible = Number(row.eligible ?? 0)
@@ -736,7 +651,6 @@ export class MusicsService implements OnModuleInit {
     const ratio = eligible > 0 ? Math.round((filled / eligible) * 100) : null
     return { eligible, filled, ratio, asOf: ym }
   }
-
 
   async getCategoryTop5(query: CategoryTop5QueryDto): Promise<CategoryTop5ResponseDto> {
     const ym = resolveYM(query.yearMonth)
@@ -759,43 +673,10 @@ export class MusicsService implements OnModuleInit {
 
   async getRealtimeApiStatus(query: RealtimeApiStatusQueryDto): Promise<RealtimeApiStatusResponseDto> {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 20)
-
-    // music_plays 테이블에서 직접 데이터 조회
-    const q = sql`
-      SELECT 
-        mp.id,
-        mp.created_at,
-        CASE WHEN mp.is_valid_play THEN 'success' ELSE 'error' END AS status,
-        CASE 
-          WHEN mp.use_case = '0' THEN '/api/music/play'
-          WHEN mp.use_case = '1' THEN '/api/music/play'
-          WHEN mp.use_case = '2' THEN '/api/lyrics/get'
-          ELSE '/api/unknown'
-        END AS endpoint,
-        CASE 
-          WHEN mp.use_case = '0' THEN '음원 호출'
-          WHEN mp.use_case = '1' THEN '음원 호출'
-          WHEN mp.use_case = '2' THEN '가사 호출'
-          ELSE '알 수 없음'
-        END AS call_type,
-        CASE 
-          WHEN mp.is_valid_play AND mp.reward_code = '1' THEN '리워드 발생'
-          WHEN mp.is_valid_play AND mp.reward_code != '1' THEN '유효재생 (리워드 없음)'
-          ELSE '무효재생'
-        END AS validity,
-        c.name AS company
-      FROM music_plays mp
-      JOIN companies c ON c.id = mp.using_company_id
-      ORDER BY mp.created_at DESC
-      LIMIT ${limit}
-    `
+    const q = buildRealtimeApiStatusQuery(limit)
 
     const res = await this.db.execute(q)
     const rows = (res.rows || []) as any[]
-
-    console.log('🔍 [RealtimeApiStatus] Query executed, rows count:', rows.length)
-    console.log('🔍 [RealtimeApiStatus] Sample data:', rows.slice(0, 3))
-
     const items: RealtimeApiStatusItemDto[] = rows.map((r: any) => ({
       id: r.id || Math.random(),
       status: r.status === 'success' ? 'success' : 'error',
@@ -803,6 +684,8 @@ export class MusicsService implements OnModuleInit {
       callType: r.call_type || '알 수 없음',
       validity: r.validity || '무효재생',
       company: r.company || 'Unknown',
+      musicId: r.music_id ? Number(r.music_id) : undefined,
+      musicTitle: r.music_title || undefined,
       timestamp: r.created_at ? new Date(r.created_at).toLocaleString('ko-KR', {
         year: '2-digit',
         month: '2-digit', 
@@ -819,44 +702,20 @@ export class MusicsService implements OnModuleInit {
 
   async getRealtimeApiCalls(query: RealtimeApiStatusQueryDto): Promise<RealtimeApiStatusResponseDto> {
     const limit = Math.min(Math.max(query.limit ?? 5, 1), 20)
-
-    // music_plays 테이블에서 직접 데이터 조회
-    const q = sql`
-      SELECT 
-        mp.created_at,
-        CASE WHEN mp.is_valid_play THEN 'success' ELSE 'error' END AS status,
-        CASE 
-          WHEN mp.use_case = '0' THEN '/api/music/play'
-          WHEN mp.use_case = '1' THEN '/api/music/play'
-          WHEN mp.use_case = '2' THEN '/api/lyrics/get'
-          ELSE '/api/unknown'
-        END AS endpoint,
-        CASE 
-          WHEN mp.use_case = '0' THEN '음원 호출'
-          WHEN mp.use_case = '1' THEN '음원 호출'
-          WHEN mp.use_case = '2' THEN '가사 호출'
-          ELSE '알 수 없음'
-        END AS call_type,
-        CASE 
-          WHEN mp.is_valid_play THEN '유효재생'
-          ELSE '무효재생'
-        END AS validity,
-        c.name AS company
-      FROM music_plays mp
-      JOIN companies c ON c.id = mp.using_company_id
-      ORDER BY mp.created_at DESC
-      LIMIT ${limit}
-    `
+    const q = buildRealtimeApiCallsQuery(limit)
 
     const res = await this.db.execute(q)
     const rows = (res.rows || []) as any[]
 
     const items: RealtimeApiStatusItemDto[] = rows.map((r: any) => ({
+      id: r.id || Math.random(),
       status: r.status === 'success' ? 'success' : 'error',
       endpoint: r.endpoint || '/api/unknown',
       callType: r.call_type || '알 수 없음',
       validity: r.validity || '무효재생',
       company: r.company || 'Unknown',
+      musicId: r.music_id ? Number(r.music_id) : undefined,
+      musicTitle: r.music_title || undefined,
       timestamp: r.timestamp || '00:00:00',
     }))
 
@@ -869,9 +728,6 @@ export class MusicsService implements OnModuleInit {
     const res = await this.db.execute(q)
     const rows = (res.rows || []) as any[]
 
-    // console.log(`[TopTracks] Fetching top ${limit} tracks based on 24h valid plays`)
-    // console.log(`[TopTracks] Found ${rows.length} tracks`)
-
     const items: RealtimeTopTracksItemDto[] = rows.map((r: any) => ({
       rank: Number(r.rank || 0),
       title: r.title || 'Unknown Track',
@@ -880,7 +736,6 @@ export class MusicsService implements OnModuleInit {
       validRate: Number(r.valid_rate || 0),
     }))
 
-    //console.log(`[TopTracks] Top track: ${items[0]?.title} with ${items[0]?.validPlays} valid plays`)
     return { items }
   }
 
@@ -911,13 +766,13 @@ export class MusicsService implements OnModuleInit {
     try {
       const musicBaseDir = process.env.MUSIC_BASE_DIR
         ? path.resolve(process.env.MUSIC_BASE_DIR)
-        : path.resolve(process.cwd(), 'music');
+        : path.resolve(process.cwd(), 'uploads', 'music');
       const lyricsBaseDir = process.env.LYRICS_BASE_DIR
         ? path.resolve(process.env.LYRICS_BASE_DIR)
-        : path.resolve(process.cwd(), 'lyrics');
+        : path.resolve(process.cwd(), 'uploads', 'lyrics');
       const imagesBaseDir = process.env.IMAGES_BASE_DIR
         ? path.resolve(process.env.IMAGES_BASE_DIR)
-        : path.resolve(process.cwd(), 'images');
+        : path.resolve(process.cwd(), 'uploads', 'images');
 
       await fs.mkdir(musicBaseDir, { recursive: true });
       await fs.mkdir(lyricsBaseDir, { recursive: true });
@@ -1003,12 +858,12 @@ export class MusicsService implements OnModuleInit {
 
     // 원격 URL인 경우(레거시 데이터 호환)
     if (/^https?:\/\//i.test(cover)) {
-      return { url: cover, isUrl: true };
+      return { url: cover, isUrl: true };   
     }
 
     const imagesBaseDir = process.env.IMAGES_BASE_DIR
       ? path.resolve(process.env.IMAGES_BASE_DIR)
-      : path.resolve(process.cwd(), 'images');
+      : path.resolve(process.cwd(), 'uploads', 'images');
 
     const relative = String(cover).replace(/^[/\\]+/, '');
     const absPath = path.resolve(imagesBaseDir, relative);
@@ -1140,15 +995,7 @@ export class MusicsService implements OnModuleInit {
     const [yy, mm] = ym.split('-').map(Number)
 
     // 사용량 계산(보강): 1) rewards 지급건수, 2) (mmr.total - mmr.remaining) 중 더 큰 값 사용
-    const cte = buildMonthRangeCTE(yy, mm)
-    const rewardsCntRes = await this.db.execute(sql`
-      ${cte}
-      SELECT COUNT(*)::int AS rewarded
-      FROM rewards r, month_range mr
-      WHERE r.music_id = ${musicId}
-        AND r.reward_code = '1'
-        AND r.created_at >= mr.month_start AND r.created_at <= mr.month_end
-    `)
+    const rewardsCntRes = await this.db.execute(buildMusicRewardsCountQuery(musicId, yy, mm))
     const rewardedCnt = Number((rewardsCntRes.rows?.[0] as any)?.rewarded ?? 0)
 
     const mmrRowRes = await this.db

@@ -1,26 +1,31 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Res, UseInterceptors, UploadedFiles, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Res, UseInterceptors, UploadedFiles, BadRequestException, ValidationPipe } from '@nestjs/common';
 import { MusicsService } from './musics.service';
-import { CreateMusicDto } from './dto/create-music.dto';
-import { UpdateMusicDto } from './dto/update-music.dto';
-import { FindMusicsDto } from './dto/find-musics.dto';
-import { DeleteMusicsDto } from './dto/delete-musics.dto';
 import type { Response } from 'express';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import * as fs from 'fs';
-import { UpdateRewardDto } from './dto/update-reward.dto';
-import { CreateCategoryDto } from './dto/create-category.dto';
-import { MusicRewardsSummaryQueryDto } from './dto/music-rewards-summary.dto';
-import { ValidationPipe } from '@nestjs/common';
-import { MusicRewardsTrendQueryDto } from './dto/music-rewards-trend.dto';
-import { MusicMonthlyRewardsQueryDto } from './dto/music-monthly-rewards.dto';
-import { MusicCompanyUsageQueryDto } from './dto/music-company-usage.dto';
-import { MusicTotalStatsQueryDto } from './dto/music-stats.dto';
-import { PlaysValidStatsQueryDto } from './dto/plays-valid-stats.dto';
-import { RevenueForecastQueryDto } from './dto/revenue-forecast.dto';
-import { RewardsFilledStatsQueryDto } from './dto/rewards-filled-stats.dto';
-import { CategoryTop5QueryDto } from './dto/category-top5.dto';
-import { RealtimeApiStatusQueryDto, RealtimeTopTracksQueryDto, RealtimeTransactionsQueryDto } from './dto/realtime.dto';
+
+// DTOs
+import {
+  CreateMusicDto,
+  UpdateMusicDto,
+  FindMusicsDto,
+  DeleteMusicsDto,
+  UpdateRewardDto,
+  CreateCategoryDto,
+  MusicRewardsSummaryQueryDto,
+  MusicRewardsTrendQueryDto,
+  MusicMonthlyRewardsQueryDto,
+  MusicCompanyUsageQueryDto,
+  MusicTotalStatsQueryDto,
+  PlaysValidStatsQueryDto,
+  RevenueForecastQueryDto,
+  RewardsFilledStatsQueryDto,
+  CategoryTop5QueryDto,
+  RealtimeApiStatusQueryDto,
+  RealtimeTopTracksQueryDto,
+  RealtimeTransactionsQueryDto
+} from './dto';
 
 @Controller('/admin/musics')
 export class MusicsController {
@@ -86,10 +91,6 @@ export class MusicsController {
     return this.musicsService.getRewardsFilledStats(query);
   }
 
-  @Get('stats/category-top5')
-  async getCategoryTop5(@Query(new ValidationPipe({ transform: true })) query: CategoryTop5QueryDto) {
-    return this.musicsService.getCategoryTop5(query);
-  }
 
   @Get('realtime/api-status')
   async getRealtimeApiStatus(@Query(new ValidationPipe({ transform: true })) query: RealtimeApiStatusQueryDto) {
@@ -99,6 +100,11 @@ export class MusicsController {
   @Get('realtime/api-calls')
   async getRealtimeApiCalls(@Query(new ValidationPipe({ transform: true })) query: RealtimeApiStatusQueryDto) {
     return this.musicsService.getRealtimeApiCalls(query);
+  }
+
+  @Get('stats/category-top5')
+  async getCategoryTop5(@Query(new ValidationPipe({ transform: true })) query: CategoryTop5QueryDto) {
+    return this.musicsService.getCategoryTop5(query);
   }
 
   @Get('realtime/top-tracks')
