@@ -19,6 +19,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed:music-categories": "ts-node src/scripts/seedCategories.ts",
+    "seed:companies": "ts-node src/scripts/seed-companies.ts",
+    "seed:company-subscriptions": "ts-node src/scripts/seed-company-subscriptions.ts",
     "db:generate": "drizzle-kit generate --config=./drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=./drizzle.config.ts",
     "db:studio": "drizzle-kit studio --config=./drizzle.config.ts"

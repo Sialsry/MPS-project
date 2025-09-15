@@ -7,9 +7,9 @@ const LOCK_KEY = 2025091201;
 
 @Injectable()
 export class TagsCron {
-  constructor(private readonly tags: TagsService) {}
+  constructor(private readonly tags: TagsService) { }
 
-  @Cron('0 0 */2 * * *', { timeZone: 'Asia/Seoul' })
+  @Cron('0 */15 * * * *', { timeZone: 'Asia/Seoul' })
   async everyMinute() {
     if (process.env.TAGS_AUTO_NORMALIZE !== '1') return;
     await this.runSafely(async () => {
