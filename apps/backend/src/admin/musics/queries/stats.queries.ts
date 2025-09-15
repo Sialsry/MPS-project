@@ -35,6 +35,9 @@ export const buildCategoryTop5Query = (ymYear: number, ymMonth: number, tz: stri
 export const buildRealtimeApiStatusQuery = (limit: number = 5) => sql`
   WITH recent_plays AS (
     SELECT 
+      mp.id,
+      mp.music_id,
+      m.title AS music_title,
       mp.created_at,
       CASE WHEN mp.is_valid_play THEN 'success' ELSE 'error' END AS status,
       CASE 
@@ -56,10 +59,14 @@ export const buildRealtimeApiStatusQuery = (limit: number = 5) => sql`
       c.name AS company
     FROM music_plays mp
     JOIN companies c ON c.id = mp.using_company_id
+    LEFT JOIN musics m ON m.id = mp.music_id
     ORDER BY mp.created_at DESC
     LIMIT ${limit * 3}
   )
   SELECT 
+    id,
+    music_id,
+    music_title,
     status,
     endpoint,
     call_type,

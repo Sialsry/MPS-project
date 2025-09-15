@@ -18,7 +18,7 @@ import { MusicRewardsSummaryQueryDto, MusicRewardsSummaryResponseDto } from './d
 import { MusicRewardsTrendQueryDto, MusicRewardsTrendResponseDto } from './dto/music-rewards-trend.dto';
 import { MusicMonthlyRewardsQueryDto, MusicMonthlyRewardsResponseDto } from './dto/music-monthly-rewards.dto';
 import { buildMusicRewardsSummaryQuery, buildMusicRewardsSummaryCountQuery, buildMusicRewardsOrderSql } from './queries/rewards.queries';
-import { buildFindAllQuery, buildFindOneQuery, buildUpsertNextMonthRewardsQuery, buildCleanupOrphanCategoriesQuery } from './queries/musics.queries';
+import { buildFindAllQuery, buildFindAllCountQuery, buildFindOneQuery, buildUpsertNextMonthRewardsQuery, buildCleanupOrphanCategoriesQuery } from './queries/musics.queries';
 import { buildMusicTrendDailyQuery, buildMusicTrendMonthlyQuery } from './queries/trend.queries';
 import { buildMusicMonthlyRewardsQuery } from './queries/monthly.queries';
 import { buildMusicCompanyUsageListQuery, buildMusicCompanyUsageCountQuery } from './queries/company-usage.queries';
@@ -77,6 +77,7 @@ export class MusicsService implements OnModuleInit {
     musics: any[];
     page: number;
     limit: number;
+    totalCount: number;
   }> {
     const {
       page = 1,
@@ -104,19 +105,29 @@ export class MusicsService implements OnModuleInit {
       limit: l,
       offset,
     });
+    const cntQuery = buildFindAllCountQuery({
+      search,
+      categoryLabel: category ?? null,
+      musicType: (musicType as any) ?? '',
+    })
 
     console.log('🔍 Query parameters:', { search, category, musicType, currentMonth, limit: l, offset });
     console.log('🔍 Raw query:', rawQuery);
     
-    const results = await this.db.execute(rawQuery);
+    const [results, countRes] = await Promise.all([
+      this.db.execute(rawQuery),
+      this.db.execute(cntQuery),
+    ]);
     
     console.log('🔍 Query results:', results.rows.length, 'rows found');
     console.log('🔍 First result:', results.rows[0]);
 
+    const totalCount = Number((countRes.rows?.[0] as any)?.total ?? 0)
     return {
       musics: results.rows,
       page: p,
-      limit: l
+      limit: l,
+      totalCount,
     };
   }
 
@@ -160,6 +171,7 @@ export class MusicsService implements OnModuleInit {
       this.db.execute(listSql),
       this.db.execute(countSql),
     ])
+
 
     const items = (rowsRes.rows || []).map((r: any) => ({
       musicId: Number(r.music_id),
@@ -764,6 +776,7 @@ export class MusicsService implements OnModuleInit {
     const q = sql`
       SELECT 
         mp.id,
+        mp.music_id,
         mp.created_at,
         CASE WHEN mp.is_valid_play THEN 'success' ELSE 'error' END AS status,
         CASE 
@@ -783,9 +796,11 @@ export class MusicsService implements OnModuleInit {
           WHEN mp.is_valid_play AND mp.reward_code != '1' THEN '유효재생 (리워드 없음)'
           ELSE '무효재생'
         END AS validity,
-        c.name AS company
+        c.name AS company,
+        m.title AS music_title
       FROM music_plays mp
       JOIN companies c ON c.id = mp.using_company_id
+      LEFT JOIN musics m ON m.id = mp.music_id
       ORDER BY mp.created_at DESC
       LIMIT ${limit}
     `
@@ -803,6 +818,8 @@ export class MusicsService implements OnModuleInit {
       callType: r.call_type || '알 수 없음',
       validity: r.validity || '무효재생',
       company: r.company || 'Unknown',
+      musicId: r.music_id ? Number(r.music_id) : undefined,
+      musicTitle: r.music_title || undefined,
       timestamp: r.created_at ? new Date(r.created_at).toLocaleString('ko-KR', {
         year: '2-digit',
         month: '2-digit', 
@@ -852,11 +869,14 @@ export class MusicsService implements OnModuleInit {
     const rows = (res.rows || []) as any[]
 
     const items: RealtimeApiStatusItemDto[] = rows.map((r: any) => ({
+      id: r.id || Math.random(),
       status: r.status === 'success' ? 'success' : 'error',
       endpoint: r.endpoint || '/api/unknown',
       callType: r.call_type || '알 수 없음',
       validity: r.validity || '무효재생',
       company: r.company || 'Unknown',
+      musicId: r.music_id ? Number(r.music_id) : undefined,
+      musicTitle: r.music_title || undefined,
       timestamp: r.timestamp || '00:00:00',
     }))
 
