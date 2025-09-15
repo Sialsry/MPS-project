@@ -379,8 +379,8 @@ export class SchedulerService {
         this.logger.log('스케줄러 서비스가 초기화되었습니다.');
     }
 
-    // 매일 밤 12시 10분에 실행 (0 10 0 * * *)
-    @Cron('0 10 0 * * *', {
+    // 매일 오전 9시 50분에 실행
+    @Cron('9 50 0 * * *', {
         name: 'dailyBlockchainRecord',
         timeZone: 'Asia/Seoul'
     })
@@ -653,6 +653,7 @@ export class SchedulerService {
         const processDate = targetDate || (() => {
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate());
+            console.log(yesterday, "today 날짜입니다.")
             return yesterday;
         })();
 

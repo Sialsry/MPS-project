@@ -27,6 +27,7 @@ export class RealtimeService {
     const query = sql`
       SELECT 
         mp.id,
+        mp.music_id,
         mp.created_at,
         CASE 
           WHEN mp.is_valid_play = true AND mp.reward_code = '1' THEN 'success'
@@ -47,9 +48,11 @@ export class RealtimeService {
           WHEN mp.is_valid_play = true AND mp.reward_code != '1' THEN '유효재생 (리워드 없음)'
           ELSE '무효재생'
         END as validity,
-        c.name as company
+        c.name as company,
+        m.title as music_title
       FROM music_plays mp
       LEFT JOIN companies c ON c.id = mp.using_company_id
+      LEFT JOIN musics m ON m.id = mp.music_id
       WHERE mp.created_at >= NOW() - INTERVAL '5 minutes'
       ORDER BY mp.created_at DESC
       LIMIT 50
@@ -58,11 +61,13 @@ export class RealtimeService {
     const result = await db.execute(query)
     return result.rows.map((row: any) => ({
       id: row.id,
+      musicId: row.music_id ? Number(row.music_id) : undefined,
       status: row.status,
       endpoint: row.endpoint,
       callType: row.call_type,
       validity: row.validity,
       company: row.company || '알 수 없음',
+      musicTitle: row.music_title || undefined,
       timestamp: row.created_at ? new Date(row.created_at).toLocaleTimeString('ko-KR') : '00:00:00'
     }))
   }
