@@ -1,23 +1,52 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { CreateCompanyDto } from './dto/create-company.dto';
-import { UpdateCompanyDto } from './dto/update-company.dto';
-import type { DB } from '../../db/client';
-import { sql } from 'drizzle-orm';
-import type { RewardsSummaryQueryDto } from './dto/rewards-summary.query.dto';
-import { getDefaultYearMonthKST, isValidYearMonth, resolveYearMonthKST } from '../../common/utils/date.util';
-import { normalizePagination } from '../../common/utils/pagination.util';
-import { normalizeSort } from '../../common/utils/sort.util';
-import { buildSummaryQuery, buildDailyQuery, buildByMusicQuery, buildSummaryListBaseQuery, buildDailyIndustryAvgQuery, buildMonthlyCompanyQuery, buildMonthlyIndustryAvgQuery } from './queries/rewards.queries';
-import { buildRenewalStatsQuery, buildHourlyValidPlaysQuery, buildTierDistributionQuery, buildRevenueCalendarQuery, buildRevenueTrendsQuery, buildRevenueCompaniesQuery, buildRevenueCompaniesCumulativeQuery } from './queries/stats.queries';
-import { RevenueCalendarQueryDto, RevenueCalendarResponseDto, RevenueCalendarDayDto } from './dto/revenue-calendar.dto';
-import { RevenueTrendsQueryDto, RevenueTrendsResponseDto, RevenueTrendsItemDto } from './dto/revenue-trends.dto';
-import { RevenueCompaniesQueryDto, RevenueCompaniesResponseDto, RevenueCompaniesItemDto } from './dto/revenue-companies.dto';
-import { CompanyTotalStatsQueryDto, CompanyTotalStatsResponseDto } from './dto/company-stats.dto';
-import { APP_CONFIG } from '../../config/app.config';
-import { RenewalStatsQueryDto, RenewalStatsResponseDto } from './dto/renewal-stats.dto';
-import { HourlyPlaysQueryDto, HourlyPlaysResponseDto } from './dto/hourly-plays.dto';
-import { TierDistributionQueryDto, TierDistributionResponseDto } from './dto/tier-distribution.dto';
-import { buildDayRangeCTE } from '../../common/utils/date.util';
+import { Injectable, Inject } from '@nestjs/common'
+import type { DB } from '../../db/client'
+import { sql } from 'drizzle-orm'
+import { APP_CONFIG } from '../../config/app.config'
+import { getDefaultYearMonthKST, isValidYearMonth, resolveYearMonthKST, buildDayRangeCTE } from '../../common/utils/date.util'
+import { normalizePagination } from '../../common/utils/pagination.util'
+import { normalizeSort } from '../../common/utils/sort.util'
+
+// DTOs
+import {
+  CreateCompanyDto,
+  UpdateCompanyDto,
+  RewardsSummaryQueryDto,
+  RevenueCalendarQueryDto,
+  RevenueCalendarResponseDto,
+  RevenueCalendarDayDto,
+  RevenueTrendsQueryDto,
+  RevenueTrendsResponseDto,
+  RevenueTrendsItemDto,
+  RevenueCompaniesQueryDto,
+  RevenueCompaniesResponseDto,
+  RevenueCompaniesItemDto,
+  CompanyTotalStatsQueryDto,
+  CompanyTotalStatsResponseDto,
+  RenewalStatsQueryDto,
+  RenewalStatsResponseDto,
+  HourlyPlaysQueryDto,
+  HourlyPlaysResponseDto,
+  TierDistributionQueryDto,
+  TierDistributionResponseDto
+} from './dto'
+
+// Queries
+import {
+  buildSummaryQuery,
+  buildDailyQuery,
+  buildByMusicQuery,
+  buildSummaryListBaseQuery,
+  buildDailyIndustryAvgQuery,
+  buildMonthlyCompanyQuery,
+  buildMonthlyIndustryAvgQuery,
+  buildRenewalStatsQuery,
+  buildHourlyValidPlaysQuery,
+  buildTierDistributionQuery,
+  buildRevenueCalendarQuery,
+  buildRevenueTrendsQuery,
+  buildRevenueCompaniesQuery,
+  buildRevenueCompaniesCumulativeQuery
+} from './queries'
 
 @Injectable()
 export class CompanyService {
@@ -231,7 +260,9 @@ export class CompanyService {
   }
 
   async getRevenueCalendar(query: RevenueCalendarQueryDto): Promise<RevenueCalendarResponseDto> {
+    console.log('🔍 [RevenueCalendar] query.yearMonth:', query.yearMonth)
     const ym = resolveYearMonthKST(query.yearMonth)
+    console.log('🔍 [RevenueCalendar] resolved ym:', ym)
     const [y, m] = ym.split('-').map(Number)
     const tz = 'Asia/Seoul'
 

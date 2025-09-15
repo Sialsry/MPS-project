@@ -74,6 +74,40 @@ export function buildFindAllQuery(params: {
   return query
 }
 
+export function buildFindAllCountQuery(params: {
+  search?: string
+  categoryLabel?: string | null
+  musicType?: 'Inst' | '일반' | '전체'
+}) {
+  const { search, categoryLabel, musicType } = params
+
+  const conditions: any[] = []
+  if (search) {
+    conditions.push(sql`(musics.title ILIKE ${`%${search}%`} OR musics.artist ILIKE ${`%${search}%`} OR music_tags.text ILIKE ${`%${search}%`})`)
+  }
+  if (categoryLabel && categoryLabel !== '전체') {
+    conditions.push(sql`music_categories.name = ${categoryLabel}`)
+  }
+  if (musicType && musicType !== '전체') {
+    if (musicType === 'Inst') {
+      conditions.push(sql`musics.inst = true`)
+    } else if (musicType === '일반') {
+      conditions.push(sql`musics.inst = false`)
+    }
+  }
+
+  const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``
+
+  const q = sql`
+    SELECT COUNT(DISTINCT musics.id) AS total
+    FROM musics
+    LEFT JOIN music_categories ON musics.category_id = music_categories.id
+    LEFT JOIN music_tags ON musics.id = music_tags.music_id
+    ${whereClause}
+  `
+  return q
+}
+
 export function buildFindOneQuery(id: number, currentMonth: string) {
   return sql`
     SELECT
