@@ -20,6 +20,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed:music-categories": "ts-node src/scripts/seedCategories.ts",
     "seed:companies": "ts-node src/scripts/seed-companies.ts",
+    "seed:plays-rewards": "ts-node src/scripts/seed-plays-and-rewards.ts",
+    "seed:monthly-rewards": "ts-node src/scripts/seed-monthly-music-rewards.ts",
     "seed:company-subscriptions": "ts-node src/scripts/seed-company-subscriptions.ts",
     "db:generate": "drizzle-kit generate --config=./drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=./drizzle.config.ts",
