@@ -283,10 +283,10 @@ export class MusicController {
         // 합산하되 [-20s, +20s]로 클램프 (둘 다 걸려도 과도하게 치우치지 않게)
         // let skewMs = Math.max(-MAX_SKEW_MS, Math.min(MAX_SKEW_MS, bitrateSkewMs + sizeSkewMs));
         // (예) 전체적으로 8초 빨리 끝내고 싶다면:
-        let skewMs: number = -40_000;
+        let skewMs: number = 0;
         console.log(isSmallFile);
         // (예) 저용량만 +12초 늦추고 싶다면:
-        if (isSmallFile) skewMs += +60_000;
+        // if (isSmallFile) skewMs += +60_000;
         // 목표 절반 시각(조정): halfAbsAdj
         const halfAbsAdj = t.startedAt + halfMs + skewMs;
 
