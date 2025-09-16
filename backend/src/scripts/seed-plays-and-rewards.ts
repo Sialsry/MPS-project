@@ -62,6 +62,13 @@ function pickEnum<T extends string>(arr: readonly T[]): T {
 
 async function main() {
     const now = new Date()
+    // Use up to yesterday (exclude today)
+    const yesterdayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+    yesterdayUtc.setUTCDate(yesterdayUtc.getUTCDate() - 1)
+    if (yesterdayUtc.getTime() < START_DATE.getTime()) {
+        console.log('End date is before start date. Nothing to seed.')
+        return
+    }
 
     // Fetch existing companies and musics
     const [companyRows, musicRows] = await Promise.all([
@@ -89,7 +96,7 @@ async function main() {
         }
     }
 
-    const days = daysBetweenInclusive(START_DATE, now)
+    const days = daysBetweenInclusive(START_DATE, yesterdayUtc)
     const weights = buildDailyWeights(days)
     const countsPerDay = splitTotalByWeights(TOTAL_PLAYS, weights)
 
