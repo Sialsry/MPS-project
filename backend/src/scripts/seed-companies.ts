@@ -24,6 +24,42 @@ function makeBusinessNumber(i: number) {
     return `110-${mid}-${tail}`
 }
 
+// Realistic Korean-style company name generator
+const KR_BRANDS = [
+    '한빛', '누리', '가온', '이룸', '라온', '다온', '한결', '바람', '새봄', '별빛',
+    '해솔', '온새미로', '맑음', '푸름', '나래', '하늘', '모아', '도담', '다솜', '온기',
+    '미르', '새결', '소담', '오름',
+]
+const KR_SUFFIXES = [
+    '테크', '솔루션', '미디어', '바이오', '모빌리티', '네트웍스', '소프트', '디지털', '랩스', '스튜디오', '시스템', '엔지니어링', '커머스', '푸드', '에너지',
+]
+const KR_LEGAL = ['주식회사', '(주)', '유한회사'] as const
+
+const EN_BRANDS = [
+    'hanbit', 'nuri', 'gaon', 'eroom', 'laon', 'daon', 'hangyeol', 'baram', 'saebom', 'byeolbit',
+    'haesol', 'onsaemiro', 'malgeum', 'pureum', 'narae', 'haneul', 'moa', 'dodam', 'dasom', 'ongi',
+    'mir', 'saegyeol', 'sodam', 'oreum',
+]
+const EN_SUFFIXES = [
+    'tech', 'solutions', 'media', 'bio', 'mobility', 'networks', 'soft', 'digital', 'labs', 'studio', 'systems', 'engineering', 'commerce', 'food', 'energy',
+]
+
+function buildCompanyNameAndSlug(index: number) {
+    const bi = index % KR_BRANDS.length
+    const si = index % KR_SUFFIXES.length
+    const li = index % KR_LEGAL.length
+    const brandKr = KR_BRANDS[bi]
+    const suffixKr = KR_SUFFIXES[si]
+    const brandEn = EN_BRANDS[bi]
+    const suffixEn = EN_SUFFIXES[si]
+    const legal = KR_LEGAL[li]
+    // Randomly choose prefix or suffix legal form, but deterministically by index for stability
+    const usePrefix = (index % 2) === 0
+    const nameKr = usePrefix ? `${legal}${brandKr}${suffixKr}` : `${legal} ${brandKr}${suffixKr}`
+    const slug = `${brandEn}-${suffixEn}-${pad(index + 1, 2)}`
+    return { nameKr, slug }
+}
+
 async function main() {
     const baseFrom = new Date('2025-01-01T00:00:00+09:00')
     const now = new Date()
@@ -43,17 +79,18 @@ async function main() {
     const rows: NewCompany[] = grades.map((grade, idx) => {
         const n = idx + 1
         const createdAt = randomDate(baseFrom, now)
-        const name = `Demo Company ${pad(n, 2)}`
+        const { nameKr, slug } = buildCompanyNameAndSlug(idx)
+        const domain = `${slug}.example.com`
         return {
-            name,
+            name: nameKr,
             business_number: makeBusinessNumber(n),
-            email: `company${pad(n, 2)}@example.com`,
+            email: `info@${domain}`,
             password_hash: passwordHash,
-            phone: `010-${pad(1000 + n, 4)}-${pad(1000 + (n * 7) % 9000, 4)}`,
+            phone: `010-${pad(1000 + (n * 37) % 9000, 4)}-${pad(1000 + (n * 71) % 9000, 4)}`,
             grade: grade as any,
-            ceo_name: `CEO ${pad(n, 2)}`,
+            ceo_name: `대표 ${pad(n, 2)}`,
             profile_image_url: null,
-            homepage_url: `https://company${pad(n, 2)}.example.com`,
+            homepage_url: `https://${domain}`,
             smart_account_address: null,
             api_key_hash: null,
             total_rewards_earned: '0' as any,
