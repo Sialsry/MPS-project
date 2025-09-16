@@ -556,43 +556,33 @@ export class MeService {
 
     // 총 개수
     const cntRes = await this.db.execute(sql`
-      SELECT COUNT(*)::text AS c
-      FROM ${music_plays} p
-      WHERE p.using_company_id = ${companyId} AND p.music_id = ${musicId}
-    `);
+    SELECT COUNT(*)::text AS c
+    FROM ${music_plays} p
+    WHERE p.using_company_id = ${companyId} AND p.music_id = ${musicId}
+  `);
     const total = Number((cntRes as any).rows?.[0]?.c ?? '0');
 
-    // 리스트: p.meta 제거 → NULL로 대체
+    // 리스트: is_valid는 rewards와 무관하게 p.is_valid_play만 사용
     const listRes = await this.db.execute(sql`
-      SELECT
-        p.id AS play_id,
-        to_char(timezone(${TZ}, p.created_at), 'YYYY-MM-DD HH24:MI') AS played_at,
-        CASE
-          WHEN r.id IS NOT NULL
-           AND r.status = ANY(${sql`ARRAY['pending'::reward_status,'successed'::reward_status]`})
-          THEN TRUE ELSE FALSE
-        END AS is_valid,
-        NULL::jsonb AS meta,                    -- ⬅⬅⬅ 여기!
-        r.id   AS reward_id,
-        r.reward_code,
-        r.amount::text AS amount,
-        r.status
-      FROM ${music_plays} p
-      LEFT JOIN ${rewards} r
-        ON r.play_id = p.id
-       AND r.reward_code = ${REWARD_CODE_EARNING}::reward_code
-      WHERE p.using_company_id = ${companyId} AND p.music_id = ${musicId}
-      ORDER BY p.created_at DESC, p.id DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `);
+    SELECT
+      p.id AS play_id,
+      to_char(timezone(${TZ}::text, p.created_at), 'YYYY-MM-DD HH24:MI') AS played_at,
+      p.is_valid_play AS is_valid,          -- ✅ 플레이 자체 플래그만 사용
+      NULL::jsonb AS meta,                  -- 의도대로 meta는 항상 null(jsonb)
+      r.id   AS reward_id,                  -- 리워드는 참고용으로만
+      r.reward_code,
+      r.amount::text AS amount,
+      r.status
+    FROM ${music_plays} p
+    LEFT JOIN ${rewards} r
+      ON r.play_id = p.id                   -- ✅ 코드 필터 제거: 매칭되면 붙고, 없으면 NULL
+    WHERE p.using_company_id = ${companyId}
+      AND p.music_id = ${musicId}
+    ORDER BY p.created_at DESC, p.id DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `);
 
-    console.log(listRes);
-
-    const rows: Array<{
-      play_id: number; played_at: string; is_valid: boolean; meta: any;
-      reward_id: number | null; reward_code: '0' | '1' | '2' | '3' | null;
-      amount: string | null; status: 'pending' | 'successed' | null;
-    }> = (listRes as any).rows ?? [];
+    const rows = (listRes as any).rows ?? [];
 
     return {
       page, limit, total,
