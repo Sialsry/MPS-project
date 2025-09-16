@@ -8,28 +8,16 @@ import { join } from 'path';
 import * as crypto from 'crypto';
 import { MusicService } from './music.service';
 
-// v1: 기존 (playId 없음)
-type PlayTokenV1 = {
+type PlayToken = {
     v: 1;
     musicId: number;
     companyId: number;
-    startedAt: number;
-    t50?: number;
-    b50?: number;
-    maxSent?: number;
+    startedAt: number;   // epoch ms
+    // ⬇ stateless 보정/선형 진행 관리용
+    t50?: number;        // 50% 도달 시각(ms)
+    b50?: number;        // 50% 도달 당시 바이트 위치(end+1)
+    maxSent?: number;    // 지금까지 보낸 최대 바이트(end+1)
 };
-// v2: playId 포함
-type PlayTokenV2 = {
-    v: 2;
-    musicId: number;
-    companyId: number;
-    startedAt: number;
-    t50?: number;
-    b50?: number;
-    maxSent?: number;
-    playId: number;
-};
-type PlayToken = PlayTokenV1 | PlayTokenV2;
 
 @Controller('music')
 export class MusicController {
@@ -64,16 +52,15 @@ export class MusicController {
         try {
             const json = Buffer.from(b64, 'base64url').toString('utf8');
             if (this.sign(json) !== sig) return null;
-            const obj = JSON.parse(json) as any;
-            if (obj?.v === 1) return obj as PlayTokenV1;
-            if (obj?.v === 2 && typeof obj.playId === 'number') return obj as PlayTokenV2;
-            return null;
+            const obj = JSON.parse(json) as PlayToken;
+            if (obj?.v !== 1) return null;
+            return obj;
         } catch {
             return null;
         }
     }
-    private issueToken(musicId: number, companyId: number, playId: number): string {
-        const token: PlayTokenV2 = { v: 2, musicId, companyId, playId, startedAt: Date.now() };
+    private issueToken(musicId: number, companyId: number): string {
+        const token: PlayToken = { v: 1, musicId, companyId, startedAt: Date.now() };
         return this.toWire(token);
     }
     private getCookie(req: Request, name: string): string | null {
@@ -111,7 +98,6 @@ export class MusicController {
             const apiKey = headerApiKey || apiKeyQuery;
             if (apiKey) {
                 company = await this.musicService.validateApiKey(apiKey);
-                if (!company) throw new HttpException('잘못된 API Key 입니다.', HttpStatus.UNAUTHORIZED);
             }
 
             // 2) 토큰 (헤더/쿼리/쿠키 중 가장 최신)
@@ -122,7 +108,7 @@ export class MusicController {
             if (!company && token) {
                 company = await this.musicService.findCompanyById(token.companyId);
             }
-            if (!company) throw new HttpException('API Key 가 필요합니다.', HttpStatus.UNAUTHORIZED);
+            if (!company) throw new HttpException('API 키가 필요합니다.', HttpStatus.UNAUTHORIZED);
 
             // 3) 음원/권한
             const music = await this.musicService.findById(musicId);
@@ -130,20 +116,16 @@ export class MusicController {
             const ok = await this.musicService.checkPlayPermission(company, music);
             if (!ok) throw new HttpException('재생 권한이 없습니다.', HttpStatus.FORBIDDEN);
 
-            // 4) 세션 + 토큰(v2) 기반 재사용 정책
-            let isInitialAttempt = !range || !range.startsWith('bytes=') || /^bytes=0-?\d*$/.test(range.trim());
-            // v2 playId 채택 전 검증: 다른 company/music 토큰이면 무시
-            let musicPlayId: number | null = null;
-            if (token && (token as any).v === 2) {
-                if (token.companyId === company.id && token.musicId === musicId) {
-                    musicPlayId = (token as any).playId;
-                }
-            }
+            // 4) 세션
+            const activeSession = await this.musicService.findActiveSession(music.id, company.id);
+            let musicPlayId: number;
             let rewardInfo: any;
             let rewardAmount: any;
-
-            const createNewSession = async () => {
-                console.log('[play] creating new session: music', music.id, 'company', company.id, 'reason=isInitialAttempt?', isInitialAttempt, 'prevPlayId', musicPlayId);
+            if (activeSession) {
+                musicPlayId = activeSession.id;
+                rewardInfo = activeSession.reward_code;
+                rewardAmount = activeSession.reward_amount ?? 0;
+            } else {
                 rewardInfo = await this.musicService.getRewardCode(musicId, company.id);
                 const rewardRow = await this.musicService.findRewardById(musicId);
                 rewardAmount = rewardRow ? rewardRow.reward_per_play : 0;
@@ -157,74 +139,18 @@ export class MusicController {
                 });
                 musicPlayId = startPlay.id;
                 await this.musicService.updateInitMusicStats(music.id);
-            };
-
-            const activeCandidate = await this.musicService.findActiveSession(music.id, company.id);
-            // 1초 쿨다운: 최근 생성된 세션이 있고 아직 전송 진행(=maxSent)>0 이거나 isInitialAttempt 재요청이면 재사용
-            const COOL_MS = 1000;
-            const nowTsInit = Date.now();
-            if (musicPlayId && activeCandidate && activeCandidate.id === musicPlayId) {
-                // 기존 세션 존재
-                const tokenProgress = (token as any)?.maxSent || 0;
-                if (isInitialAttempt && tokenProgress > 0) {
-                    // 이미 진행된 세션의 0-start 재요청 → 재사용
-                    console.log('[play] suppress new session (restart on progressed session)', musicPlayId);
-                    isInitialAttempt = false;
-                }
-                rewardInfo = activeCandidate.reward_code;
-                rewardAmount = activeCandidate.reward_amount ?? 0;
-            } else if (isInitialAttempt) {
-                // 새 시작 의도. 단, 최근(activeCandidate) 이 있고 생성 후 1초 이내라면 재사용
-                if (!musicPlayId && activeCandidate) {
-                    const rawCreated = (activeCandidate as any).created_at as Date | string | null | undefined;
-                    const createdAt = rawCreated ? new Date(rawCreated as any).getTime() : 0;
-                    if (createdAt && (nowTsInit - createdAt) < COOL_MS) {
-                        console.log('[play] reuse recent session within cooldown', activeCandidate.id);
-                        musicPlayId = activeCandidate.id;
-                        rewardInfo = activeCandidate.reward_code;
-                        rewardAmount = activeCandidate.reward_amount ?? 0;
-                    } else {
-                        await createNewSession();
-                    }
-                } else if (!musicPlayId) {
-                    await createNewSession();
-                } else {
-                    // token playId 있으나 activeCandidate 불일치 → 새로운 세션
-                    await createNewSession();
-                }
-            } else {
-                // 청크 요청 (initial 아님)
-                if (musicPlayId && activeCandidate && activeCandidate.id === musicPlayId) {
-                    rewardInfo = activeCandidate.reward_code;
-                    rewardAmount = activeCandidate.reward_amount ?? 0;
-                } else if (activeCandidate) {
-                    console.log('[play] adopt active session (no/other playId)', activeCandidate.id);
-                    musicPlayId = activeCandidate.id;
-                    rewardInfo = activeCandidate.reward_code;
-                    rewardAmount = activeCandidate.reward_amount ?? 0;
-                } else if (!musicPlayId) {
-                    // 방어: 진행 중인데 세션 식별 불가 → 생성
-                    await createNewSession();
-                }
-            }
-
-            if (!musicPlayId) {
-                // 방어
-                console.warn('[play] musicPlayId still null after logic – forcing new session');
-                await createNewSession();
             }
 
             // 5) 파일
             const filePath = join(process.cwd(), '/uploads/music/', music.file_path);
             const fileSize = statSync(filePath).size;
 
-            // 6) 토큰 재발급(조건: v1, 다른 music/company, playId 불일치)
-            if (!token || token.musicId !== music.id || token.companyId !== company.id || (token as any).v !== 2 || (token as any).playId !== musicPlayId) {
-                tokenStr = this.issueToken(music.id, company.id, musicPlayId!);
+            // 6) 토큰 재발급(불일치 시)
+            if (!token || token.musicId !== music.id || token.companyId !== company.id) {
+                tokenStr = this.issueToken(music.id, company.id);
                 token = this.fromWire(tokenStr)!;
                 res.setHeader('X-Play-Token', tokenStr);
                 res.setHeader('Set-Cookie', `pt=${encodeURIComponent(tokenStr)}; Path=/; HttpOnly; SameSite=Lax`);
-                console.log('[play] issued token v2', { playId: musicPlayId, musicId: music.id, companyId: company.id });
             }
 
             // 7) Range 없으면 합성(1MB)
@@ -235,7 +161,7 @@ export class MusicController {
             this.setNoCacheHeaders(res, tokenStr);
             return await this.handleRangeRequestStateless({
                 tokenStr, token: token!, music, companyId: company.id,
-                filePath, fileSize, range, res, musicPlayId: musicPlayId!, rewardInfo, rewardAmount
+                filePath, fileSize, range, res, musicPlayId, rewardInfo, rewardAmount
             });
         } catch (e) {
             this.setNoCacheHeaders(res);
@@ -244,7 +170,6 @@ export class MusicController {
             throw new HttpException('음원 재생 중 오류', HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-
     private setNoCacheHeaders(res: Response, tokenStr?: string) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private, max-age=0, s-maxage=0');
         res.setHeader('Pragma', 'no-cache');
@@ -258,7 +183,6 @@ export class MusicController {
             res.setHeader('ETag', `W/"pt-${tag}"`);
         }
     }
-
     // --- Range 처리 + 'pre-50 자유주행, post-50 (halfMs+skew)까지 선형 100%' ---
     private async handleRangeRequestStateless(opts: {
         tokenStr: string;
@@ -300,14 +224,10 @@ export class MusicController {
         let tStr = tokenStr;
         const now = Date.now();
         if (start === 0 && (!t || (now - t.startedAt) > this.FIRST_REQ_OLD_MS)) {
-            // 재발급하되 기존 playId (v2) 유지, v1 이면 playId 없음 → 그대로 유지 (어차피 상위 로직에서 v2 갱신됨)
-            const playId = (t as any)?.playId;
-            if (playId) {
-                tStr = this.issueToken(t.musicId ?? 0, t.companyId ?? 0, playId);
-                t = this.fromWire(tStr)!;
-                res.setHeader('X-Play-Token', tStr);
-                res.setHeader('Set-Cookie', `pt=${encodeURIComponent(tStr)}; Path=/; HttpOnly; SameSite=Lax`);
-            }
+            tStr = this.issueToken(token.musicId ?? 0, token.companyId ?? 0);
+            t = this.fromWire(tStr)!;
+            res.setHeader('X-Play-Token', tStr);
+            res.setHeader('Set-Cookie', `pt=${encodeURIComponent(tStr)}; Path=/; HttpOnly; SameSite=Lax`);
         }
 
         // 3) 공통 값
@@ -365,7 +285,7 @@ export class MusicController {
         // (예) 전체적으로 8초 빨리 끝내고 싶다면:
         let skewMs: number = -40_000;
         console.log(isSmallFile);
-        // (예) 저용량만 +12초 늦// 추고 싶다면:
+        // (예) 저용량만 +12초 늦추고 싶다면:
         if (isSmallFile) skewMs += +60_000;
         // 목표 절반 시각(조정): halfAbsAdj
         const halfAbsAdj = t.startedAt + halfMs + skewMs;
