@@ -144,7 +144,8 @@ async function main() {
 
             const isValid = Math.random() < 0.8
             const duration = isValid ? randInt(60, 240) : randInt(5, 59)
-            const rewardCode = pickEnum(rewardCodes)
+            const isCurrentUtcMonth = ts.getUTCFullYear() === now.getUTCFullYear() && ts.getUTCMonth() === now.getUTCMonth()
+            const rewardCode = (comp.grade === 'free' && isCurrentUtcMonth) ? '0' : pickEnum(rewardCodes)
             const useCase = pickEnum(useCases)
             const rewardAmount = (Math.random() * (2 - 0.01) + 0.01).toFixed(3)
             const usePrice = randInt(1, 10)
